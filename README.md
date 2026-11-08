@@ -5,6 +5,7 @@ frames become numbers (backend), and the numbers become music, live in the
 browser (frontend).
 
 ```
+AGENTS.md  rules for AI coding assistants (CLAUDE.md points to it)
 backend/   Python: NASA frames -> static JSON API     (see backend/README.md, backend/API.md)
 public/    the website: index.html, api/, frames/
 src/       engine.js: Tone.js sonifier (Scan, Planet Chord, Strict mode)
