@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earth Jukebox test</title>
+<style>
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+:focus-visible { outline:3px solid #ffbf00; outline-offset:2px; }
+body { background:#111; color:#fff; font:18px/1.5 system-ui; padding:16px; }
+button { font:inherit; min-height:44px; padding:0 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Earth Jukebox</h1>
+
+  <fieldset>
+    <legend>Choose a track</legend>
+    <label><input type="radio" name="track" value="scan" checked> Ocean Fever, scan</label>
+    <label><input type="radio" name="track" value="state"> Ocean Fever, planet chord</label>
+  </fieldset>
+
+  <button id="play">Play</button>
+  <button id="describe">Describe this moment</button>
+  <label><input id="strict" type="checkbox"> Strict data mode</label>
+
+  <p>
+    <label for="time">Time</label>
+    <input id="time" type="range" min="0" value="0" step="1">
+  </p>
+
+  <fieldset>
+    <legend>Listening cursor</legend>
+    <label for="lon">West to east</label>
+    <input id="lon" type="range" min="0" max="35" value="18">
+    <label for="lat">North to south</label>
+    <input id="lat" type="range" min="0" max="17" value="9">
+  </fieldset>
+
+  <p id="live" role="status" class="sr-only"></p>
+</main>
+<script src="bundle.js"></script>
+<script>
+(async () => {
+  // Backend API: the track list, then the first track's score (see backend/API.md).
+  const index = await (await fetch("api/tracks.json")).json();
+  const score = await (await fetch(index.tracks[0].score)).json();
+  const $ = (id) => document.getElementById(id);
+  const say = (text) => { $("live").textContent = text; };
+  const timeText = (i) => { const f = score.frames[i]; return `${f.date}, map average ${f.mean.toFixed(1)} ${score.units}`; };
+  const lonText = (c) => { const l = -180 + (Number(c) + .5) * 10; return `${Math.abs(l)} degrees ${l < 0 ? "west" : "east"}`; };
+  const latText = (r) => { const l = 90 - (Number(r) + .5) * 10; return `${Math.abs(l)} degrees ${l < 0 ? "south" : "north"}`; };
+  $("time").max = score.frames.length - 1;
+  $("time").setAttribute("aria-valuetext", timeText(0));
+  $("lon").setAttribute("aria-valuetext", lonText(18));
+  $("lat").setAttribute("aria-valuetext", latText(9));
+
+  const onFrame = (f, i) => { $("time").value = i; $("time").setAttribute("aria-valuetext", timeText(i)); window.framesSeen = (window.framesSeen || 0) + 1; };
+  let son = new EJ.Sonifier(score, { mapping: "scan", onFrame });
+  window.son = son; let playing = false;
+
+  $("play").addEventListener("click", async () => {
+    if (playing) { son.pause(); playing = false; $("play").textContent = "Play"; return; }
+    await son.play(); playing = true; $("play").textContent = "Pause";
+  });
+  $("describe").addEventListener("click", () => {
+    if (playing) { son.pause(); playing = false; $("play").textContent = "Play"; }
+    say(son.frame().text);
+  });
+  $("time").addEventListener("input", (e) => {
+    const i = Number(e.target.value); son.seek(i); e.target.setAttribute("aria-valuetext", timeText(i));
+  });
+  const probe = async () => { window.lastProbe = await son.probe(Number($("lon").value), Number($("lat").value)); say(window.lastProbe); };
+  $("lon").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", lonText(e.target.value)); probe(); });
+  $("lat").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", latText(e.target.value)); probe(); });
+  window.ready = true;
+})();
+</script>
+</body>
+</html>

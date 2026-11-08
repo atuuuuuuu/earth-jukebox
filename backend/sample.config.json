@@ -1,0 +1,41 @@
+{
+  "sample": true,
+  "out": "../public",
+  "sources": {
+    "sst": {
+      "title": "SAMPLE DATA, not from NASA: synthetic sea surface temperature anomaly maps",
+      "url": "https://svs.gsfc.nasa.gov/5176",
+      "credit": "Synthetic test maps made by backend/make_fixture.py, shaped like SVS 5176",
+      "framesDir": "../data/sample/frames",
+      "firstDate": "2024-06-01",
+      "lastDate": "2026-10-29",
+      "colorbar": "../data/sample/colorbar.jpg",
+      "range": [-4, 4],
+      "units": "degrees C",
+      "hotLine": 2,
+      "leftLon": -180
+    }
+  },
+  "tracks": [
+    {
+      "id": "a1-ocean-fever",
+      "code": "A1",
+      "title": "Ocean Fever (sample)",
+      "subtitle": "Sea surface temperature",
+      "description": "The whole ocean, one frame a month, scanned west to east. A bell rings while the Niño 3.4 box is above the El Niño line.",
+      "source": "sst",
+      "select": { "every": 6 },
+      "tuning": { "ladder": [-1, 2], "spreadMax": 3, "tenseAt": 0.25 }
+    },
+    {
+      "id": "a2-el-nino",
+      "code": "A2",
+      "title": "El Niño: then vs now (sample)",
+      "subtitle": "Same day, 2025 and 2026",
+      "description": "The first of each month in 2025, then the same day in 2026, back to back.",
+      "source": "sst",
+      "select": { "pairs": { "years": [2025, 2026], "day": 1 } },
+      "tuning": { "ladder": [-1, 2], "spreadMax": 3, "tenseAt": 0.25 }
+    }
+  ]
+}
