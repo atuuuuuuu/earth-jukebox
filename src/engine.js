@@ -140,7 +140,7 @@ export class Sonifier {
       const index = this.index;
       if (realtime) {
         if (s === 0) draw.schedule(() => { if (!this.disposed) this.onFrame(f, index); }, time);
-        draw.schedule(() => { if (!this.disposed) this.onStep(s, index); }, time);
+        draw.schedule(() => { if (!this.disposed) this.onStep(s, index, time); }, time);
       }
 
       if (s === 0) {
@@ -175,7 +175,13 @@ export class Sonifier {
             // Sequence done: go silent and tell the page once the last note has sounded.
             this.halted = true;
             this.queue = null;
-            if (realtime) draw.schedule(() => { if (!this.disposed) this.onSequenceEnd(); }, time + (60 / this.bpm) / 4);
+            // A plain timer, not Tone.Draw: Draw silently drops callbacks that run more than 0.25 s late
+            // (a background tab, or a busy page), which left the page stuck on "Stop" for good.
+            if (realtime) {
+              const token = this.seqToken;
+              const ms = Math.max(0, (time + (60 / this.bpm) / 4 - Tone.getContext().currentTime) * 1000);
+              setTimeout(() => { if (!this.disposed && this.seqToken === token) this.onSequenceEnd(); }, ms);
+            }
           } else this.index = this.queue[this.qpos];
         } else this.index = (this.index + 1) % this.score.frames.length;
       }
@@ -213,6 +219,7 @@ export class Sonifier {
 
   // Play these frames once each, in order, then stop (Hear the change: A then B).
   async playSequence(indices) {
+    this.seqToken = (this.seqToken || 0) + 1;
     this.queue = indices.map((i) => clamp(Math.round(i), 0, this.score.frames.length - 1));
     this.qpos = 0;
     this.seek(this.queue[0]);
@@ -220,7 +227,7 @@ export class Sonifier {
   }
 
   // Cancel a running sequence, so the next Play loops the track again.
-  cancelSequence() { this.queue = null; this.halted = false; }
+  cancelSequence() { this.queue = null; this.halted = false; this.seqToken = (this.seqToken || 0) + 1; }
 
   // The current output waveform, -1..1, or null before the first sound.
   waveform() { return this.wave ? this.wave.getValue() : null; }
