@@ -27,6 +27,7 @@ uniform sampler2D uEarth;
 uniform float uMix;            // crossfade between the previous and current frame
 uniform float uLeftLon;
 uniform float uStrip;          // scan strip 0..15, or -1
+uniform float uHead;           // playhead longitude, gliding through the strip being played
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
 uniform float uBell;           // 0..1, the El Niño bell glow
 uniform float uDataOn;
@@ -66,6 +67,8 @@ void main() {
     float edge = band(abs(dd - 11.25), 0.55);
     col = mix(col, col * 1.18 + 0.06, 0.55 * inside);
     col = mix(col, vec3(1.0), 0.9 * edge);
+    // Playhead: where in this strip the music is right now.
+    col = mix(col, vec3(1.0, 0.97, 0.85), 0.95 * band(lonDist(lon, uHead), 0.7));
   }
 
   // Listening cursor: one 10 degree cell.
@@ -149,6 +152,10 @@ void main() {
       this.targetYaw = null;
       this.spin = true;
       this.strip = -1;
+      this.follow = false;   // turn with the scan
+      this.clock = opts.clock || (() => performance.now() / 1000);   // the audio clock, in seconds
+      this.fps = 24;         // smooth enough, and light on older laptops
+      this.nextDraw = 0;
       this.cell = [-1, -1];
       this.bell = 0;
       this.mix = 1;
@@ -193,7 +200,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uCell", "uBell", "uDataOn"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uDataOn"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -244,6 +251,20 @@ void main() {
     }
 
     ringBell() { this.bell = 1; }
+    // The music reached strip s at audio time `at` (seconds on this.clock); it lasts `seconds`.
+    // The playhead glides through it on the audio clock, so it matches what you hear even if frames bunch up.
+    step(s, seconds, at) {
+      this.strip = s;
+      this.stepDur = seconds;
+      this.stepAt = typeof at === "number" ? at : this.clock();
+    }
+    // Playhead position in strips (0..16), or -1 when nothing is being scanned.
+    head() {
+      if (this.strip < 0) return -1;
+      if (this.reduced.matches || !this.stepDur) return this.strip + 0.5;
+      // Up to two strips ahead: if the page stalls and a step callback is dropped, keep following the audio.
+      return this.strip + clamp((this.clock() - this.stepAt) / this.stepDur, 0, 2);
+    }
     lookAt(lon, lat) {
       this.targetYaw = lon;
       if (typeof lat === "number") this.targetTilt = clamp(lat, -60, 60);
@@ -306,11 +327,24 @@ void main() {
 
     loop(now) {
       this.raf = requestAnimationFrame(this.loop);
+      if (document.hidden) { this.last = now; return; }
+      // Draw at about this.fps, whatever the screen's refresh rate.
+      if (now + 3 < this.nextDraw) return;
+      const frameMs = 1000 / this.fps;
+      this.nextDraw = this.nextDraw + frameMs < now ? now + frameMs : this.nextDraw + frameMs;
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
-      if (document.hidden) return;
       const still = this.reduced.matches;
-      if (this.targetYaw !== null && this.targetYaw !== undefined) {
+      const h = this.head();
+      this.headPos = h;
+      this.headLon = h < 0 ? 999 : this.leftLon + h * 22.5;
+      if (this.follow && h >= 0) {
+        // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
+        const diff = wrap(this.headLon - this.yaw);
+        const moving = !still && h < this.strip + 2 ? 22.5 / this.stepDur : 0;
+        this.yaw = still ? wrap(this.headLon) : wrap(this.yaw + moving * dt + diff * Math.min(1, dt * 5));
+        this.targetYaw = this.yaw;   // stay here when the music stops
+      } else if (this.targetYaw !== null && this.targetYaw !== undefined) {
         const diff = wrap(this.targetYaw - this.yaw);
         this.yaw = wrap(this.yaw + (still ? diff : diff * Math.min(1, dt * 4)));
         if (Math.abs(diff) < 0.05) this.yaw = this.targetYaw;
@@ -345,7 +379,9 @@ void main() {
       gl.uniformMatrix3fv(this.u.uRot, false, new Float32Array(R));
       gl.uniform1f(this.u.uMix, this.mix);
       gl.uniform1f(this.u.uLeftLon, this.leftLon);
-      gl.uniform1f(this.u.uStrip, this.strip);
+      // The lit strip is the one under the playhead (the same as this.strip unless a step callback was dropped).
+      gl.uniform1f(this.u.uStrip, this.strip < 0 ? -1 : Math.floor(this.headPos) % 16);
+      gl.uniform1f(this.u.uHead, this.headLon === undefined ? 999 : this.headLon);
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
       gl.uniform1f(this.u.uBell, this.bell);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);

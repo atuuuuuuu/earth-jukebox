@@ -129,7 +129,7 @@
     return frameImgs.get(src);
   };
   try {
-    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit) });
+    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
     window.globe = globe;
     earthImg.onload = () => globe.setEarth(earthImg);
     earthImg.src = "textures/blue-marble.jpg";
@@ -331,13 +331,13 @@
   };
   // i is the frame this step belongs to. son.frame() can already be the next frame here:
   // the engine schedules ahead, so at step 15 it has moved on before this callback runs.
-  const onStep = (s, i) => {
+  const onStep = (s, i, time) => {
     placeMarker(s);
     const scan = settings.mapping === "scan";
     lightBar(scan ? s : -1);
     if (globe) {
-      globe.strip = scan ? s : -1;
-      if (scan && $("follow").checked) globe.lookAt(wrapLon(stripLon(s)));
+      if (scan) globe.step(s, 60 / settings.bpm / 4, time); else globe.strip = -1;
+      globe.follow = scan && $("follow").checked;
     }
     updateSignal(score.frames[i], s);
   };
