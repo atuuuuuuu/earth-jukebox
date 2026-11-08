@@ -3,77 +3,516 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Earth Jukebox test</title>
+<title>Earth Jukebox: NASA ocean temperature as music</title>
+<meta name="description" content="Listen to NASA's sea surface temperature data. An accessible sonification for NASA Space Apps 2026.">
 <style>
-.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-:focus-visible { outline:3px solid #ffbf00; outline-offset:2px; }
-body { background:#111; color:#fff; font:18px/1.5 system-ui; padding:16px; }
-button { font:inherit; min-height:44px; padding:0 20px; }
+:root {
+  --bg: #0b1220;
+  --panel: #131c2e;
+  --panel-2: #1a2540;
+  --line: #34446a;
+  --text: #f2f4f8;
+  --muted: #b8c2d6;
+  --accent: #ffb547;
+  --accent-ink: #1b1204;
+  --cold: #5aa9ff;
+  --warm: #ff7a45;
+  --focus: #ffbf00;
+  --radius: 14px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 18px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: #9fd0ff; }
+a:hover { color: #cfe7ff; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.skip {
+  position: absolute; left: 16px; top: -100px; z-index: 10;
+  background: var(--accent); color: var(--accent-ink); padding: 10px 16px; border-radius: 8px;
+  font-weight: 700; text-decoration: none;
+}
+.skip:focus { top: 12px; }
+
+/* Header: a stripe that echoes the cold-to-warm colour bar. */
+header { padding: 28px 16px 8px; max-width: 1280px; margin: 0 auto; }
+header::before {
+  content: ""; display: block; height: 6px; border-radius: 3px; margin-bottom: 20px;
+  background: linear-gradient(90deg, #1b4fa0, #5aa9ff, #e9e2cf, #ffb06a, #b33a12, #5a1406);
+}
+h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1.05; letter-spacing: -0.02em; }
+.tag { margin: 8px 0 0; color: var(--muted); max-width: 60ch; }
+.note {
+  display: inline-block; margin: 12px 0 0; padding: 6px 12px; border-radius: 8px;
+  background: #3a2a00; color: #ffe2a3; border: 1px solid #8a6400; font-weight: 600;
+}
+
+main {
+  max-width: 1280px; margin: 0 auto; padding: 16px; display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  main {
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+    grid-template-areas: "player map" "player cursor" "player settings";
+    align-items: start;
+  }
+  #player { grid-area: player; }
+  #map-panel { grid-area: map; }
+  #cursor-panel { grid-area: cursor; }
+  #settings-panel { grid-area: settings; }
+}
+
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 16px; padding: 10px 12px 12px; min-width: 0; }
+legend { padding: 0 6px; font-weight: 700; }
+.hint { color: var(--muted); font-size: 0.9rem; margin: 4px 0 0; }
+
+/* Track list: jukebox selector cards. Native radios, whole card clickable. */
+.tracks { display: grid; gap: 10px; }
+.track {
+  position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center;
+  background: var(--panel-2); border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; min-height: 64px;
+}
+.track:has(input:checked) { border-color: var(--accent); background: #24304f; }
+.track input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); grid-row: span 2; }
+.track label { font-weight: 700; cursor: pointer; }
+.track label::after { content: ""; position: absolute; inset: 0; }
+.track .code {
+  display: inline-block; font: 700 0.85rem/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--accent); color: var(--accent-ink); padding: 5px 7px; border-radius: 6px; margin-right: 6px; vertical-align: 2px;
+}
+.track .sub { color: var(--muted); font-size: 0.9rem; margin: 0; grid-column: 2; }
+.about { color: var(--muted); font-size: 0.95rem; margin: -6px 0 16px; }
+
+.opts { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.opts label, .check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.opts input, .check input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+
+button {
+  font: inherit; font-weight: 700; min-height: 44px; padding: 0 20px; border-radius: 10px; cursor: pointer;
+  background: var(--panel-2); color: var(--text); border: 2px solid var(--line);
+}
+button:hover { border-color: var(--muted); }
+button:disabled { opacity: 0.6; cursor: progress; }
+#play {
+  width: 100%; min-height: 64px; font-size: 1.3rem; margin-bottom: 14px;
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+#play::before { content: "\25B6"; margin-right: 10px; font-size: 0.9em; }
+#play[data-state="playing"]::before { content: "\275A\275A"; letter-spacing: -2px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.row button { flex: 1 1 140px; }
+
+.slider { margin: 0 0 16px; }
+.slider label { display: block; font-weight: 700; }
+.slider output { display: block; color: var(--muted); font-size: 0.95rem; }
+input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+.readout {
+  min-height: 3em; margin: 0; padding: 12px 14px; border-radius: 10px; background: #0e1626; border: 1px dashed var(--line);
+  font-size: 0.98rem; white-space: pre-line;
+}
+.readout:empty::before { content: "Press Describe or Key to hear what is going on."; color: var(--muted); }
+
+/* The map. Keeps its 2:1 shape at every width. */
+figure { margin: 0; }
+.frame { position: relative; aspect-ratio: 2 / 1; background: #2a2f38; border-radius: 10px; overflow: hidden; }
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#marker {
+  position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; left: 3.125%;
+  background: #fff; box-shadow: 0 0 0 1px #000, 0 0 12px 2px rgba(255, 255, 255, 0.55);
+}
+#cursor-box {
+  position: absolute; border: 2px solid #fff; outline: 2px solid #000; border-radius: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #marker { transition: left 90ms linear; }
+}
+figcaption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 12px; }
+.date { font-size: clamp(1.6rem, 4.5vw, 2.4rem); font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+.badge {
+  font-weight: 800; padding: 4px 10px; border-radius: 999px; border: 2px solid; font-size: 1rem;
+}
+.badge.then { color: #bfe0ff; border-color: var(--cold); }
+.badge.now { color: #ffd2bd; border-color: var(--warm); }
+.stats { color: var(--muted); width: 100%; margin: 0; }
+.legend { margin-top: 12px; font-size: 0.9rem; color: var(--muted); }
+.legend .bar {
+  height: 12px; border-radius: 6px; margin: 4px 0;
+  background: linear-gradient(90deg, #0b3d91, #3d8bff, #a9d2ff, #f4ead8, #ffc28a, #e0662a, #8a1f05, #3d0802);
+}
+.legend .ticks { display: flex; justify-content: space-between; }
+
+footer { max-width: 1280px; margin: 0 auto; padding: 8px 16px 40px; color: var(--muted); font-size: 0.92rem; }
+footer p { margin: 6px 0; }
 </style>
 </head>
 <body>
-<main>
+<a class="skip" href="#player">Skip to the player</a>
+
+<header>
   <h1>Earth Jukebox</h1>
+  <p class="tag">NASA's sea surface temperature, played as music. Warmer than normal sounds higher. Listen with headphones: the ocean moves from your left ear (west) to your right (east).</p>
+  <p id="sample-note" class="note" hidden>Sample data, not from NASA</p>
+</header>
 
-  <fieldset>
-    <legend>Choose a track</legend>
-    <label><input type="radio" name="track" value="scan" checked> Ocean Fever, scan</label>
-    <label><input type="radio" name="track" value="state"> Ocean Fever, planet chord</label>
-  </fieldset>
+<main>
+  <section id="player" class="panel" aria-labelledby="player-h" tabindex="-1">
+    <h2 id="player-h">Player</h2>
 
-  <button id="play">Play</button>
-  <button id="describe">Describe this moment</button>
-  <label><input id="strict" type="checkbox"> Strict data mode</label>
+    <fieldset>
+      <legend>Choose a track</legend>
+      <div id="track-list" class="tracks"><p class="hint">Loading tracks…</p></div>
+    </fieldset>
+    <p id="track-about" class="about"></p>
 
-  <p>
-    <label for="time">Time</label>
-    <input id="time" type="range" min="0" value="0" step="1">
-  </p>
+    <button id="play" type="button" data-state="paused">Play</button>
 
-  <fieldset>
-    <legend>Listening cursor</legend>
-    <label for="lon">West to east</label>
-    <input id="lon" type="range" min="0" max="35" value="18">
-    <label for="lat">North to south</label>
-    <input id="lat" type="range" min="0" max="17" value="9">
-  </fieldset>
+    <div class="slider">
+      <label for="time">Time</label>
+      <input id="time" type="range" min="0" max="0" value="0" step="1">
+      <output id="time-out" for="time" aria-hidden="true"></output>
+    </div>
 
-  <p id="live" role="status" class="sr-only"></p>
+    <fieldset>
+      <legend>Sound</legend>
+      <div class="opts">
+        <label><input type="radio" name="mapping" value="scan" checked> Scan</label>
+        <label><input type="radio" name="mapping" value="state"> Planet Chord</label>
+      </div>
+      <label class="check"><input id="strict" type="checkbox" aria-describedby="strict-hint"> Strict data mode</label>
+      <p id="strict-hint" class="hint">Strict: plain tones on a continuous pitch, no musical scale or reverb.</p>
+    </fieldset>
+
+    <div class="row">
+      <button id="describe" type="button">Describe this moment</button>
+      <button id="key" type="button">Key</button>
+    </div>
+
+    <p id="live" role="status" class="readout"></p>
+  </section>
+
+  <section id="map-panel" class="panel" aria-labelledby="map-h">
+    <h2 id="map-h">Map</h2>
+    <figure>
+      <div class="frame">
+        <img id="map-img" alt="" width="1024" height="512">
+        <div id="marker" aria-hidden="true"></div>
+        <div id="cursor-box" aria-hidden="true"></div>
+      </div>
+      <figcaption>
+        <span id="date" class="date"></span>
+        <span id="badge" class="badge" hidden></span>
+        <p id="stats" class="stats"></p>
+      </figcaption>
+    </figure>
+    <div class="legend">
+      <span id="legend-title">Colour: blue is colder than normal, red is warmer. Grey is land.</span>
+      <div class="bar" aria-hidden="true"></div>
+      <div class="ticks" aria-hidden="true"><span id="leg-lo"></span><span>0</span><span id="leg-hi"></span></div>
+    </div>
+  </section>
+
+  <section id="cursor-panel" class="panel" aria-labelledby="cursor-h">
+    <h2 id="cursor-h">Listening cursor</h2>
+    <fieldset>
+      <legend>Listen to one spot</legend>
+      <p class="hint" id="cursor-hint">Each move plays one 10 degree square of the current map and says its temperature.</p>
+      <div class="slider">
+        <label for="lon">West to east</label>
+        <input id="lon" type="range" min="0" max="35" value="18" step="1" aria-describedby="cursor-hint">
+      </div>
+      <div class="slider">
+        <label for="lat">North to south</label>
+        <input id="lat" type="range" min="0" max="17" value="9" step="1">
+      </div>
+    </fieldset>
+  </section>
+
+  <section id="settings-panel" class="panel" aria-labelledby="settings-h">
+    <h2 id="settings-h">Settings</h2>
+    <fieldset>
+      <legend>Settings</legend>
+      <fieldset>
+        <legend>Speed</legend>
+        <div class="opts">
+          <label><input type="radio" name="speed" value="42"> Half</label>
+          <label><input type="radio" name="speed" value="84" checked> Normal</label>
+          <label><input type="radio" name="speed" value="168"> Double</label>
+        </div>
+      </fieldset>
+      <div class="slider">
+        <label for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="100" value="100" step="5" aria-valuetext="100 percent">
+      </div>
+      <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
+      <p id="mono-hint" class="hint">Keeps every sound in the centre, for one earbud or hearing in one ear.</p>
+      <div class="row" style="margin: 12px 0 0">
+        <button id="save" type="button" aria-describedby="save-hint">Save as WAV</button>
+      </div>
+      <p id="save-hint" class="hint">Saves one full pass of this track and sound mode as an audio file.</p>
+    </fieldset>
+  </section>
 </main>
+
+<footer>
+  <p id="credits"></p>
+  <p>Made for NASA Space Apps 2026. Not an official NASA product. Sound synthesised live with <a href="https://tonejs.github.io/">Tone.js</a>. Built with help from Claude, an AI assistant by Anthropic.</p>
+</footer>
+
 <script src="bundle.js"></script>
 <script>
 (async () => {
-  // Backend API: the track list, then the first track's score (see backend/API.md).
-  const index = await (await fetch("api/tracks.json")).json();
-  const score = await (await fetch(index.tracks[0].score)).json();
   const $ = (id) => document.getElementById(id);
-  const say = (text) => { $("live").textContent = text; };
-  const timeText = (i) => { const f = score.frames[i]; return `${f.date}, map average ${f.mean.toFixed(1)} ${score.units}`; };
-  const lonText = (c) => { const l = -180 + (Number(c) + .5) * 10; return `${Math.abs(l)} degrees ${l < 0 ? "west" : "east"}`; };
-  const latText = (r) => { const l = 90 - (Number(r) + .5) * 10; return `${Math.abs(l)} degrees ${l < 0 ? "south" : "north"}`; };
-  $("time").max = score.frames.length - 1;
-  $("time").setAttribute("aria-valuetext", timeText(0));
-  $("lon").setAttribute("aria-valuetext", lonText(18));
-  $("lat").setAttribute("aria-valuetext", latText(9));
+  const live = $("live");
 
-  const onFrame = (f, i) => { $("time").value = i; $("time").setAttribute("aria-valuetext", timeText(i)); window.framesSeen = (window.framesSeen || 0) + 1; };
-  let son = new EJ.Sonifier(score, { mapping: "scan", onFrame });
-  window.son = son; let playing = false;
+  // The live region speaks only when the listener acts. Clearing first makes repeats speak again.
+  let sayTimer;
+  const say = (text) => {
+    clearTimeout(sayTimer);
+    live.textContent = "";
+    sayTimer = setTimeout(() => { live.textContent = text; }, 50);
+  };
+
+  // Backend API: the track list, then the chosen track's score (see backend/API.md).
+  let index;
+  try {
+    index = await (await fetch("api/tracks.json")).json();
+  } catch (e) {
+    $("track-list").innerHTML = "";
+    say("Could not load the tracks. Open the page through a web server, for example npm run serve, not as a file.");
+    throw e;
+  }
+  const scores = new Map();
+  const getScore = async (track) => {
+    if (!scores.has(track.id)) scores.set(track.id, fetch(track.score).then((r) => r.json()));
+    return scores.get(track.id);
+  };
+
+  $("sample-note").hidden = !index.sample;
+
+  // Footer credits: one line per distinct source.
+  const credits = $("credits");
+  const seen = new Set();
+  for (const t of index.tracks) {
+    if (!t.source || seen.has(t.source.url)) continue;
+    seen.add(t.source.url);
+    const line = document.createElement("span");
+    const a = document.createElement("a");
+    a.href = t.source.url; a.textContent = t.source.title;
+    line.append("Source: ", a, `. ${t.source.credit}.`);
+    if (credits.childNodes.length) credits.append(document.createElement("br"));
+    credits.append(line);
+  }
+
+  // Track list, built from the data.
+  const list = $("track-list");
+  list.innerHTML = "";
+  index.tracks.forEach((t, i) => {
+    const id = `track-${t.id}`;
+    const div = document.createElement("div");
+    div.className = "track";
+    div.innerHTML = `<input type="radio" name="track"><label><span class="code"></span><span class="title"></span></label><p class="sub"></p>`;
+    const input = div.querySelector("input");
+    input.id = id; input.value = t.id; input.checked = i === 0;
+    input.setAttribute("aria-describedby", `${id}-sub`);
+    div.querySelector("label").htmlFor = id;
+    div.querySelector(".code").textContent = t.code;
+    div.querySelector(".title").textContent = t.title;
+    const sub = div.querySelector(".sub");
+    sub.id = `${id}-sub`; sub.textContent = t.subtitle;
+    list.append(div);
+  });
+
+  // Player state. Settings live here so they survive track changes and Strict toggles.
+  const settings = { mapping: "scan", strict: false, bpm: EJ.TEMPO, volume: 100, mono: false };
+  let track = index.tracks[0];
+  let score = await getScore(track);
+  let son = null;
+  let playing = false;
+  let gen = 0;
+
+  const signed = (v) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(1)}`;
+  const niceDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const lonOf = (c) => { const l = (((score.leftLon ?? -180) + (Number(c) + 0.5) * 10 + 540) % 360) - 180; return l; };
+  const lonText = (c) => { const l = lonOf(c); return `${Math.abs(l)} degrees ${l < 0 ? "west" : "east"}`; };
+  const latText = (r) => { const l = 90 - (Number(r) + 0.5) * 10; return `${Math.abs(l)} degrees ${l < 0 ? "south" : "north"}`; };
+  const timeText = (i) => {
+    const f = score.frames[i];
+    const avg = f.mean === null ? "no data" : `map average ${signed(f.mean)} ${score.units}`;
+    return `${f.date}${f.label ? ` (${f.label})` : ""}, ${avg}. Moment ${i + 1} of ${score.frames.length}`;
+  };
+
+  // Map panel.
+  const img = $("map-img"), marker = $("marker"), box = $("cursor-box");
+  const preload = [];
+  const showFrame = (i) => {
+    const f = score.frames[i];
+    if (img.getAttribute("src") !== f.image) img.src = f.image;
+    img.alt = `Sea surface temperature anomaly map, ${f.date}`;
+    $("date").textContent = niceDate(f.date);
+    const badge = $("badge");
+    if (f.label) {
+      const then = son && f.label === son.thenLabel;
+      badge.hidden = false;
+      badge.textContent = `${then ? "Then" : "Now"}: ${f.label}`;
+      badge.className = `badge ${then ? "then" : "now"}`;
+    } else badge.hidden = true;
+    const nino = typeof f.nino34Relative === "number" && f.nino34Relative > score.ninoLine;
+    $("stats").textContent = `${f.mean === null ? "No data" : `Map average ${signed(f.mean)} ${score.units}`}${nino ? ". El Niño bell: on" : ""}`;
+    // Preload the next frame so the map never flashes.
+    const next = score.frames[(i + 1) % score.frames.length];
+    const p = new Image(); p.src = next.image; preload.splice(0, preload.length, p);
+  };
+  const placeMarker = (step) => {
+    marker.style.left = `${((step + 0.5) / EJ.STEPS) * 100}%`;
+  };
+  const showMarker = () => { marker.hidden = settings.mapping !== "scan"; };
+  const placeBox = () => {
+    const c = Number($("lon").value), r = Number($("lat").value);
+    Object.assign(box.style, { left: `${(c / 36) * 100}%`, top: `${(r / 18) * 100}%`, width: `${100 / 36}%`, height: `${100 / 18}%` });
+  };
+
+  const setTime = (i) => {
+    $("time").value = i;
+    const text = timeText(i);
+    $("time").setAttribute("aria-valuetext", text);
+    $("time-out").textContent = text;
+  };
+
+  const onFrame = (f, i) => {
+    setTime(i);
+    showFrame(i);
+    window.framesSeen = (window.framesSeen || 0) + 1;
+  };
+  const onStep = (s) => placeMarker(s);
+
+  const setPlayButton = () => {
+    $("play").textContent = playing ? "Pause" : "Play";
+    $("play").dataset.state = playing ? "playing" : "paused";
+  };
+
+  // Build a fresh Sonifier. The old one is disposed first, so notes never double.
+  const rebuild = async (startIndex) => {
+    const mine = ++gen;
+    if (son) son.dispose();
+    son = new EJ.Sonifier(score, { ...settings, startIndex, onFrame, onStep });
+    window.son = son;
+    setTime(son.index);
+    showFrame(son.index);
+    placeMarker(0);
+    if (playing) {
+      const ok = await son.play();
+      if (mine !== gen) return;
+      if (!ok) { playing = false; setPlayButton(); }
+    }
+  };
+
+  const loadTrack = async (id) => {
+    const t = index.tracks.find((x) => x.id === id);
+    const s = await getScore(t);
+    if (t !== index.tracks.find((x) => x.id === document.querySelector('input[name="track"]:checked').value)) return;
+    track = t; score = s;
+    $("track-about").textContent = t.description || "";
+    $("time").max = score.frames.length - 1;
+    $("leg-lo").textContent = `${signed(score.range[0])} ${score.units}`;
+    $("leg-hi").textContent = `${signed(score.range[1])} ${score.units}`;
+    await rebuild(0);
+  };
+
+  list.addEventListener("change", async (e) => {
+    if (e.target.name !== "track") return;
+    await loadTrack(e.target.value);
+    say(`${playing ? "Now playing" : "Selected"} ${track.code} ${track.title}.${playing ? "" : " Press Play to listen."}`);
+  });
 
   $("play").addEventListener("click", async () => {
-    if (playing) { son.pause(); playing = false; $("play").textContent = "Play"; return; }
-    await son.play(); playing = true; $("play").textContent = "Pause";
+    if (playing) { son.pause(); playing = false; setPlayButton(); return; }
+    playing = true; setPlayButton();
+    const mine = son;
+    const ok = await son.play();
+    if (!ok && mine === son) { playing = false; setPlayButton(); }
   });
-  $("describe").addEventListener("click", () => {
-    if (playing) { son.pause(); playing = false; $("play").textContent = "Play"; }
-    say(son.frame().text);
-  });
+
+  const stopForSpeech = () => { if (playing) { son.pause(); playing = false; setPlayButton(); } };
+  $("describe").addEventListener("click", () => { stopForSpeech(); say(son.frame().text); });
+  $("key").addEventListener("click", () => { stopForSpeech(); say(EJ.keyText(score)); });
+
   $("time").addEventListener("input", (e) => {
-    const i = Number(e.target.value); son.seek(i); e.target.setAttribute("aria-valuetext", timeText(i));
+    const i = Number(e.target.value);
+    son.seek(i); setTime(i); showFrame(i); placeMarker(0);
   });
-  const probe = async () => { window.lastProbe = await son.probe(Number($("lon").value), Number($("lat").value)); say(window.lastProbe); };
+
+  document.querySelectorAll('input[name="mapping"]').forEach((r) => r.addEventListener("change", (e) => {
+    settings.mapping = e.target.value;
+    son.mapping = settings.mapping;   // read live on every step: no restart
+    showMarker();
+  }));
+  $("strict").addEventListener("change", (e) => {
+    settings.strict = e.target.checked;
+    rebuild(son.index);               // Strict rewires the synths, so it needs a new Sonifier
+  });
+
+  const probe = async () => {
+    placeBox();
+    const c = $("lon").value, r = $("lat").value;
+    const value = await son.probe(Number(c), Number(r));
+    window.lastProbe = value;
+    if (value) say(`${lonText(c)}, ${latText(r)}: ${value}`);
+  };
   $("lon").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", lonText(e.target.value)); probe(); });
   $("lat").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", latText(e.target.value)); probe(); });
+
+  document.querySelectorAll('input[name="speed"]').forEach((r) => r.addEventListener("change", (e) => {
+    settings.bpm = Number(e.target.value);
+    son.setTempo(settings.bpm);
+  }));
+  $("volume").addEventListener("input", (e) => {
+    settings.volume = Number(e.target.value);
+    e.target.setAttribute("aria-valuetext", `${settings.volume} percent`);
+    son.setVolume(settings.volume);
+  });
+  $("mono").addEventListener("change", (e) => {
+    settings.mono = e.target.checked;
+    son.setMono(settings.mono);
+  });
+
+  $("save").addEventListener("click", async () => {
+    const btn = $("save");
+    stopForSpeech();
+    btn.disabled = true;
+    const seconds = Math.min(180, EJ.passSeconds(score, settings.bpm));
+    const name = `${track.id}-${settings.mapping}.wav`;
+    say(`Rendering ${track.code} ${track.title}, ${Math.round(seconds)} seconds of audio. This takes a few seconds.`);
+    try {
+      const buffer = await EJ.renderOffline(score, { ...settings }, seconds);
+      const url = URL.createObjectURL(EJ.toWav(buffer));
+      const a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      say(`Saved ${name}.`);
+    } catch (err) {
+      say(`Could not save the audio: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Start-up state.
+  $("lon").setAttribute("aria-valuetext", lonText($("lon").value));
+  $("lat").setAttribute("aria-valuetext", latText($("lat").value));
+  placeBox();
+  showMarker();
+  await loadTrack(track.id);
   window.ready = true;
 })();
 </script>
