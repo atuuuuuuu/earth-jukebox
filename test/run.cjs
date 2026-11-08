@@ -5,11 +5,13 @@ const axeSource = fs.readFileSync(path.join(__dirname, "../node_modules/axe-core
 const root = path.join(__dirname, "../public");
 const server = http.createServer((q, r) => {
   const f = path.join(root, q.url === "/" ? "index.html" : q.url.split("?")[0]);
-  fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { "Content-Type": f.endsWith(".html") ? "text/html" : f.endsWith(".js") ? "text/javascript" : "application/json" }); r.end(d); });
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg" };
+  fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); r.end(d); });
 }).listen(8123);
 
 (async () => {
-  const browser = await chromium.launch({ args: ["--autoplay-policy=user-gesture-required"] });
+  // SwiftShader gives headless Chromium WebGL, so the globe is tested too.
+  const browser = await chromium.launch({ args: ["--autoplay-policy=user-gesture-required", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -17,7 +19,7 @@ const server = http.createServer((q, r) => {
   await page.goto("http://localhost:8123/");
   await page.waitForFunction("window.ready === true");
 
-  console.log("context before gesture:", await page.evaluate("EJ.Tone.getContext().state"));
+  console.log("context before gesture:", await page.evaluate("EJ.Tone.getContext().state"), "| globe:", await page.evaluate("window.globeReady ? 'WebGL' : 'flat map fallback'"));
 
   // Keyboard only: tab until the Play button has focus, then press Space.
   for (let i = 0; i < 12; i++) {
@@ -48,6 +50,20 @@ const server = http.createServer((q, r) => {
   await page.evaluate("document.getElementById('lon').value = 5; document.getElementById('lon').dispatchEvent(new Event('input', {bubbles:true}))");
   await page.waitForTimeout(200);
   console.log("cursor over ocean:", await page.getAttribute("#lon", "aria-valuetext"), "->", await page.evaluate("window.lastProbe"));
+
+  // Tap the middle of the globe: it should play and name that spot.
+  if (await page.evaluate("window.globeReady")) {
+    await page.evaluate("window.scrollTo(0, 0)");
+    const g = await page.locator("#globe").boundingBox();
+    await page.mouse.click(g.x + g.width / 2, g.y + g.height / 2);
+    await page.waitForTimeout(300);
+    console.log("globe tap:", await page.textContent("#live"));
+  }
+
+  // Hear the change: plays A then B once, then stops by itself.
+  await page.click("#cmp-play");
+  await page.waitForFunction("document.getElementById('cmp-play').textContent.startsWith('Play')", null, { timeout: 20000 });
+  console.log("hear the change finished:", await page.evaluate("EJ.Tone.getTransport().state"), "| waveform samples:", await page.evaluate("(son.waveform() || []).length"));
 
   // Time slider by arrow key.
   await page.focus("#time");

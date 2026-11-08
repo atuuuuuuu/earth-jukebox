@@ -6,7 +6,7 @@ browser (the frontend, which you are building).
 
 ## Layout
 
-- `public/` the website: `index.html`, `bundle.js` (built), `api/`, `frames/`
+- `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built), `textures/` (NASA Blue Marble), `api/`, `frames/`
 - `src/engine.js` the Tone.js sonifier. `npm run build` bundles it into `public/bundle.js` as the global `EJ`
 - `backend/` Python that builds `public/api` and `public/frames`. `backend/API.md` is the contract
 - `test/run.cjs` browser test: keyboard play, audio level, accessibility (axe)
@@ -39,7 +39,8 @@ Read `backend/API.md` before writing any code that touches data.
 - One Tone transport. Before building a new `Sonifier` (new track, Strict mode), stop and clear the old one: `Tone.getTransport().stop()`, `Tone.getTransport().cancel()`, dispose its nodes. Otherwise every note plays twice.
 - Accessibility is the point of the project: native controls (`button`, `input type="range"`, `fieldset` + `legend`), everything works with the keyboard alone, sliders carry `aria-valuetext`, one `role="status"` live region that speaks only when asked, visible focus, touch targets at least 44 px, works at 375 px wide.
 - The site must run as static files on GitHub Pages: relative paths only.
-- Keep the hooks the browser test uses: ids `play`, `describe`, `live`, `time`, `lon`, `lat`, and `window.ready`, `window.framesSeen`, `window.lastProbe`, global `EJ`. If you must change one, update `test/run.cjs` in the same change.
+- The globe is never decoration: everything it shows (scan strip, cursor cell, Niño 3.4 box, bell) must come from the score, and the same information must be available without it (flat map, text, sound). Never fake or estimate a value for display.
+- Keep the hooks the browser test uses: ids `play`, `describe`, `live`, `time`, `lon`, `lat`, `globe`, `cmp-play`, and `window.ready`, `window.framesSeen`, `window.lastProbe`, `window.globeReady`, global `EJ`. If you must change one, update `test/run.cjs` in the same change.
 
 ## Check before saying done
 

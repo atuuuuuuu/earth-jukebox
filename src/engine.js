@@ -29,9 +29,12 @@ const gainFor = (volume) => 1.7 * (clamp(volume / 100)) ** 2;
 export class Sonifier {
   constructor(score, {
     mapping = "scan", strict = false, bpm = TEMPO, volume = 100, mono = false, startIndex = 0,
-    onFrame = () => {}, onStep = () => {},
+    onFrame = () => {}, onStep = () => {}, onSequenceEnd = () => {},
   } = {}) {
-    Object.assign(this, { score, mapping, strict, bpm, volume, mono, onFrame, onStep, index: 0, step: 0 });
+    Object.assign(this, { score, mapping, strict, bpm, volume, mono, onFrame, onStep, onSequenceEnd, index: 0, step: 0 });
+    // Optional play-once list of frame indices (Hear the change). null = loop the whole track.
+    this.queue = null;
+    this.halted = false;
     this.span = score.range[1] - score.range[0];
     // Track settings. Set them once per track and publish them with the method.
     this.tune = { ladder: [-1, 2], spreadMax: 3, tenseAt: 0.25, ...score.tuning };
@@ -68,6 +71,11 @@ export class Sonifier {
     // The limiter stays last in the chain, so nothing (the bell included) can clip.
     const limiter = keep(new Tone.Limiter(-3).toDestination());
     this.master = keep(new Tone.Gain(gainFor(this.volume)).connect(limiter));
+    // A tap on the final mix for the on-screen waveform. Live only; it changes nothing you hear.
+    if (realtime) {
+      this.wave = keep(new Tone.Waveform(512));
+      limiter.connect(this.wave);
+    }
     let out = this.master;
     if (!this.strict) {
       const reverb = keep(new Tone.Reverb({ decay: 4, wet: 0.25 }).connect(this.master));
@@ -126,6 +134,7 @@ export class Sonifier {
 
     const draw = Tone.getDraw();
     transport.scheduleRepeat((time) => {
+      if (this.halted) return;
       const f = this.frame();
       const s = this.step;
       const index = this.index;
@@ -159,7 +168,17 @@ export class Sonifier {
       }
 
       this.step = (s + 1) % STEPS;
-      if (this.step === 0) this.index = (this.index + 1) % this.score.frames.length;
+      if (this.step === 0) {
+        if (this.queue) {
+          this.qpos += 1;
+          if (this.qpos >= this.queue.length) {
+            // Sequence done: go silent and tell the page once the last note has sounded.
+            this.halted = true;
+            this.queue = null;
+            if (realtime) draw.schedule(() => { if (!this.disposed) this.onSequenceEnd(); }, time + (60 / this.bpm) / 4);
+          } else this.index = this.queue[this.qpos];
+        } else this.index = (this.index + 1) % this.score.frames.length;
+      }
     }, "16n");
     return true;
   }
@@ -172,6 +191,7 @@ export class Sonifier {
 
   // Live playback. Call this only from a click or key press.
   async play() {
+    this.halted = false;
     await Tone.start();
     if (this.disposed) return false;
     if (!(await this.ensureWired()) || this.disposed) return false;
@@ -183,11 +203,27 @@ export class Sonifier {
 
   pause() {
     Tone.getTransport().pause();
+    // Drop visuals already queued in the look-ahead, so a bar or strip never relights after pause.
+    Tone.getDraw().cancel(Tone.now());
     if (this.drone) this.drone.triggerRelease(Tone.now());
     this.playing = false;
   }
 
   seek(i) { this.index = clamp(Math.round(i), 0, this.score.frames.length - 1); this.step = 0; }
+
+  // Play these frames once each, in order, then stop (Hear the change: A then B).
+  async playSequence(indices) {
+    this.queue = indices.map((i) => clamp(Math.round(i), 0, this.score.frames.length - 1));
+    this.qpos = 0;
+    this.seek(this.queue[0]);
+    return this.play();
+  }
+
+  // Cancel a running sequence, so the next Play loops the track again.
+  cancelSequence() { this.queue = null; this.halted = false; }
+
+  // The current output waveform, -1..1, or null before the first sound.
+  waveform() { return this.wave ? this.wave.getValue() : null; }
 
   // Live settings. They apply within one step; pass them to the next Sonifier too.
   setTempo(bpm) { this.bpm = bpm; Tone.getTransport().bpm.value = bpm; }
@@ -208,7 +244,7 @@ export class Sonifier {
     if (v === null) return "Land or no data";
     this.pan.pan.rampTo(this.panFor(-1 + (2 * (col + 0.5)) / 36), 0.02);
     this.lead.triggerAttackRelease(this.pitch(v, this.frame()), "8n");
-    return `${v > 0 ? "+" : ""}${v.toFixed(1)} ${this.score.units}`;
+    return `${signed(v)} ${this.score.units}`;
   }
 
   free() {
@@ -230,7 +266,11 @@ export class Sonifier {
   }
 }
 
-const signed = (v, d = 1) => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(d)}`;
+// Sign from the rounded value, so -0.04 reads "0.0", never "-0.0".
+function signed(v, d = 1) {
+  const r = Number(v.toFixed(d));
+  return `${r > 0 ? "+" : r < 0 ? "-" : ""}${Math.abs(r).toFixed(d)}`;
+}
 const lonName = (lon) => {
   const l = ((lon + 540) % 360) - 180;
   if (Math.abs(l) < 0.01) return "0 degrees";
