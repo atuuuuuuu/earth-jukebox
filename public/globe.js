@@ -17,6 +17,11 @@ void main() {
   gl_Position = uMVP * vec4(aPos, 1.0);
 }`;
 
+  // With OES_standard_derivatives, lines are a fixed number of screen pixels wide and anti-aliased.
+  // Without it, they fall back to a fixed width in degrees.
+  const FRAG_DERIV = `#extension GL_OES_standard_derivatives : enable
+#define HAS_DERIV 1
+`;
   const FRAG = `
 precision highp float;
 varying vec2 vLL;
@@ -31,9 +36,20 @@ uniform float uHead;           // playhead longitude, gliding through the strip 
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
 uniform float uBell;           // 0..1, the El Niño bell glow
 uniform float uDataOn;
+uniform float uPx;             // device pixels per CSS pixel
 
 float lonDist(float a, float b) { return abs(mod(a - b + 540.0, 360.0) - 180.0); }
 float band(float d, float w) { return 1.0 - smoothstep(0.0, w, d); }
+// A line px CSS pixels wide, at distance d (in degrees) from its centre, with a one-pixel soft edge.
+float line(float d, float px) {
+#ifdef HAS_DERIV
+  float w = max(fwidth(d), 1e-4);
+#else
+  float w = 0.3 / uPx;
+#endif
+  float hw = 0.5 * px * uPx * w;
+  return 1.0 - smoothstep(hw, hw + w * uPx, d);
+}
 
 void main() {
   float lon = vLL.x, lat = vLL.y;
@@ -55,20 +71,28 @@ void main() {
   vec3 land = earth * 0.82;
   vec3 col = mix(land, data, isData);
 
+  vec3 n = normalize(vN);
+  // Meridians all meet at the poles and get squeezed at the globe's edge: fade them out there
+  // so they never bunch into a smear or a jagged sliver.
+  float meridianFade = smoothstep(0.0, 0.3, cos(radians(lat))) * smoothstep(0.0, 0.25, n.z);
+
   // Faint graticule every 30 degrees.
-  float g = max(band(abs(mod(lon + 180.0, 30.0) - 15.0) - 14.82, 0.12), band(abs(mod(lat + 90.0, 30.0) - 15.0) - 14.82, 0.12));
-  col = mix(col, vec3(1.0), 0.10 * g);
+  float gLon = line(15.0 - abs(mod(lon + 180.0, 30.0) - 15.0), 1.0) * meridianFade;
+  float gLat = line(15.0 - abs(mod(lat + 90.0, 30.0) - 15.0), 1.0);
+  col = mix(col, vec3(1.0), 0.10 * max(gLon, gLat));
 
   // Scan strip: the 22.5 degree slice being played right now.
   if (uStrip >= 0.0) {
     float c = uLeftLon + (uStrip + 0.5) * 22.5;
     float dd = lonDist(lon, c);
     float inside = 1.0 - smoothstep(10.9, 11.25, dd);
-    float edge = band(abs(dd - 11.25), 0.55);
+    float edge = line(abs(dd - 11.25), 1.5) * meridianFade;
     col = mix(col, col * 1.18 + 0.06, 0.55 * inside);
-    col = mix(col, vec3(1.0), 0.9 * edge);
-    // Playhead: where in this strip the music is right now.
-    col = mix(col, vec3(1.0, 0.97, 0.85), 0.95 * band(lonDist(lon, uHead), 0.7));
+    col = mix(col, vec3(1.0), 0.45 * edge);
+    // Playhead: where in this strip the music is right now. Its own warm colour, so it stays
+    // one clear line when it reaches the strip edge.
+    float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
+    col = mix(col, vec3(1.0, 0.9, 0.55), 0.95 * ph);
   }
 
   // Listening cursor: one 10 degree cell.
@@ -77,15 +101,15 @@ void main() {
     float cLat = 90.0 - (uCell.y + 0.5) * 10.0;
     float dx = lonDist(lon, cLon), dy = abs(lat - cLat);
     float box = max(dx, dy);
-    float ring = band(abs(box - 5.0), 0.45) * step(min(dx, dy), 5.4);
+    float ring = line(abs(box - 5.0), 2.0) * step(min(dx, dy), 5.4);
     col = mix(col, vec3(1.0, 0.86, 0.3), 0.95 * ring);
   }
 
   // Niño 3.4 box: 5S to 5N, 170W to 120W. Glows when the bell rings.
   {
     float dx = lonDist(lon, -145.0), dy = abs(lat);
-    float edgeX = band(abs(dx - 25.0), 0.4) * step(dy, 5.3);
-    float edgeY = band(abs(dy - 5.0), 0.4) * step(dx, 25.3);
+    float edgeX = line(abs(dx - 25.0), 1.5) * step(dy, 5.3);
+    float edgeY = line(abs(dy - 5.0), 1.5) * step(dx, 25.3);
     float dash = step(0.5, fract((lon + lat) / 3.0));
     float e = max(edgeX, edgeY);
     vec3 boxCol = mix(vec3(0.85, 0.95, 1.0), vec3(1.0, 0.95, 0.6), uBell);
@@ -95,7 +119,6 @@ void main() {
   }
 
   // Soft light from the upper left, never so dark that the data is hard to read.
-  vec3 n = normalize(vN);
   vec3 L = normalize(vec3(-0.45, 0.5, 0.75));
   float diff = max(dot(n, L), 0.0);
   float light = 0.62 + 0.48 * diff;
@@ -182,7 +205,8 @@ void main() {
       };
       const p = gl.createProgram();
       gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT));
-      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FRAG));
+      const deriv = gl.getExtension("OES_standard_derivatives");
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, (deriv ? FRAG_DERIV : "") + FRAG));
       gl.linkProgram(p);
       if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
       gl.useProgram(p);
@@ -200,7 +224,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uDataOn"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uDataOn", "uPx"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -385,6 +409,7 @@ void main() {
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
       gl.uniform1f(this.u.uBell, this.bell);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
+      gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
     }
 
