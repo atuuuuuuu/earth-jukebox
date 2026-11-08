@@ -1,40 +1,40 @@
 {
   "api": 1,
   "generated": "2026-11-08",
-  "sample": true,
+  "sample": false,
   "tracks": [
     {
       "id": "a1-ocean-fever",
       "code": "A1",
-      "title": "Ocean Fever (sample)",
+      "title": "Ocean Fever",
       "subtitle": "Sea surface temperature",
-      "description": "The whole ocean, one frame a month, scanned west to east. A bell rings while the Niño 3.4 box is above the El Niño line.",
+      "description": "The whole ocean, about one frame a month, scanned west to east. A bell rings while the Niño 3.4 box is above the El Niño line.",
       "score": "api/scores/a1-ocean-fever.json",
-      "frames": 30,
-      "firstDate": "2024-06-01",
-      "lastDate": "2026-10-19",
+      "frames": 31,
+      "firstDate": "2024-05-18",
+      "lastDate": "2026-11-04",
       "units": "degrees C",
       "source": {
-        "title": "SAMPLE DATA, not from NASA: synthetic sea surface temperature anomaly maps",
+        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
         "url": "https://svs.gsfc.nasa.gov/5176",
-        "credit": "Synthetic test maps made by backend/make_fixture.py, shaped like SVS 5176"
+        "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC"
       }
     },
     {
       "id": "a2-el-nino",
       "code": "A2",
-      "title": "El Niño: then vs now (sample)",
+      "title": "El Niño: then vs now",
       "subtitle": "Same day, 2025 and 2026",
       "description": "The first of each month in 2025, then the same day in 2026, back to back.",
       "score": "api/scores/a2-el-nino.json",
-      "frames": 20,
-      "firstDate": "2025-01-02",
-      "lastDate": "2026-09-29",
+      "frames": 22,
+      "firstDate": "2025-01-01",
+      "lastDate": "2026-11-01",
       "units": "degrees C",
       "source": {
-        "title": "SAMPLE DATA, not from NASA: synthetic sea surface temperature anomaly maps",
+        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
         "url": "https://svs.gsfc.nasa.gov/5176",
-        "credit": "Synthetic test maps made by backend/make_fixture.py, shaped like SVS 5176"
+        "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC"
       }
     }
   ]

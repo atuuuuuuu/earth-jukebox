@@ -7,14 +7,25 @@
       "url": "https://svs.gsfc.nasa.gov/5176",
       "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC",
       "framesDir": "../data/sst/daily",
-      "firstDate": "SET-ME: date on the FIRST frame of the dated video, YYYY-MM-DD",
-      "lastDate": "SET-ME: date on the LAST frame of the dated video, YYYY-MM-DD",
+      "firstDate": "2024-05-18",
+      "lastDate": "2026-11-04",
       "colorbar": "../data/sst/colorbar.jpg",
-      "range": [-4, 4],
+      "range": [
+        -4,
+        4
+      ],
       "units": "degrees C",
       "hotLine": 2,
       "leftLon": -180,
-      "landColors": []
+      "landColors": [],
+      "ignoreBoxes": [
+        [
+          0,
+          645,
+          212,
+          720
+        ]
+      ]
     }
   },
   "tracks": [
@@ -25,8 +36,17 @@
       "subtitle": "Sea surface temperature",
       "description": "The whole ocean, about one frame a month, scanned west to east. A bell rings while the Niño 3.4 box is above the El Niño line.",
       "source": "sst",
-      "select": { "every": 30 },
-      "tuning": { "ladder": [-1, 2], "spreadMax": 3, "tenseAt": 0.25 }
+      "select": {
+        "every": 30
+      },
+      "tuning": {
+        "ladder": [
+          -1,
+          2
+        ],
+        "spreadMax": 3,
+        "tenseAt": 0.25
+      }
     },
     {
       "id": "a2-el-nino",
@@ -35,8 +55,23 @@
       "subtitle": "Same day, 2025 and 2026",
       "description": "The first of each month in 2025, then the same day in 2026, back to back.",
       "source": "sst",
-      "select": { "pairs": { "years": [2025, 2026], "day": 1 } },
-      "tuning": { "ladder": [-1, 2], "spreadMax": 3, "tenseAt": 0.25 }
+      "select": {
+        "pairs": {
+          "years": [
+            2025,
+            2026
+          ],
+          "day": 1
+        }
+      },
+      "tuning": {
+        "ladder": [
+          -1,
+          2
+        ],
+        "spreadMax": 3,
+        "tenseAt": 0.25
+      }
     }
   ]
 }

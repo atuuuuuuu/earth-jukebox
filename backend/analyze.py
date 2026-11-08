@@ -26,7 +26,8 @@ GRID = (36, 18)          # 10-degree cells (columns, rows) for the listening cur
 MIN_PATCH = 40           # smallest hot patch that counts, in analysis pixels
 NINO34_LAT = (-5.0, 5.0)         # the Nino 3.4 box: 5S to 5N ...
 NINO34_LON = (-170.0, -120.0)    # ... and 170W to 120W
-NINO_LINE = 0.5          # NOAA's El Nino threshold for the Nino 3.4 anomaly, degrees C
+TROPICS_LAT = (-20.0, 20.0)      # the tropical ocean, for the relative index
+NINO_LINE = 0.5          # NOAA's El Nino threshold, applied to the RELATIVE Nino 3.4, degrees C
 
 
 # ---------------------------------------------------------------- files
@@ -98,7 +99,16 @@ def _find_horizontal_bar(lab: np.ndarray) -> tuple[int, int, int, int] | None:
     corners = np.array([lab[0, 0], lab[0, -1], lab[-1, 0], lab[-1, -1]])
     background = np.median(corners, axis=0)
     off_bg = np.linalg.norm(band - background, axis=1)
-    c0, c1 = _longest_run(off_bg > 6)
+    # The bar proper is coloured for its full height. The pointed "beyond the
+    # range" arrows that legends like NASA's add at each end are not, so this
+    # leaves them out: the range runs from where one arrow ends to the other.
+    coloured = np.linalg.norm(lab - background, axis=2) > 6
+    mid = (r0 + r1) // 2
+    up, down = coloured[:mid + 1][::-1], coloured[mid:]
+    height = (np.where(up.all(axis=0), len(up), np.argmin(up, axis=0))
+              + np.where(down.all(axis=0), len(down), np.argmin(down, axis=0)) - 1) * coloured[mid]
+    tall = height >= height.max() - 1      # unbroken colour through the bar's full height
+    c0, c1 = _longest_run(tall)
     if c0 < 0:
         return None
 
@@ -106,7 +116,7 @@ def _find_horizontal_bar(lab: np.ndarray) -> tuple[int, int, int, int] | None:
     # a blue-white-red bar on a white page. Bridge a gap when the bar fades into
     # the background on both sides of it; a label beside the bar does not fade.
     runs, start = [], None
-    for i, on in enumerate(np.append(off_bg > 6, False)):
+    for i, on in enumerate(np.append(tall, False)):
         if on and start is None:
             start = i
         elif not on and start is not None:
@@ -171,9 +181,20 @@ def read_colourbar(path: str | Path, vmin: float, vmax: float, crop=None,
             "([x0, y0, x1, y1] in pixels) in the config.")
 
     r0, r1, c0, c1 = found
-    colours = np.median(lab[r0 + (r1 - r0) // 4: r1 - (r1 - r0) // 4 + 1, c0:c1 + 1], axis=0)
+    colours = _despike(np.median(lab[r0 + (r1 - r0) // 4: r1 - (r1 - r0) // 4 + 1, c0:c1 + 1], axis=0))
     values = np.linspace(vmin, vmax, len(colours))
     return ColourBar(cKDTree(colours), _share_flat_runs(colours, values), (r0 + r1) // 2, c0, c1, vertical)
+
+
+def _despike(colours: np.ndarray, limit: float = 12.0) -> np.ndarray:
+    """Remove tick marks drawn across the bar: a column far from the colours a few
+    pixels either side of it is a tick, not part of the colour scale."""
+    out = colours.copy()
+    for i in range(5, len(colours) - 5):
+        ref = np.median(np.r_[colours[i - 5:i - 1], colours[i + 2:i + 6]], axis=0)
+        if np.linalg.norm(colours[i] - ref) > limit:
+            out[i] = ref
+    return out
 
 
 def _share_flat_runs(colours: np.ndarray, values: np.ndarray, same: float = 0.8) -> np.ndarray:
@@ -219,6 +240,15 @@ def to_values(img: np.ndarray, bar: ColourBar, max_dist: float = 14.0,
     return out.reshape(H, W)
 
 
+def ignore_boxes(v: np.ndarray, boxes, frame_shape) -> np.ndarray:
+    """Mark rectangles of the frame as no data, such as a burned-in date box.
+    Boxes are [x0, y0, x1, y1] in the frame's own pixels."""
+    fh, fw = frame_shape[:2]
+    for x0, y0, x1, y1 in boxes:
+        v[int(y0 * H / fh):int(np.ceil(y1 * H / fh)), int(x0 * W / fw):int(np.ceil(x1 * W / fw))] = np.nan
+    return v
+
+
 def pixel_lat_lon(left_lon: float = -180.0) -> tuple[np.ndarray, np.ndarray]:
     lat = 90 - (np.arange(H) + 0.5) * 180 / H
     lon = (left_lon + (np.arange(W) + 0.5) * 360 / W + 180) % 360 - 180
@@ -248,8 +278,11 @@ def box_mean(v: np.ndarray, w: np.ndarray, lat_range, lon_range, left_lon: float
     """Area-weighted mean inside a lat/lon box. Works for boxes that cross 180 degrees too."""
     lat, lon = pixel_lat_lon(left_lon)
     rows = (lat >= lat_range[0]) & (lat <= lat_range[1])
-    span = (lon_range[1] - lon_range[0]) % 360
-    cols = ((lon - lon_range[0]) % 360) <= span
+    width = lon_range[1] - lon_range[0]
+    if width >= 360:                             # all the way round
+        cols = np.ones_like(lon, dtype=bool)
+    else:
+        cols = ((lon - lon_range[0]) % 360) <= width % 360
     return wmean(v[np.ix_(rows, cols)], w[np.ix_(rows, cols)])
 
 
@@ -266,9 +299,10 @@ def describe(f: dict, units: str, left_lon: float = -180.0) -> str:
     if not known or f["mean"] is None:
         return f"{f['date']}. No mapped data in this frame."
     parts.append(f"Map average {_signed(f['mean'])} {units}.")
-    if f.get("nino34") is not None:
-        side = "above" if f["nino34"] > NINO_LINE else "below"
-        parts.append(f"Niño 3.4 at {_signed(f['nino34'])}, {side} the El Niño line.")
+    if f.get("nino34Relative") is not None:
+        side = "above" if f["nino34Relative"] > NINO_LINE else "below"
+        parts.append(f"Niño 3.4 at {_signed(f['nino34'])}, {_signed(f['nino34Relative'])} "
+                     f"relative to the tropics, {side} the El Niño line.")
     peak, k = max(known)
     lon = (left_lon + (k + 0.5) * 360 / COLS + 180) % 360 - 180
     side = "W" if lon < 0 else "E"
@@ -288,7 +322,7 @@ def summarize(v: np.ndarray, w: np.ndarray, *, hot: float, date: str, units: str
         f = {"date": date, "mean": None, "spread": 0.0, "hot": 0.0, "clusters": 0,
              "valid": 0.0, "columns": [None] * COLS, "grid": [[None] * GRID[0] for _ in range(GRID[1])]}
         if nino34:
-            f["nino34"] = None
+            f.update(nino34=None, tropics=None, nino34Relative=None)
         f["text"] = describe(f, units, left_lon)
         return f
 
@@ -307,6 +341,11 @@ def summarize(v: np.ndarray, w: np.ndarray, *, hot: float, date: str, units: str
         "grid": cells(v, w, *GRID),
     }
     if nino34:
+        # NOAA now judges El Nino by the RELATIVE Nino 3.4: the box minus the
+        # whole tropical ocean, so a warming ocean alone cannot ring the bell.
         f["nino34"] = box_mean(v, w, NINO34_LAT, NINO34_LON, left_lon)
+        f["tropics"] = box_mean(v, w, TROPICS_LAT, (-180.0, 180.0), left_lon)
+        f["nino34Relative"] = (None if f["nino34"] is None or f["tropics"] is None
+                               else round(f["nino34"] - f["tropics"], 3))
     f["text"] = describe(f, units, left_lon)
     return f

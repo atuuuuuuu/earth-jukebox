@@ -79,8 +79,8 @@ class Source:
     def values(self, i: int) -> np.ndarray:
         if i not in self._cache:
             img = analyze.load_frame(self.paths[i], self.cfg.get("frameCrop"))
-            self._cache[i] = analyze.to_values(img, self.bar, self.cfg.get("maxDist", 14.0),
-                                               self.cfg.get("landColors", []))
+            v = analyze.to_values(img, self.bar, self.cfg.get("maxDist", 14.0), self.cfg.get("landColors", []))
+            self._cache[i] = analyze.ignore_boxes(v, self.cfg.get("ignoreBoxes", []), img.shape)
         return self._cache[i]
 
     def nearest(self, day: date) -> int | None:
@@ -203,11 +203,13 @@ def build(config_path: Path) -> dict:
         size = (out / index["tracks"][-1]["score"]).stat().st_size / 1024
         valid = [f["valid"] for f in frames]
         nino = [f["nino34"] for f in frames if f.get("nino34") is not None]
+        rel = [f["nino34Relative"] for f in frames if f.get("nino34Relative") is not None]
         report.append(
             f"{track['code']} {track['title']}: {len(frames)} frames, "
             f"{index['tracks'][-1]['firstDate']} to {index['tracks'][-1]['lastDate']}, {size:.0f} KB, "
             f"mapped area {min(valid):.0%}-{max(valid):.0%}"
-            + (f", Niño 3.4 {min(nino):+.1f} to {max(nino):+.1f}" if nino else ""))
+            + (f", Niño 3.4 {min(nino):+.1f} to {max(nino):+.1f}" if nino else "")
+            + (f" (relative {min(rel):+.1f} to {max(rel):+.1f})" if rel else ""))
 
     (out / "api" / "tracks.json").write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
 

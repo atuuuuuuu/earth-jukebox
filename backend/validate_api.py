@@ -77,8 +77,14 @@ def check(public: Path) -> list[str]:
                 bad(f"{at}: image not found: {f.get('image')}")
             if not in_range(f.get("mean")):
                 bad(f"{at}: mean {f.get('mean')} outside the range")
-            if "nino34" in f and not in_range(f["nino34"]):
-                bad(f"{at}: nino34 {f['nino34']} outside the range")
+            for k in ("nino34", "tropics"):
+                if k in f and not in_range(f[k]):
+                    bad(f"{at}: {k} {f[k]} outside the range")
+            if "nino34" in f:
+                rel, n34, trop = f.get("nino34Relative"), f.get("nino34"), f.get("tropics")
+                if (rel is None) != (n34 is None or trop is None) or (
+                        rel is not None and abs(rel - (n34 - trop)) > 0.002):
+                    bad(f"{at}: nino34Relative must equal nino34 minus tropics")
             if not 0 <= f.get("hot", -1) <= 1 or not 0 <= f.get("valid", -1) <= 1:
                 bad(f"{at}: hot and valid must be between 0 and 1")
             if not isinstance(f.get("clusters"), int) or f["clusters"] < 0:

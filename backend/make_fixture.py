@@ -67,6 +67,7 @@ def main(out: Path, n: int = N, step_days: int = STEP_DAYS):
     weight = np.cos(np.deg2rad(LAT))
     ocean = ~land
     in_box = (LAT >= -5) & (LAT <= 5) & (LON >= -170) & (LON <= -120)
+    tropics = (LAT >= -20) & (LAT <= 20)
     rng = np.random.default_rng(7)
 
     truth = {"first": FIRST.isoformat(), "stepDays": step_days, "range": [VMIN, VMAX],
@@ -91,6 +92,7 @@ def main(out: Path, n: int = N, step_days: int = STEP_DAYS):
             "date": day.isoformat(),
             "mean": float(np.average(field[ocean], weights=weight[ocean])),
             "nino34": float(np.average(field[in_box & ocean], weights=weight[in_box & ocean])),
+            "tropics": float(np.average(field[tropics & ocean], weights=weight[tropics & ocean])),
         })
     truth["last"] = truth["frames"][-1]["date"]
     (out / "truth.json").write_text(json.dumps(truth, indent=1), encoding="utf-8")

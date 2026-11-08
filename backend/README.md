@@ -23,8 +23,9 @@ NASA video ──ffmpeg──> frames ──build_api.py──> public/api/*.jso
 | `sample.config.json` | The same settings for the synthetic sample data |
 | `validate_api.py` | Checks every API file against `API.md`. Run it before every deploy |
 | `inspect_frame.py` | Checks one frame by eye (the Gate 1 test) |
+| `nino_check.py` | Compares one month's El Niño numbers with NOAA's monthly discussion |
 | `make_fixture.py` | Makes synthetic maps with known answers, for tests and the sample API |
-| `tests/test_backend.py` | 14 tests: known answers in, the same answers must come out |
+| `tests/test_backend.py` | 16 tests: known answers in, the same answers must come out |
 
 ## Set up once
 
@@ -41,7 +42,7 @@ On Windows, type `py` where these notes say `python3`. Install the libraries:
 pip install numpy scipy opencv-python-headless
 ```
 
-Then run the tests from the project folder. All 14 should say `ok`:
+Then run the tests from the project folder. All 16 should say `ok`:
 
 ```bash
 python3 -m unittest discover backend/tests -v
@@ -55,39 +56,46 @@ python3 backend/build_api.py backend/sample.config.json  # writes public/api
 python3 backend/validate_api.py public                   # "API OK"
 ```
 
-The sample API is already in `public/api`, so your frontend pair can start
-building against it now. `tracks.json` says `"sample": true` until you build
-from real data.
+This writes into `public/api` too, replacing the real API, so rebuild the real
+one afterwards (step 5 below). `public/api` already holds the API built from
+NASA's real video, so your frontend pair can build against real data now.
 
 ## On the day: real NASA data
 
 **1. Download** from [SVS 5176](https://svs.gsfc.nasa.gov/5176) into `data/sst/`:
-the no-datestamp MP4, the dated MP4, and the colour bar image (save it as
+the video (`sst_anomaly_30_sec_4096x2048_2x1_30p.mp4`, 338 MB) and the colour
+bar image `sst_mur_anomaly_auto_colorbar_01_print.jpg` (save it as
 `data/sst/colorbar.jpg`). Check the Resources tab first: if NASA lists a
 different visualization, use that one instead (see "A different dataset" below).
 
-**2. Extract every frame** from the no-datestamp video. Nearest-neighbour
-scaling keeps NASA's exact colours:
+**2. Extract every frame.** Nearest-neighbour scaling keeps NASA's exact colours.
+It takes about a minute and about 320 MB:
 
 ```bash
 mkdir -p data/sst/daily
-ffmpeg -i data/sst/sst_nodates.mp4 -vf scale=1440:720:flags=neighbor -q:v 2 data/sst/daily/%04d.jpg
+ffmpeg -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -vf scale=1440:720:flags=neighbor -q:v 2 data/sst/daily/%04d.jpg
 ```
 
-**3. Read the dates.** Save the first and last frames of the *dated* video, open
-them, and read the date printed on each:
+The video prints its date in a box at the bottom left. `ignoreBoxes` in the
+config already blanks that box out, so its white text is not read as data.
+
+**3. Read the dates.** Save the first and last frames, open them, and read the
+date printed on each:
 
 ```bash
-ffmpeg -i data/sst/sst_dated.mp4 -frames:v 1 data/sst/first.png
-ffmpeg -sseof -0.2 -i data/sst/sst_dated.mp4 -update 1 data/sst/last.png
+ffmpeg -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -frames:v 1 data/sst/first.png
+ffmpeg -sseof -0.2 -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -update 1 data/sst/last.png
 ```
 
-Put the two dates in `tracks.config.json` as `firstDate` and `lastDate`.
+Put the two dates in `tracks.config.json` as `firstDate` and `lastDate`. The
+video downloaded on 8 Nov 2026 runs from 18 May 2024 to 4 Nov 2026, and those
+dates are already in the config. NASA updates the video daily, so a newer
+download needs new dates.
 
 **4. Gate 1: check one frame by eye.**
 
 ```bash
-python3 backend/inspect_frame.py data/sst/daily/0001.jpg data/sst/colorbar.jpg --range -4 4
+python3 backend/inspect_frame.py data/sst/daily/0901.jpg data/sst/colorbar.jpg --range -4 4 --ignore=0,645,212,720
 ```
 
 Open `check_colorbar.png`: the green box must sit on the bar. Open
@@ -105,9 +113,16 @@ python3 backend/validate_api.py public
 The build prints how many days lie between frames. If it says "exactly one per
 day: yes", the dates are exact.
 
-**6. Check against NOAA.** NOAA put Niño 3.4 at +2.1 °C in its 8 Oct 2026
-discussion. Your October values should land roughly near that. Expect rough
-agreement only: NASA's daily data and NOAA's index use different baselines.
+**6. Check against NOAA.** NOAA's monthly ENSO discussion reports the *relative*
+Niño 3.4: the box minus the whole tropical ocean. Compare a month with it:
+
+```bash
+python3 backend/nino_check.py backend/tracks.config.json 2026-09
+```
+
+For September 2026 this gives +2.04 °C. NOAA's 8 Oct discussion gives +2.1 °C.
+The plain Niño 3.4 on NASA's map is about 1 °C higher (+3.1), because in 2026
+the whole tropical ocean runs about 1 °C warm.
 
 **7. Hand over.** Commit `public/api` and `public/frames`. The frontend needs
 nothing else.
@@ -142,22 +157,25 @@ near the poles a pixel covers much less of the Earth. At 60° it covers half as
 much as at the equator, so each pixel counts by cos(latitude).
 
 **What is the Niño 3.4 bell?** The average of the ocean box from 5°S to 5°N and
-170°W to 120°W. Above +0.5 °C is the line NOAA uses for El Niño conditions. It is
-the one sound with a scientific threshold rather than a chosen one.
+170°W to 120°W, minus the average of the whole tropical ocean. That is how NOAA
+judges El Niño today, so warming of the whole ocean alone cannot ring the bell.
+Above +0.5 °C is NOAA's El Niño line. It is the one sound with a scientific
+threshold rather than a chosen one.
 
 **How do you know it is right?** The tests build fake maps where we know every
 true number. The decoder recovers the map average to within 0.01 °C after JPEG
-compression. On real data we check three spots by eye, check that the ocean
-covers about the right share of the Earth, and compare Niño 3.4 with NOAA.
+compression. On NASA's real frames, land and ice are left out (65% of the Earth
+is mapped, right for oceans without sea ice), and the relative Niño 3.4 for
+September 2026 comes out at +2.04 °C, against NOAA's own +2.1 °C.
 
 **Why no database?** The data does not change while people listen, so a server
 would add something that can break and give listeners nothing. The API is
 static files: fast, free to host, and it cannot go down during judging.
 
 **What are the limits?** A colour map can only be read as finely as its colours
-differ. If the bar has a flat white middle, every value inside it reads as its
-midpoint (on the sample bar, that is −0.24 to +0.24 °C). Video compression adds
-small errors. The data covers about 2.5 years: enough to show El Niño, too short
+differ, and NASA's scale stops at ±4 °C. NOAA reports water above +4 °C in the
+eastern Pacific, and on our map that water reads as +4, so the hottest values
+are a floor, not the full number. Video compression adds small errors. The data covers about 2.5 years: enough to show El Niño, too short
 to show the long-term warming trend.
 
 ## Before you submit

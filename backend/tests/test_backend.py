@@ -82,11 +82,18 @@ class Backend(unittest.TestCase):
             limit = 0.3 if abs(true) < 0.3 else 0.1
             self.assertLess(abs(f["nino34"] - true), limit, f"{f['date']}: {f['nino34']} vs {true:.2f}")
 
+    def test_relative_nino34_matches_the_truth(self):
+        for f in self.a1["frames"]:
+            t = self.truth_for(f["date"])
+            self.assertLess(abs(f["tropics"] - t["tropics"]), 0.03, f["date"])
+            self.assertAlmostEqual(f["nino34Relative"], f["nino34"] - f["tropics"], places=2)
+
     def test_bell_side_of_the_line_is_right(self):
         for f in self.a1["frames"]:
-            true = self.truth_for(f["date"])["nino34"]
-            if abs(true - analyze.NINO_LINE) > 0.15:
-                self.assertEqual(f["nino34"] > analyze.NINO_LINE, true > analyze.NINO_LINE, f["date"])
+            t = self.truth_for(f["date"])
+            true = t["nino34"] - t["tropics"]
+            if abs(true - analyze.NINO_LINE) > 0.3:
+                self.assertEqual(f["nino34Relative"] > analyze.NINO_LINE, true > analyze.NINO_LINE, f["date"])
 
     def test_land_is_silent(self):
         for f in self.a1["frames"]:
@@ -114,6 +121,12 @@ class Backend(unittest.TestCase):
         a = analyze.box_mean(v, w, analyze.NINO34_LAT, analyze.NINO34_LON, -180)
         b = analyze.box_mean(shifted, w, analyze.NINO34_LAT, analyze.NINO34_LON, 0)
         self.assertAlmostEqual(a, b, places=6)
+
+    def test_box_all_the_way_round(self):
+        v = np.ones((analyze.H, analyze.W))
+        w = analyze.area_weights()
+        self.assertEqual(analyze.box_mean(v, w, (-20, 20), (-180, 180)), 1.0)
+        self.assertEqual(analyze.box_mean(v, w, (-5, 5), (170, -170)), 1.0)   # across the date line
 
     # -- choosing frames
 

@@ -20,8 +20,8 @@ You need Node 20+, Python 3.10+ and ffmpeg.
 npm install
 pip install numpy scipy opencv-python-headless
 
-npm run test:backend   # 14 backend tests
-npm run sample         # sample API from synthetic maps (already in public/api)
+npm run test:backend   # 16 backend tests
+npm run sample         # sample API from synthetic maps (replaces the real API in public/api)
 npm run validate       # check the API against backend/API.md
 npm run build          # bundle the engine into public/bundle.js
 npm run serve          # then open http://localhost:8000

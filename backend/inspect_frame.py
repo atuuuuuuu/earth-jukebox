@@ -10,7 +10,9 @@ Writes two pictures into the folder you run it from, and prints numbers:
                       marked with their decoded values. Compare each spot's colour
                       with the colour bar: the numbers should match by eye.
 
-Add --spot LAT,LON (as many as you like) to choose your own spots.
+Add --spot=LAT,LON (as many as you like) to choose your own spots, and
+--ignore=X0,Y0,X1,Y1 to blank out a burned-in date box. Keep the "=":
+values that start with a minus sign need it.
 """
 import argparse
 import sys
@@ -28,9 +30,10 @@ def main():
     p.add_argument("frame")
     p.add_argument("colorbar")
     p.add_argument("--range", nargs=2, type=float, required=True, metavar=("LOW", "HIGH"))
-    p.add_argument("--spot", action="append", default=[], help="LAT,LON, for example 0,-140")
+    p.add_argument("--spot", action="append", default=[], help="LAT,LON, written as --spot=-30,80")
     p.add_argument("--left-lon", type=float, default=-180)
     p.add_argument("--max-dist", type=float, default=14.0)
+    p.add_argument("--ignore", action="append", default=[], help="X0,Y0,X1,Y1 box to treat as no data, written as --ignore=0,645,212,720")
     a = p.parse_args()
 
     bar = analyze.read_colourbar(a.colorbar, *a.range)
@@ -44,10 +47,13 @@ def main():
 
     img = analyze.load_frame(a.frame)
     v = analyze.to_values(img, bar, a.max_dist)
+    boxes = [list(map(float, b.split(","))) for b in a.ignore]
+    v = analyze.ignore_boxes(v, boxes, img.shape)
     w = analyze.area_weights()
     f = analyze.summarize(v, w, hot=a.range[1] / 2, date="frame", units="", left_lon=a.left_lon)
     print(f"Mapped area: {f['valid']:.0%} of the Earth (an ocean map should be about 60-70%)")
-    print(f"Map average: {f['mean']}   Niño 3.4 box: {f['nino34']}")
+    print(f"Map average: {f['mean']}   Niño 3.4 box: {f['nino34']}   tropics (20S-20N): {f['tropics']}"
+          f"   relative Niño 3.4: {f['nino34Relative']}")
 
     spots = [tuple(map(float, s.split(","))) for s in a.spot] or [(0, -140), (40, -40), (-40, 80)]
     view = cv2.resize(img, (analyze.W * 2, analyze.H * 2), interpolation=cv2.INTER_NEAREST)
