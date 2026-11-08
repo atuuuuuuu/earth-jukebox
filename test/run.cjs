@@ -4,6 +4,7 @@ const axeSource = fs.readFileSync(path.join(__dirname, "../node_modules/axe-core
 
 const root = path.join(__dirname, "../public");
 const server = http.createServer((q, r) => {
+  if (q.url === "/favicon.ico") { r.writeHead(204); r.end(); return; }   // real Chrome asks for one; the site has none
   const f = path.join(root, q.url === "/" ? "index.html" : q.url.split("?")[0]);
   const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg" };
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); r.end(d); });
@@ -11,7 +12,14 @@ const server = http.createServer((q, r) => {
 
 (async () => {
   // SwiftShader gives headless Chromium WebGL, so the globe is tested too.
-  const browser = await chromium.launch({ args: ["--autoplay-policy=user-gesture-required", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+  const launch = { args: ["--autoplay-policy=user-gesture-required", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] };
+  // Playwright's own Chromium does not support every OS (for example macOS 13): fall back to installed Google Chrome.
+  let browser;
+  try { browser = await chromium.launch(launch); }
+  catch (e) {
+    browser = await chromium.launch({ ...launch, channel: "chrome" }).catch(() => { throw e; });
+    console.log("browser: Playwright Chromium unavailable here, using installed Google Chrome");
+  }
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));

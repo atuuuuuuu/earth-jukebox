@@ -51,6 +51,8 @@ npm i -D playwright && npx playwright install chromium
 npm test
 ```
 
+Where Playwright has no Chromium build (macOS 13, for example), the test falls back to your installed Google Chrome.
+
 The test also taps the globe and runs Hear the change. Chromium gets WebGL in headless mode through SwiftShader.
 
 ## Save a track as WAV
