@@ -72,7 +72,7 @@
   });
 
   // Player state. Settings live here so they survive track changes and Strict toggles.
-  const settings = { mapping: "scan", strict: false, bpm: EJ.TEMPO, volume: 100, mono: false };
+  const settings = { mapping: "scan", strict: false, bpm: EJ.TEMPO, volume: 100, mono: false, muted: [] };
   let track = index.tracks[0];
   let score = await getScore(track);
   let son = null;
@@ -448,15 +448,28 @@
   });
 
   // ---------- Listening cursor ----------
+  // Named places are only a way to point at a spot. The sound and value still come from the score.
+  let place = "";
+  const PLACES = {
+    regions: [
+      ["Niño 3.4", -145, 0], ["Gulf Stream", -65, 38], ["Coral Triangle", 125, 0], ["Humboldt Current", -80, -15],
+      ["Indian Ocean", 75, -5], ["Southern Ocean", 0, -60], ["North Atlantic", -30, 50], ["Mediterranean", 15, 35],
+    ],
+    cities: [
+      ["Tokyo", 145, 35], ["Sydney", 155, -35], ["Lagos", 3, 5], ["Mumbai", 68, 18],
+      ["Rio de Janeiro", -35, -23], ["Honolulu", -157, 21], ["Lisbon", -15, 38], ["Cape Town", 15, -37],
+    ],
+  };
   const probe = async () => {
     placeBox();
     const c = $("lon").value, r = $("lat").value;
     if (globe) globe.lookAt(lonOf(c), clamp(latOf(r), -50, 50));
     const value = await son.probe(Number(c), Number(r));
     window.lastProbe = value;
-    if (value) say(`${lonText(c)}, ${latText(r)}: ${value}`);
+    if (value) say(`${place ? `${place}. ` : ""}${lonText(c)}, ${latText(r)}: ${value}`);
   };
-  const pickSpot = ({ lon, lat }) => {
+  const pickSpot = ({ lon, lat }, name = "") => {
+    place = name;
     const c = Math.min(35, Math.floor((((lon - leftLon()) % 360) + 360) % 360 / 10));
     const r = clamp(Math.floor((90 - lat) / 10), 0, 17);
     $("lon").value = c; $("lat").value = r;
@@ -465,8 +478,16 @@
     setSpin(false);
     probe();
   };
-  $("lon").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", lonText(e.target.value)); setSpin(false); probe(); });
-  $("lat").addEventListener("input", (e) => { e.target.setAttribute("aria-valuetext", latText(e.target.value)); setSpin(false); probe(); });
+  for (const [group, id] of [["regions", "places-regions"], ["cities", "places-cities"]]) {
+    $(id).innerHTML = PLACES[group].map(([n, lon, lat]) =>
+      `<button type="button" class="place" data-lon="${lon}" data-lat="${lat}">${n}</button>`).join("");
+    $(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button.place");
+      if (b) pickSpot({ lon: Number(b.dataset.lon), lat: Number(b.dataset.lat) }, group === "cities" ? `Sea beside ${b.textContent}` : b.textContent);
+    });
+  }
+  $("lon").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", lonText(e.target.value)); setSpin(false); probe(); });
+  $("lat").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", latText(e.target.value)); setSpin(false); probe(); });
 
   // ---------- Hear the change ----------
   const cmpA = $("cmp-a"), cmpB = $("cmp-b");
@@ -553,6 +574,15 @@
     settings.volume = Number(e.target.value);
     e.target.setAttribute("aria-valuetext", `${settings.volume} percent`);
     son.setVolume(settings.volume);
+  });
+  // Mixer: one native checkbox per sound. Ticked = you hear it.
+  $("mixer-list").innerHTML = EJ.LAYERS.map((l) =>
+    `<label class="check"><input type="checkbox" data-layer="${l.id}" checked aria-describedby="mix-${l.id}"> ${l.label}</label><span id="mix-${l.id}" class="hint mix-note">${l.note}</span>`).join("");
+  $("mixer-list").addEventListener("change", (e) => {
+    const id = e.target.dataset.layer;
+    if (!id) return;
+    settings.muted = e.target.checked ? settings.muted.filter((m) => m !== id) : [...settings.muted, id];
+    son.setLayerMuted(id, !e.target.checked);
   });
   $("mono").addEventListener("change", (e) => {
     settings.mono = e.target.checked;

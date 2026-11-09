@@ -189,6 +189,14 @@
         <input id="lat" type="range" min="0" max="17" value="9" step="1">
       </div>
     </fieldset>
+    <fieldset id="places">
+      <legend>Or jump to a place</legend>
+      <p class="hint" id="places-hint">Each button plays the 10 degree square of sea at that place, in the current map, and turns the globe there. Cities are coastal: you hear the sea beside them, not the air.</p>
+      <h3 class="places-h">Ocean regions</h3>
+      <div id="places-regions" class="places" aria-describedby="places-hint"></div>
+      <h3 class="places-h">Sea beside a city</h3>
+      <div id="places-cities" class="places" aria-describedby="places-hint"></div>
+    </fieldset>
   </section>
 
   <section id="howto" class="panel" aria-labelledby="howto-h">
@@ -210,12 +218,17 @@
       <label for="volume">Volume</label>
       <input id="volume" type="range" min="0" max="100" value="100" step="5" aria-valuetext="100 percent">
     </div>
+    <fieldset id="mixer">
+      <legend>Mixer: sounds you hear</legend>
+      <div id="mixer-list" class="mixer"></div>
+      <p id="mixer-hint" class="hint">Untick a sound to hear the others on their own. Sounds that do not belong to the current mode stay quiet anyway.</p>
+    </fieldset>
     <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
     <p id="mono-hint" class="hint">Keeps every sound in the centre, for one earbud or hearing in one ear.</p>
     <div class="row" style="margin: 12px 0 0">
       <button id="save" type="button" aria-describedby="save-hint">Save as WAV</button>
     </div>
-    <p id="save-hint" class="hint">Saves one full pass of this track and sound mode as an audio file.</p>
+    <p id="save-hint" class="hint">Saves one full pass of this track and sound mode as an audio file, with your mixer choices.</p>
   </section>
 </main>
 

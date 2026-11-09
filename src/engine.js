@@ -4,6 +4,16 @@ import * as Tone from "tone";
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const euclid = (hits, steps) => Array.from({ length: steps }, (_, i) => (i * hits) % steps < hits);
 
+// The sounds a listener can switch off, one by one. Order is the order on the page.
+export const LAYERS = [
+  { id: "lead", label: "Melody", note: "the 16 scan notes, or none in Planet Chord" },
+  { id: "tick", label: "Ticks", note: "map quarters in Scan, hot patches in Planet Chord" },
+  { id: "drone", label: "Zero hum", note: "the low steady tone for no change" },
+  { id: "pad", label: "Chord", note: "the Planet Chord pad" },
+  { id: "bell", label: "El Niño bell", note: "rings when the Niño 3.4 box is hot" },
+  { id: "cue", label: "Then and now cue", note: "low note for then, high note for now" },
+];
+
 export const TEMPO = 84;      // Normal speed. One bar (16 steps) per frame.
 export const STEPS = 16;
 
@@ -28,10 +38,12 @@ const gainFor = (volume) => 1.7 * (clamp(volume / 100)) ** 2;
 
 export class Sonifier {
   constructor(score, {
-    mapping = "scan", strict = false, bpm = TEMPO, volume = 100, mono = false, startIndex = 0,
+    mapping = "scan", strict = false, bpm = TEMPO, volume = 100, mono = false, startIndex = 0, muted = [],
     onFrame = () => {}, onStep = () => {}, onSequenceEnd = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, strict, bpm, volume, mono, onFrame, onStep, onSequenceEnd, index: 0, step: 0 });
+    this.muted = new Set(muted);
+    this.layers = {};
     // Optional play-once list of frame indices (Hear the change). null = loop the whole track.
     this.queue = null;
     this.halted = false;
@@ -85,17 +97,24 @@ export class Sonifier {
       out = reverb;
     }
 
+    // One gain per sound, so the listener can switch each one off. The limiter still comes last.
+    const layer = (id, dest) => {
+      const g = keep(new Tone.Gain(this.muted.has(id) ? 0 : 1).connect(dest));
+      this.layers[id] = g;
+      return g;
+    };
+
     this.pan = keep(new Tone.Panner(0).connect(out));
     this.lead = keep(new Tone.Synth({
       oscillator: { type: this.strict ? "sine" : "triangle" },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.25 },
       volume: -8,
-    }).connect(this.pan));
+    }).connect(layer("lead", this.pan)));
     const tick = keep(new Tone.NoiseSynth({
       noise: { type: "pink" },
       envelope: { attack: 0.001, decay: 0.05, sustain: 0 },
       volume: -24,
-    }).connect(out));
+    }).connect(layer("tick", out)));
 
     // The reference tone is the sound of "no change": the listener's zero line.
     this.zero = Tone.Frequency(this.pitch(0, { hot: 0 })).transpose(-24);
@@ -103,11 +122,11 @@ export class Sonifier {
       oscillator: { type: "sine" },
       envelope: { attack: 1, sustain: 1, release: 1 },
       volume: -22,
-    }).connect(out));
+    }).connect(layer("drone", out)));
     // Live: the drone follows play / pause. Offline: it sounds for the whole render.
     if (!realtime) this.drone.triggerAttack(this.zero, 0);
 
-    const filter = keep(new Tone.Filter({ type: "lowpass", frequency: 800 }).connect(out));
+    const filter = keep(new Tone.Filter({ type: "lowpass", frequency: 800 }).connect(layer("pad", out)));
     const pad = keep(new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: "sawtooth" },
       envelope: { attack: 0.6, sustain: 0.8, release: 1.2 },
@@ -124,13 +143,13 @@ export class Sonifier {
       envelope: { attack: 0.001, decay: 1.4, sustain: 0, release: 1.4 },
       modulationEnvelope: { attack: 0.002, decay: 0.3, sustain: 0, release: 0.2 },
       volume: -10,
-    }).connect(out));
+    }).connect(layer("bell", out)));
     // The then / now cue: one plain note, quieter than the bell.
     const cue = keep(new Tone.Synth({
       oscillator: { type: "sine" },
       envelope: { attack: 0.005, decay: 0.15, sustain: 0, release: 0.1 },
       volume: -20,
-    }).connect(out));
+    }).connect(layer("cue", out)));
 
     const draw = Tone.getDraw();
     transport.scheduleRepeat((time) => {
@@ -237,6 +256,12 @@ export class Sonifier {
   setVolume(volume) {
     this.volume = volume;
     if (this.master) this.master.gain.rampTo(gainFor(volume), 0.05);
+  }
+  // Switch one sound on or off while playing. Ramped, so there is no click.
+  setLayerMuted(id, isMuted) {
+    if (isMuted) this.muted.add(id); else this.muted.delete(id);
+    const g = this.layers[id];
+    if (g) g.gain.rampTo(isMuted ? 0 : 1, 0.03);
   }
   setMono(mono) {
     this.mono = mono;
