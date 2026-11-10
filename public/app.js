@@ -208,7 +208,7 @@
       badge.className = `badge ${then ? "then" : "now"}`;
     } else badge.hidden = true;
     const nino = bellOn(f);
-    $("stats").textContent = `${f.mean === null ? "No data" : `Map average ${signed(f.mean)} ${unitShort()}`}. ${Math.round(f.hot * 100)}% of the ocean above the hot line, in ${f.clusters} patches.${nino ? " El Niño bell: on." : ""}`;
+    $("stats").textContent = `${f.mean === null ? "No data" : `Whole ocean ${signed(f.mean)} ${unitShort()} vs normal`}. ${Math.round(f.hot * 100)}% of it is very hot, in ${f.clusters} patches.${nino ? " El Niño bell: on." : ""}`;
     const bell = $("bell");
     bell.textContent = `El Niño bell: ${nino ? "on" : "off"}`;
     bell.classList.toggle("on", nino);
@@ -244,7 +244,7 @@
       $("s-chord").innerHTML = `Rung ${rung + 1} of 6<small>${["smoothest", "smooth", "open", "edgy", "rough", "roughest"][rung]}${settings.mapping === "state" ? ", playing" : ""}</small>`;
     } else $("s-chord").textContent = "–";
     if (s === null || settings.mapping !== "scan") {
-      $("s-strip").innerHTML = settings.mapping === "scan" ? "–<small>Press Play</small>" : "Whole map<small>Planet Chord</small>";
+      $("s-strip").innerHTML = settings.mapping === "scan" ? "–<small>Press Play</small>" : "Whole map<small>Planet Chord plays it all at once</small>";
       $("s-value").textContent = "–"; $("s-note").textContent = "–";
       return;
     }
@@ -393,6 +393,10 @@
     $("leg-lo").textContent = `${signed(score.range[0])} ${unitShort()}`;
     $("leg-hi").textContent = `${signed(score.range[1])} ${unitShort()}`;
     $("bars-scale").textContent = `${signed(score.range[0], 0)} to ${signed(score.range[1], 0)} ${unitShort()}`;
+    // Explainer text uses the track's own lines, never a hardcoded value.
+    const deg = (v) => `${Math.abs(v).toFixed(1)} ${unitShort()}`;
+    if (typeof score.ninoLine === "number") document.querySelectorAll(".v-nino-line").forEach((el) => { el.textContent = deg(score.ninoLine); });
+    if (typeof score.hotLine === "number") document.querySelectorAll(".v-hot-line").forEach((el) => { el.textContent = deg(score.hotLine); });
     $("ax-w").textContent = lonShort(leftLon());
     $("ax-m").textContent = lonShort(leftLon() + 180);
     $("ax-e").textContent = lonShort(leftLon() + 360);

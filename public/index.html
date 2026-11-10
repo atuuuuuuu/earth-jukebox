@@ -12,224 +12,286 @@
 
 <header class="top">
   <div class="brand">
-    <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+    <svg width="40" height="40" viewBox="0 0 52 52" aria-hidden="true">
       <defs><linearGradient id="bg-g" x1="0" x2="1"><stop offset="0" stop-color="#3d8bff"/><stop offset="0.5" stop-color="#f4ead8"/><stop offset="1" stop-color="#e0662a"/></linearGradient></defs>
       <circle cx="26" cy="26" r="23" fill="#0b1630" stroke="url(#bg-g)" stroke-width="2.5"/>
       <path d="M8 27h6l3-7 4 14 4-19 4 22 4-15 3 8 3-3h5" fill="none" stroke="url(#bg-g)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    <div>
-      <h1>Earth Jukebox</h1>
-      <p class="tag">NASA's sea surface temperature, played as music on a living globe. Warmer than normal sounds higher. Wear headphones: the ocean moves from your left ear (west) to your right (east).</p>
-    </div>
+    <span class="brand-name">Earth Jukebox</span>
   </div>
   <div class="chips">
     <span class="chip"><span class="dot" aria-hidden="true"></span><span>Real NASA data, <b id="chip-frames">loading</b></span></span>
     <span id="sample-note" class="note" hidden>Sample data, not from NASA</span>
   </div>
 </header>
-<div class="stripe" aria-hidden="true"></div>
 
 <main>
-  <section id="player" class="panel" aria-labelledby="player-h" tabindex="-1">
-    <h2 id="player-h">Player</h2>
-
-    <fieldset>
-      <legend>Choose a track</legend>
-      <div id="track-list" class="tracks"><p class="hint">Loading tracks…</p></div>
-    </fieldset>
-    <p id="track-about" class="about"></p>
-
-    <button id="play" type="button" data-state="paused">Play</button>
-    <div class="transport">
-      <button id="prev" type="button">Previous moment</button>
-      <button id="next" type="button">Next moment</button>
-    </div>
-
-    <div class="slider">
-      <label for="time">Time</label>
-      <svg id="spark" class="spark" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
-        <defs><linearGradient id="spark-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffb547" stop-opacity="0.35"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></linearGradient></defs>
-        <line class="zero" x1="0" x2="100" y1="20" y2="20"/>
-        <path class="area" d=""/>
-        <path class="mean" d=""/>
-        <path class="nino" d=""/>
-        <line class="cur" x1="0" x2="0" y1="0" y2="40"/>
-      </svg>
-      <input id="time" type="range" min="0" max="0" value="0" step="1">
-      <output id="time-out" for="time" aria-hidden="true"></output>
-      <div class="spark-key" aria-hidden="true"><span><i></i>Map average</span><span><i class="n"></i>Niño 3.4 vs tropics</span><span>Dashed line: 0</span></div>
-    </div>
-
-    <fieldset>
-      <legend>Sound</legend>
-      <div class="opts">
-        <label><input type="radio" name="mapping" value="scan" checked> Scan</label>
-        <label><input type="radio" name="mapping" value="state"> Planet Chord</label>
+  <!-- Intro: what this is, what El Niño is, where to start -->
+  <section id="intro" class="intro" aria-labelledby="intro-h">
+    <div class="intro-text">
+      <p class="eyebrow">NASA Space Apps 2026 · The Earth Information Jukebox</p>
+      <h1 id="intro-h">Listen to the ocean's temperature</h1>
+      <p class="lede">NASA satellites measure how warm the sea surface is, every day, all over the planet. Earth Jukebox turns those maps into music. <b>Warmer than normal sounds higher, colder sounds lower.</b> Put on headphones: the ocean plays from your left ear (west) to your right (east).</p>
+      <div class="intro-actions">
+        <a class="cta" href="#player">Start listening</a>
+        <a class="cta ghost" href="#elnino">What is El Niño?</a>
       </div>
-      <label class="check"><input id="strict" type="checkbox" aria-describedby="strict-hint"> Strict data mode</label>
-      <p id="strict-hint" class="hint">Strict: plain tones on a continuous pitch, no musical scale or reverb.</p>
-    </fieldset>
-
-    <div class="row">
-      <button id="describe" type="button">Describe this moment</button>
-      <button id="key" type="button">Key</button>
+      <ol class="steps" aria-label="How to use Earth Jukebox">
+        <li><a href="#listen"><span class="n" aria-hidden="true">1</span><span><b>Listen</b>Pick a track and press Play. The globe shows what is playing.</span></a></li>
+        <li><a href="#explore"><span class="n" aria-hidden="true">2</span><span><b>Explore</b>Compare two dates, or tap any spot on the ocean to hear it.</span></a></li>
+        <li><a href="#guide"><span class="n" aria-hidden="true">3</span><span><b>Understand</b>Find out what every sound means.</span></a></li>
+      </ol>
     </div>
-    <label class="check"><input id="speak" type="checkbox" aria-describedby="speak-hint"> Read aloud</label>
-    <p id="speak-hint" class="hint" style="margin: -4px 0 12px">Also speaks with your device's voice. Leave off if you use a screen reader.</p>
 
-    <p id="live" role="status" class="readout"></p>
+    <div class="intro-cards">
+      <article id="elnino" class="card" aria-labelledby="elnino-h" tabindex="-1">
+        <h2 id="elnino-h">What is El Niño?</h2>
+        <p>Every few years, a long strip of the Pacific Ocean along the equator warms up by a degree or more. That warm spell is <b>El Niño</b>. It moves rain and storms around the world: floods in Peru, drought in Australia and Indonesia, and a hotter year for the whole planet.</p>
+        <p>Scientists watch one patch of that ocean, called <b>Niño 3.4</b> (the dashed box on the globe, in the middle of the Pacific; it glows while the bell rings). When it is more than <b class="v-nino-line">half a degree</b> warmer than the rest of the tropics, El Niño is building. In Earth Jukebox, that is when <b>a bell rings</b>.</p>
+      </article>
+      <article class="card" aria-labelledby="colours-h">
+        <h2 id="colours-h">Reading the colours</h2>
+        <p>The map does not show plain temperature. It shows how far each spot is from <b>normal</b>: its usual temperature for that place and time of year.</p>
+        <div class="legend-mini" aria-hidden="true"><div class="bar"></div><div class="ticks"><span>Colder</span><span>Normal</span><span>Warmer</span></div></div>
+        <p class="hint">Blue: colder than normal, a lower note. Cream: about normal. Red: warmer than normal, a higher note.</p>
+      </article>
+    </div>
   </section>
 
-  <section id="stage" class="panel" aria-labelledby="stage-h">
-    <div class="stage-head">
-      <h2 id="stage-h">The ocean, live</h2>
-      <div class="stage-tools">
-        <fieldset class="seg">
-          <legend>View</legend>
-          <label><input type="radio" name="view" value="globe" checked> Globe</label>
-          <label><input type="radio" name="view" value="flat"> Flat map</label>
+  <!-- Step 1: Listen -->
+  <div id="listen" class="band" tabindex="-1">
+    <div class="band-head">
+      <span class="band-n" aria-hidden="true">1</span>
+      <div><h2 class="band-h">Listen</h2><p>Choose a track, press Play, and watch the globe. The white strip on the globe is the part of the ocean you are hearing.</p></div>
+    </div>
+
+    <div class="listen-grid">
+      <section id="player" class="panel" aria-labelledby="player-h" tabindex="-1">
+        <h3 id="player-h">Player</h3>
+
+        <fieldset class="bare">
+          <legend>Choose a track</legend>
+          <div id="track-list" class="tracks"><p class="hint">Loading tracks…</p></div>
         </fieldset>
-        <button id="spin" class="tool" type="button" aria-pressed="true">Spin</button>
-        <label class="check" style="font-size: 0.95rem"><input id="follow" type="checkbox"> Follow the scan</label>
-      </div>
-    </div>
+        <p id="track-about" class="about"></p>
 
-    <div id="globe-view" class="space">
-      <div class="globe-wrap">
-        <div class="halo" aria-hidden="true"></div>
-        <canvas id="globe" role="img" aria-label="3D globe of the sea surface temperature map"></canvas>
-        <div class="overlay ov-date">
-          <div id="date" class="date"></div>
-          <span id="badge" class="badge" hidden></span>
+        <button id="play" type="button" data-state="paused">Play</button>
+        <div class="transport">
+          <button id="prev" type="button">Previous moment</button>
+          <button id="next" type="button">Next moment</button>
         </div>
-        <div class="overlay ov-bell" aria-hidden="true"><span id="bell" class="bell">El Niño bell: off</span></div>
-        <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Tap the ocean to hear one spot.</p>
-      </div>
-    </div>
 
-    <figure id="flat-view" class="flat" hidden>
-      <div class="frame">
-        <img id="map-img" alt="" width="1024" height="512">
-        <div id="marker" aria-hidden="true"></div>
-        <div id="cursor-box" aria-hidden="true"></div>
-      </div>
-    </figure>
-
-    <div class="stage-foot">
-      <p class="hint-narrow" aria-hidden="true">Drag the globe to turn it. Tap the ocean to hear one spot.</p>
-      <p id="stats" class="stats"></p>
-      <div class="instruments" aria-hidden="true">
-        <div class="inst">
-          <div class="inst-label"><span>The melody: 16 strips, west to east</span><span id="bars-scale"></span></div>
-          <div id="bars" class="bars"></div>
-          <div class="bars-axis"><span id="ax-w"></span><span id="ax-m"></span><span id="ax-e"></span></div>
+        <div class="slider">
+          <label for="time">Time</label>
+          <p class="hint" id="time-hint">Each moment is one NASA map. Drag to travel through time.</p>
+          <svg id="spark" class="spark" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="spark-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffb547" stop-opacity="0.35"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></linearGradient></defs>
+            <line class="zero" x1="0" x2="100" y1="20" y2="20"/>
+            <path class="area" d=""/>
+            <path class="mean" d=""/>
+            <path class="nino" d=""/>
+            <line class="cur" x1="0" x2="0" y1="0" y2="40"/>
+          </svg>
+          <input id="time" type="range" min="0" max="0" value="0" step="1" aria-describedby="time-hint">
+          <output id="time-out" for="time" aria-hidden="true"></output>
+          <div class="spark-key" aria-hidden="true"><span><i></i>Whole ocean vs normal</span><span><i class="n"></i>El Niño box vs tropics</span><span><i class="z"></i>Normal (0)</span></div>
         </div>
-        <div class="inst">
-          <div class="inst-label"><span>What you hear</span><span id="wave-state">Press Play</span></div>
-          <canvas id="wave"></canvas>
+
+        <fieldset class="bare">
+          <legend>How should it sound?</legend>
+          <div class="modes">
+            <label class="mode"><input type="radio" name="mapping" value="scan" checked aria-describedby="mode-scan"><span><b>Scan</b><span id="mode-scan" class="hint">A melody. 16 notes sweep across the ocean, west to east. Each note is one slice: higher means warmer than normal there.</span></span></label>
+            <label class="mode"><input type="radio" name="mapping" value="state" aria-describedby="mode-chord"><span><b>Planet Chord</b><span id="mode-chord" class="hint">The whole ocean as one chord. The warmer the ocean is on average, the rougher the chord sounds.</span></span></label>
+          </div>
+          <label class="check"><input id="strict" type="checkbox" aria-describedby="strict-hint"> Strict data mode</label>
+          <p id="strict-hint" class="hint">Plain tones at the exact pitch, with no musical scale or echo. For careful listening.</p>
+        </fieldset>
+
+        <div class="row">
+          <button id="describe" type="button">Describe this moment</button>
+          <button id="key" type="button">Key</button>
+        </div>
+        <label class="check"><input id="speak" type="checkbox" aria-describedby="speak-hint"> Read aloud</label>
+        <p id="speak-hint" class="hint tight">Also speaks with your device's voice. Leave off if you use a screen reader.</p>
+
+        <p id="live" role="status" class="readout"></p>
+      </section>
+
+      <div class="listen-main">
+        <section id="stage" class="panel" aria-labelledby="stage-h">
+          <div class="stage-head">
+            <h3 id="stage-h">The ocean, live</h3>
+            <div class="stage-tools">
+              <fieldset class="seg">
+                <legend>View</legend>
+                <label><input type="radio" name="view" value="globe" checked> Globe</label>
+                <label><input type="radio" name="view" value="flat"> Flat map</label>
+              </fieldset>
+              <button id="spin" class="tool" type="button" aria-pressed="true">Spin</button>
+              <label class="check small"><input id="follow" type="checkbox"> Follow the scan</label>
+            </div>
+          </div>
+
+          <div id="globe-view" class="space">
+            <div class="globe-wrap">
+              <div class="halo" aria-hidden="true"></div>
+              <canvas id="globe" role="img" aria-label="3D globe of the sea surface temperature map"></canvas>
+              <div class="overlay ov-date">
+                <div id="date" class="date"></div>
+                <span id="badge" class="badge" hidden></span>
+              </div>
+              <div class="overlay ov-bell" aria-hidden="true"><span id="bell" class="bell">El Niño bell: off</span></div>
+              <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Tap the ocean to hear one spot.</p>
+            </div>
+          </div>
+
+          <figure id="flat-view" class="flat" hidden>
+            <div class="frame">
+              <img id="map-img" alt="" width="1024" height="512">
+              <div id="marker" aria-hidden="true"></div>
+              <div id="cursor-box" aria-hidden="true"></div>
+            </div>
+          </figure>
+
+          <div class="stage-foot">
+            <p class="hint-narrow" aria-hidden="true">Drag the globe to turn it. Tap the ocean to hear one spot.</p>
+            <p id="stats" class="stats"></p>
+            <div class="legend">
+              <div class="bar" aria-hidden="true"></div>
+              <div class="ticks" aria-hidden="true"><span id="leg-lo"></span><span>Normal</span><span id="leg-hi"></span></div>
+              <p id="legend-title" class="hint">Blue is colder than normal, red is warmer. Land shows the planet from space on the globe, and grey on the flat map.</p>
+            </div>
+            <div class="instruments" aria-hidden="true">
+              <div class="inst">
+                <div class="inst-label"><span>The melody: 16 slices, west to east</span><span id="bars-scale"></span></div>
+                <div id="bars" class="bars"></div>
+                <div class="bars-axis"><span id="ax-w"></span><span id="ax-m"></span><span id="ax-e"></span></div>
+                <p class="inst-note">Taller and redder bars play higher notes. Striped bars are land: silence.</p>
+              </div>
+              <div class="inst">
+                <div class="inst-label"><span>The sound wave</span><span id="wave-state">Press Play</span></div>
+                <canvas id="wave"></canvas>
+                <p class="inst-note">What is coming out of your speakers right now.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="signal" class="panel" aria-labelledby="signal-h">
+          <h3 id="signal-h">What you are hearing, in numbers</h3>
+          <p class="hint lead">Updates with every note. Temperatures are compared with normal for that place and time of year.</p>
+          <dl class="sig">
+            <div><dt>Slice</dt><dd id="s-strip">–</dd><dd class="exp">Which slice of the ocean is playing, west to east.</dd></div>
+            <div><dt>Value</dt><dd id="s-value">–</dd><dd class="exp">How much warmer or colder than normal that slice is.</dd></div>
+            <div><dt>Note</dt><dd id="s-note">–</dd><dd class="exp">The pitch that value plays. Higher is warmer.</dd></div>
+            <div><dt>Mood</dt><dd id="s-scale">–</dd><dd class="exp">Calm, or darker when a lot of the ocean is very hot.</dd></div>
+            <div><dt>Whole ocean</dt><dd id="s-mean">–</dd><dd class="exp">The average of the whole map, compared with normal.</dd></div>
+            <div><dt>Very hot area</dt><dd id="s-hot">–</dd><dd class="exp">Share of ocean more than <span class="v-hot-line">2 degrees</span> above normal.</dd></div>
+            <div><dt>El Niño box</dt><dd id="s-nino">–</dd><dd class="exp">Niño 3.4 compared with the tropics. Over the line, the bell rings.</dd></div>
+            <div><dt>Planet Chord</dt><dd id="s-chord">–</dd><dd class="exp">Rung 1 is smooth (cool ocean), rung 6 is rough (hot ocean).</dd></div>
+          </dl>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Explore -->
+  <div id="explore" class="band" tabindex="-1">
+    <div class="band-head">
+      <span class="band-n" aria-hidden="true">2</span>
+      <div><h2 class="band-h">Explore</h2><p>Hear how the ocean changed between two dates, or zoom in on one place.</p></div>
+    </div>
+
+    <section id="compare" class="panel" aria-labelledby="compare-h">
+      <h3 id="compare-h">Hear the change</h3>
+      <p class="hint lead">Pick two moments. You hear A, then B, in the sound chosen in the player. The list below says what changed.</p>
+      <div class="cmp-layout">
+        <div class="cmp">
+          <div id="cmp-a-card" class="cmp-card">
+            <label for="cmp-a">Moment A</label>
+            <select id="cmp-a"></select>
+            <img id="cmp-a-img" alt="" width="1024" height="512">
+            <p id="cmp-a-v" class="v"></p>
+          </div>
+          <div id="cmp-b-card" class="cmp-card">
+            <label for="cmp-b">Moment B</label>
+            <select id="cmp-b"></select>
+            <img id="cmp-b-img" alt="" width="1024" height="512">
+            <p id="cmp-b-v" class="v"></p>
+          </div>
+        </div>
+        <div class="cmp-side">
+          <button id="cmp-play" type="button">Play A, then B</button>
+          <div id="cmp-result" class="cmp-result"></div>
         </div>
       </div>
-      <div class="legend">
-        <span id="legend-title">Colour: blue is colder than normal, red is warmer. On the globe, land shows the planet from space; in the flat map it is grey.</span>
-        <div class="bar" aria-hidden="true"></div>
-        <div class="ticks" aria-hidden="true"><span id="leg-lo"></span><span>0</span><span id="leg-hi"></span></div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section id="signal" class="panel" aria-labelledby="signal-h">
-    <h2 id="signal-h">Inside the signal</h2>
-    <p class="hint" style="margin: -6px 0 12px">The numbers behind the note you are hearing right now.</p>
-    <dl class="sig">
-      <div><dt>Strip</dt><dd id="s-strip">–</dd></div>
-      <div><dt>Value</dt><dd id="s-value">–</dd></div>
-      <div><dt>Note</dt><dd id="s-note">–</dd></div>
-      <div><dt>Scale</dt><dd id="s-scale">–</dd></div>
-      <div><dt>Map average</dt><dd id="s-mean">–</dd></div>
-      <div><dt>Hot area</dt><dd id="s-hot">–</dd></div>
-      <div><dt>Niño 3.4</dt><dd id="s-nino">–</dd></div>
-      <div><dt>Planet chord</dt><dd id="s-chord">–</dd></div>
-    </dl>
-  </section>
+    <section id="cursor-panel" class="panel" aria-labelledby="cursor-h">
+      <h3 id="cursor-h">Listen to one spot</h3>
+      <p class="hint lead" id="cursor-hint">Each move plays one 10 degree square of the current map and says its temperature. The globe turns to show it. You can also tap the globe.</p>
+      <div class="cursor-layout">
+        <fieldset class="bare">
+          <legend>Move the cursor</legend>
+          <div class="slider">
+            <label for="lon">West to east</label>
+            <input id="lon" type="range" min="0" max="35" value="18" step="1" aria-describedby="cursor-hint">
+          </div>
+          <div class="slider">
+            <label for="lat">North to south</label>
+            <input id="lat" type="range" min="0" max="17" value="9" step="1">
+          </div>
+        </fieldset>
+        <fieldset id="places" class="bare">
+          <legend>Or jump to a place</legend>
+          <p class="hint" id="places-hint">Cities are on the coast: you hear the sea beside them, not the air.</p>
+          <h4 class="places-h">Ocean regions</h4>
+          <div id="places-regions" class="places" aria-describedby="places-hint"></div>
+          <h4 class="places-h">Sea beside a city</h4>
+          <div id="places-cities" class="places" aria-describedby="places-hint"></div>
+        </fieldset>
+      </div>
+    </section>
+  </div>
 
-  <section id="compare" class="panel" aria-labelledby="compare-h">
-    <h2 id="compare-h">Hear the change</h2>
-    <p class="hint" style="margin: -6px 0 12px">Pick two moments. You hear A, then B, in the sound mode chosen above.</p>
-    <div class="cmp">
-      <div id="cmp-a-card" class="cmp-card">
-        <label for="cmp-a">Moment A</label>
-        <select id="cmp-a"></select>
-        <img id="cmp-a-img" alt="" width="1024" height="512">
-        <p id="cmp-a-v" class="v"></p>
-      </div>
-      <div id="cmp-b-card" class="cmp-card">
-        <label for="cmp-b">Moment B</label>
-        <select id="cmp-b"></select>
-        <img id="cmp-b-img" alt="" width="1024" height="512">
-        <p id="cmp-b-v" class="v"></p>
-      </div>
+  <!-- Step 3: Understand -->
+  <div id="guide" class="band" tabindex="-1">
+    <div class="band-head">
+      <span class="band-n" aria-hidden="true">3</span>
+      <div><h2 class="band-h">Understand</h2><p>Every sound stands for something in the data. Nothing is added for decoration.</p></div>
     </div>
-    <div class="cmp-actions">
-      <button id="cmp-play" type="button">Play A, then B</button>
-    </div>
-    <div id="cmp-result" class="cmp-result"></div>
-  </section>
+    <div class="guide-grid">
+      <section id="howto" class="panel" aria-labelledby="howto-h">
+        <h3 id="howto-h">What each sound means</h3>
+        <ul id="keylist" class="keylist"></ul>
+      </section>
 
-  <section id="cursor-panel" class="panel" aria-labelledby="cursor-h">
-    <h2 id="cursor-h">Listening cursor</h2>
-    <fieldset>
-      <legend>Listen to one spot</legend>
-      <p class="hint" id="cursor-hint">Each move plays one 10 degree square of the current map and says its temperature. The globe turns to show it. You can also tap the globe.</p>
-      <div class="slider">
-        <label for="lon">West to east</label>
-        <input id="lon" type="range" min="0" max="35" value="18" step="1" aria-describedby="cursor-hint">
-      </div>
-      <div class="slider">
-        <label for="lat">North to south</label>
-        <input id="lat" type="range" min="0" max="17" value="9" step="1">
-      </div>
-    </fieldset>
-    <fieldset id="places">
-      <legend>Or jump to a place</legend>
-      <p class="hint" id="places-hint">Each button plays the 10 degree square of sea at that place, in the current map, and turns the globe there. Cities are coastal: you hear the sea beside them, not the air.</p>
-      <h3 class="places-h">Ocean regions</h3>
-      <div id="places-regions" class="places" aria-describedby="places-hint"></div>
-      <h3 class="places-h">Sea beside a city</h3>
-      <div id="places-cities" class="places" aria-describedby="places-hint"></div>
-    </fieldset>
-  </section>
-
-  <section id="howto" class="panel" aria-labelledby="howto-h">
-    <h2 id="howto-h">What each sound means</h2>
-    <ul id="keylist" class="keylist"></ul>
-  </section>
-
-  <section id="settings-panel" class="panel" aria-labelledby="settings-h">
-    <h2 id="settings-h">Settings</h2>
-    <fieldset>
-      <legend>Speed</legend>
-      <div class="opts">
-        <label><input type="radio" name="speed" value="42"> Half</label>
-        <label><input type="radio" name="speed" value="84" checked> Normal</label>
-        <label><input type="radio" name="speed" value="168"> Double</label>
-      </div>
-    </fieldset>
-    <div class="slider">
-      <label for="volume">Volume</label>
-      <input id="volume" type="range" min="0" max="100" value="100" step="5" aria-valuetext="100 percent">
+      <section id="settings-panel" class="panel" aria-labelledby="settings-h">
+        <h3 id="settings-h">Settings</h3>
+        <fieldset class="bare">
+          <legend>Speed</legend>
+          <div class="opts">
+            <label><input type="radio" name="speed" value="42"> Half</label>
+            <label><input type="radio" name="speed" value="84" checked> Normal</label>
+            <label><input type="radio" name="speed" value="168"> Double</label>
+          </div>
+        </fieldset>
+        <div class="slider">
+          <label for="volume">Volume</label>
+          <input id="volume" type="range" min="0" max="100" value="100" step="5" aria-valuetext="100 percent">
+        </div>
+        <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
+        <p id="mono-hint" class="hint tight">Keeps every sound in the centre, for one earbud or hearing in one ear.</p>
+        <fieldset id="mixer" class="bare">
+          <legend>Mixer: sounds you hear</legend>
+          <p id="mixer-hint" class="hint">Untick a sound to hear the others on their own. Sounds that do not belong to the current mode stay quiet anyway.</p>
+          <div id="mixer-list" class="mixer"></div>
+        </fieldset>
+        <button id="save" type="button" aria-describedby="save-hint">Save as WAV</button>
+        <p id="save-hint" class="hint">Saves one full pass of this track and sound as an audio file, with your mixer choices.</p>
+      </section>
     </div>
-    <fieldset id="mixer">
-      <legend>Mixer: sounds you hear</legend>
-      <div id="mixer-list" class="mixer"></div>
-      <p id="mixer-hint" class="hint">Untick a sound to hear the others on their own. Sounds that do not belong to the current mode stay quiet anyway.</p>
-    </fieldset>
-    <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
-    <p id="mono-hint" class="hint">Keeps every sound in the centre, for one earbud or hearing in one ear.</p>
-    <div class="row" style="margin: 12px 0 0">
-      <button id="save" type="button" aria-describedby="save-hint">Save as WAV</button>
-    </div>
-    <p id="save-hint" class="hint">Saves one full pass of this track and sound mode as an audio file, with your mixer choices.</p>
-  </section>
+  </div>
 </main>
 
 <footer>
