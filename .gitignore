@@ -1,5 +1,4 @@
 node_modules/
-public/bundle.js
 # Big NASA downloads and their frames stay on your laptop, not in git
 data/sst/
 # Regenerate with: npm run sample
