@@ -31,7 +31,7 @@
     <div class="intro-text">
       <p class="eyebrow">NASA Space Apps 2026 · The Earth Information Jukebox</p>
       <h1 id="intro-h">Listen to the ocean's temperature</h1>
-      <p class="lede">NASA satellites measure how warm the sea surface is, every day, all over the planet. Earth Jukebox turns those maps into music. <b>Warmer than normal sounds higher, colder sounds lower.</b> Put on headphones: the ocean plays from your left ear (west) to your right (east).</p>
+      <p class="lede">NASA satellites measure how warm the sea surface is, every day, all over the planet. Earth Jukebox turns those maps into music. <b>Warmer than normal sounds higher, colder sounds lower.</b> Put on headphones: the ocean plays from your left ear (west) to your right (east). Track A3 plays 145 years of the whole planet, land and ocean, from 1880 to 2025.</p>
       <div class="intro-actions">
         <a class="cta" href="#player">Start listening</a>
         <a class="cta ghost" href="#elnino">What is El Niño?</a>
@@ -73,7 +73,7 @@
         <button type="button" data-demo="sweep"><b>West to east</b><span>Left ear to right ear</span></button>
         <button type="button" data-demo="land"><b>Land</b><span>A gap of silence</span></button>
         <button type="button" data-demo="knock"><b>New map</b><span>A low knock, then quarter ticks</span></button>
-        <button type="button" data-demo="bell"><b>El Niño bell</b><span>The Pacific is running hot</span></button>
+        <button type="button" data-demo="bell" class="needs-nino"><b>El Niño bell</b><span>The Pacific is running hot</span></button>
         <button type="button" data-demo="chord"><b>Planet Chord</b><span>Smooth (cool) then rough (hot)</span></button>
         <button type="button" data-demo="hum"><b>Zero hum</b><span>The low "normal" line underneath</span></button>
         <button type="button" data-demo="then" class="needs-labels"><b>Then</b><span>Low cue: the earlier year</span></button>
@@ -86,7 +86,7 @@
   <div id="listen" class="band" tabindex="-1">
     <div class="band-head">
       <span class="band-n" aria-hidden="true">2</span>
-      <div><h2 class="band-h">Listen</h2><p>Choose a track, press Play, and watch the globe. The white strip on the globe is the part of the ocean you are hearing.</p></div>
+      <div><h2 class="band-h">Listen</h2><p>Choose a track, press Play, and watch the globe. The white strip on the globe is the part of the <span class="v-subject">ocean</span> you are hearing.</p></div>
     </div>
 
     <div class="listen-grid">
@@ -118,14 +118,14 @@
           </svg>
           <input id="time" type="range" min="0" max="0" value="0" step="1" aria-describedby="time-hint">
           <output id="time-out" for="time" aria-hidden="true"></output>
-          <div class="spark-key" aria-hidden="true"><span><i></i>Whole ocean vs normal</span><span><i class="n"></i>El Niño box vs tropics</span><span><i class="z"></i>Normal (0)</span></div>
+          <div class="spark-key" aria-hidden="true"><span><i></i>Whole <span class="v-subject">ocean</span> vs normal</span><span class="needs-nino"><i class="n"></i>El Niño box vs tropics</span><span><i class="z"></i>Normal (0)</span></div>
         </div>
 
         <fieldset class="bare">
           <legend>How should it sound?</legend>
           <div class="modes">
-            <label class="mode"><input type="radio" name="mapping" value="scan" checked aria-describedby="mode-scan"><span><b>Scan</b><span id="mode-scan" class="hint">A melody. 16 notes sweep across the ocean, west to east. Each note is one slice: higher means warmer than normal there.</span></span></label>
-            <label class="mode"><input type="radio" name="mapping" value="state" aria-describedby="mode-chord"><span><b>Planet Chord</b><span id="mode-chord" class="hint">The whole ocean as one chord. The warmer the ocean is on average, the rougher the chord sounds.</span></span></label>
+            <label class="mode"><input type="radio" name="mapping" value="scan" checked aria-describedby="mode-scan"><span><b>Scan</b><span id="mode-scan" class="hint">A melody. 16 notes sweep across the <span class="v-subject">ocean</span>, west to east. Each note is one slice: higher means warmer than normal there.</span></span></label>
+            <label class="mode"><input type="radio" name="mapping" value="state" aria-describedby="mode-chord"><span><b>Planet Chord</b><span id="mode-chord" class="hint">The whole <span class="v-subject">ocean</span> as one chord. The warmer the <span class="v-subject">ocean</span> is on average, the rougher the chord sounds.</span></span></label>
           </div>
           <label class="check"><input id="strict" type="checkbox" aria-describedby="strict-hint"> Strict data mode</label>
           <p id="strict-hint" class="hint">Plain tones at the exact pitch, with no musical scale or echo. For careful listening.</p>
@@ -136,7 +136,7 @@
           <button id="key" type="button">Key</button>
         </div>
         <label class="check"><input id="announce" type="checkbox" aria-describedby="announce-hint"> Say the date of each map</label>
-        <p id="announce-hint" class="hint tight">While playing, says the date and whether the ocean is warmer or colder than normal as each new map starts.</p>
+        <p id="announce-hint" class="hint tight">While playing, says the date and whether the <span class="v-subject">ocean</span> is warmer or colder than normal as each new map starts.</p>
         <label class="check"><input id="speak" type="checkbox" aria-describedby="speak-hint"> Read aloud</label>
         <p id="speak-hint" class="hint tight">Also speaks with your device's voice. Leave off if you use a screen reader.</p>
 
@@ -146,7 +146,7 @@
       <div class="listen-main">
         <section id="stage" class="panel" aria-labelledby="stage-h">
           <div class="stage-head">
-            <h3 id="stage-h">The ocean, live</h3>
+            <h3 id="stage-h">The <span class="v-subject">ocean</span>, live</h3>
             <div class="stage-tools">
               <fieldset class="seg">
                 <legend>View</legend>
@@ -166,8 +166,8 @@
                 <div id="date" class="date"></div>
                 <span id="badge" class="badge" hidden></span>
               </div>
-              <div class="overlay ov-bell" aria-hidden="true"><span id="bell" class="bell">El Niño bell: off</span></div>
-              <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Click the ocean to hear one spot.</p>
+              <div class="overlay ov-bell needs-nino" aria-hidden="true"><span id="bell" class="bell">El Niño bell: off</span></div>
+              <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Click a spot to hear it.</p>
             </div>
           </div>
 
@@ -180,7 +180,7 @@
           </figure>
 
           <div class="stage-foot">
-            <p class="hint-narrow" aria-hidden="true">Click or tap the ocean, on the globe or the flat map, to hear one spot.</p>
+            <p class="hint-narrow" aria-hidden="true">Click or tap a spot, on the globe or the flat map, to hear one spot.</p>
             <p id="stats" class="stats"></p>
             <div class="legend">
               <div class="bar" aria-hidden="true"></div>
@@ -207,14 +207,14 @@
           <h3 id="signal-h">What you are hearing, in numbers</h3>
           <p class="hint lead">Updates with every note. Temperatures are compared with normal for that place and time of year.</p>
           <dl class="sig">
-            <div><dt>Slice</dt><dd id="s-strip">–</dd><dd class="exp">Which slice of the ocean is playing, west to east.</dd></div>
+            <div><dt>Slice</dt><dd id="s-strip">–</dd><dd class="exp">Which slice of the <span class="v-subject">ocean</span> is playing, west to east.</dd></div>
             <div><dt>Value</dt><dd id="s-value">–</dd><dd class="exp">How much warmer or colder than normal that slice is.</dd></div>
             <div><dt>Note</dt><dd id="s-note">–</dd><dd class="exp">The pitch that value plays. Higher is warmer.</dd></div>
-            <div><dt>Mood</dt><dd id="s-scale">–</dd><dd class="exp">Calm, or darker when a lot of the ocean is very hot.</dd></div>
-            <div><dt>Whole ocean</dt><dd id="s-mean">–</dd><dd class="exp">The average of the whole map, compared with normal.</dd></div>
-            <div><dt>Very hot area</dt><dd id="s-hot">–</dd><dd class="exp">Share of ocean more than <span class="v-hot-line">2 degrees</span> above normal.</dd></div>
-            <div><dt>El Niño box</dt><dd id="s-nino">–</dd><dd class="exp">Niño 3.4 compared with the tropics. Over the line, the bell rings.</dd></div>
-            <div><dt>Planet Chord</dt><dd id="s-chord">–</dd><dd class="exp">Rung 1 is smooth (cool ocean), rung 6 is rough (hot ocean).</dd></div>
+            <div><dt>Mood</dt><dd id="s-scale">–</dd><dd class="exp">Calm, or darker when a lot of the <span class="v-subject">ocean</span> is very hot.</dd></div>
+            <div><dt>Whole <span class="v-subject">ocean</span></dt><dd id="s-mean">–</dd><dd class="exp">The average of the whole map, compared with normal.</dd></div>
+            <div><dt>Very hot area</dt><dd id="s-hot">–</dd><dd class="exp">Share of the <span class="v-subject">ocean</span> more than <span class="v-hot-line">2 degrees</span> above normal.</dd></div>
+            <div class="needs-nino"><dt>El Niño box</dt><dd id="s-nino">–</dd><dd class="exp">Niño 3.4 compared with the tropics. Over the line, the bell rings.</dd></div>
+            <div><dt>Planet Chord</dt><dd id="s-chord">–</dd><dd class="exp">Rung 1 is smooth (cool <span class="v-subject">ocean</span>), rung 6 is rough (hot <span class="v-subject">ocean</span>).</dd></div>
           </dl>
         </section>
       </div>
@@ -225,7 +225,7 @@
   <div id="explore" class="band" tabindex="-1">
     <div class="band-head">
       <span class="band-n" aria-hidden="true">3</span>
-      <div><h2 class="band-h">Explore</h2><p>Hear how the ocean changed between two dates, or zoom in on one place.</p></div>
+      <div><h2 class="band-h">Explore</h2><p>Hear how the <span class="v-subject">ocean</span> changed between two dates, or zoom in on one place.</p></div>
     </div>
 
     <section id="compare" class="panel" aria-labelledby="compare-h">

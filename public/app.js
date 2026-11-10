@@ -86,8 +86,10 @@
   const signWith = (minus) => (v, d = 1) => { const r = Number(v.toFixed(d)); return `${r > 0 ? "+" : r < 0 ? minus : ""}${Math.abs(r).toFixed(d)}`; };
   const signed = signWith("−");
   const signedSpeech = (v) => signWith("-")(v, 1);
-  const niceDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  const shortDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  // Tracks of yearly averages say only the year ("words.dates": "year"); the date marks the middle of that year.
+  const yearly = () => score?.words?.dates === "year";
+  const niceDate = (iso) => yearly() ? iso.slice(0, 4) : new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const shortDate = (iso) => yearly() ? iso.slice(0, 4) : new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
   const leftLon = () => score.leftLon ?? -180;
   const wrapLon = (l) => ((l + 540) % 360) - 180;
   const lonOf = (c) => wrapLon(leftLon() + (Number(c) + 0.5) * 10);
@@ -99,11 +101,16 @@
   const timeText = (i) => {
     const f = score.frames[i];
     const avg = f.mean === null ? "no data" : `map average ${signedSpeech(f.mean)} ${score.units}`;
-    return `${f.date}${f.label ? ` (${f.label})` : ""}, ${avg}. Moment ${i + 1} of ${score.frames.length}`;
+    return `${yearly() ? f.date.slice(0, 4) : f.date}${f.label ? ` (${f.label})` : ""}, ${avg}. Moment ${i + 1} of ${score.frames.length}`;
   };
   const unitShort = () => (score.units === "degrees C" ? "°C" : score.units);
   const bellOn = (f) => typeof f.nino34Relative === "number" && typeof score.ninoLine === "number" && f.nino34Relative > score.ninoLine;
   const tune = () => ({ ladder: [-1, 2], spreadMax: 3, tenseAt: 0.25, ...score.tuning });
+  // Words for this track's map come from the score; tracks without them are ocean tracks.
+  const words = () => ({ subject: "ocean", map: "sea surface temperature anomaly map", ...score.words });
+  const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+  const hasNino = () => score.frames.some((f) => typeof f.nino34Relative === "number");
+  const hasGaps = () => score.frames.some((f) => f.columns.some((v) => v === null));
 
   // The anomaly colour scale, matching the legend bar and the NASA frames.
   const STOPS = ["#0b3d91", "#3d8bff", "#a9d2ff", "#f4ead8", "#ffc28a", "#e0662a", "#8a1f05", "#3d0802"].map((h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16)));
@@ -197,8 +204,8 @@
   const showFrame = (i) => {
     const f = score.frames[i];
     if (img.getAttribute("src") !== f.image) img.src = f.image;
-    img.alt = `Sea surface temperature anomaly map, ${f.date}`;
-    $("globe").setAttribute("aria-label", `3D globe of the sea surface temperature anomaly map, ${niceDate(f.date)}. Drag to turn, tap to hear one spot.`);
+    img.alt = `${cap(words().map)}, ${f.date}`;
+    $("globe").setAttribute("aria-label", `3D globe of the ${words().map}, ${niceDate(f.date)}. Drag to turn, tap to hear one spot.`);
     $("date").textContent = niceDate(f.date);
     const badge = $("badge");
     if (f.label) {
@@ -208,7 +215,7 @@
       badge.className = `badge ${then ? "then" : "now"}`;
     } else badge.hidden = true;
     const nino = bellOn(f);
-    $("stats").textContent = `${f.mean === null ? "No data" : `Whole ocean ${signed(f.mean)} ${unitShort()} vs normal`}. ${Math.round(f.hot * 100)}% of it is very hot, in ${f.clusters} patches.${nino ? " El Niño bell: on." : ""}`;
+    $("stats").textContent = `${f.mean === null ? "No data" : `Whole ${words().subject} ${signed(f.mean)} ${unitShort()} vs normal`}. ${Math.round(f.hot * 100)}% of it is very hot, in ${f.clusters} patches.${nino ? " El Niño bell: on." : ""}`;
     const bell = $("bell");
     bell.textContent = `El Niño bell: ${nino ? "on" : "off"}`;
     bell.classList.toggle("on", nino);
@@ -322,7 +329,7 @@
     if ($("announce")?.checked && playing) {
       const m = f.mean;
       const how = m === null ? "no data" : Math.abs(m) < 0.05 ? "about normal" : `${Math.abs(m).toFixed(1)} degrees ${m > 0 ? "warmer" : "colder"} than normal`;
-      say(`${niceDate(f.date)}${f.label ? `, ${f.label === son.thenLabel ? "then" : "now"}` : ""}. Ocean ${how}.${bellOn(f) ? " El Niño bell." : ""}`);
+      say(`${niceDate(f.date)}${f.label ? `, ${f.label === son.thenLabel ? "then" : "now"}` : ""}. ${cap(words().subject)} ${how}.${bellOn(f) ? " El Niño bell." : ""}`);
     }
     if (bellOn(f)) {
       if (globe) globe.ringBell();
@@ -402,6 +409,16 @@
     const deg = (v) => `${Math.abs(v).toFixed(1)} ${unitShort()}`;
     if (typeof score.ninoLine === "number") document.querySelectorAll(".v-nino-line").forEach((el) => { el.textContent = deg(score.ninoLine); });
     if (typeof score.hotLine === "number") document.querySelectorAll(".v-hot-line").forEach((el) => { el.textContent = deg(score.hotLine); });
+    // Wording and El Niño parts follow the track: a map without Niño 3.4 data shows no bell or box.
+    document.querySelectorAll(".v-subject").forEach((el) => { el.textContent = words().subject; });
+    document.querySelectorAll(".needs-nino").forEach((el) => { el.hidden = !hasNino(); });
+    spark.querySelector(".nino").style.display = hasNino() ? "" : "none";
+    if (globe) globe.ninoOn = hasNino();
+    const landBtn = document.querySelector('#learn-list [data-demo="land"]');
+    if (landBtn) {
+      landBtn.hidden = !hasGaps();
+      landBtn.querySelector("b").textContent = words().subject === "ocean" ? "Land" : "No data";
+    }
     $("ax-w").textContent = lonShort(leftLon());
     $("ax-m").textContent = lonShort(leftLon() + 180);
     $("ax-e").textContent = lonShort(leftLon() + 360);
@@ -536,13 +553,13 @@
     const t = tune();
     const text = {
       normal: `That is normal: the same temperature as usual for that place and time of year. It is the middle note. Every other note is measured from it.`,
-      warmer: `Warmer than normal: normal, then ${ex.join(", ")} ${u} warmer. The warmer the sea, the higher, brighter and louder the note.`,
-      colder: `Colder than normal: normal, then ${ex.join(", ")} ${u} colder. The colder the sea, the lower the note, and it sounds soft and round.`,
+      warmer: `Warmer than normal: normal, then ${ex.join(", ")} ${u} warmer. The warmer it is, the higher, brighter and louder the note.`,
+      colder: `Colder than normal: normal, then ${ex.join(", ")} ${u} colder. The colder it is, the lower the note, and it sounds soft and round.`,
       sweep: `West to east. Each map plays from the far west in your left ear to the far east in your right ear. Use headphones, or tick Mono in settings for one ear.`,
-      land: `Land. A note, then silence where the scan crosses land, then the sea again.`,
+      land: words().subject === "ocean" ? `Land. A note, then silence where the scan crosses land, then the sea again.` : `No data. A note, then silence where the scan crosses a place with no measurements, then the map again.`,
       knock: `A new map. The low knock starts each map, and soft ticks mark each quarter of the way across.`,
       bell: `The El Niño bell. It rings at the start of a map when the Niño 3.4 box in the Pacific is more than ${signedSpeech(score.ninoLine ?? 0)} ${u} warmer than the tropics.`,
-      chord: `Planet Chord, smooth then rough. In Planet Chord mode the whole ocean plays as one chord. A smooth chord means a cool ocean on average, up to ${signedSpeech(t.ladder[0])} ${u}; a rough chord means a hot one, ${signedSpeech(t.ladder[1])} ${u} or more.`,
+      chord: `Planet Chord, smooth then rough. In Planet Chord mode the whole ${words().subject} plays as one chord. A smooth chord means a cool ${words().subject} on average, up to ${signedSpeech(t.ladder[0])} ${u}; a rough chord means a hot one, ${signedSpeech(t.ladder[1])} ${u} or more.`,
       hum: `The zero hum. A low steady tone under the music that stands for normal. It never changes.`,
       then: `The then cue: a low note at the start of a map from ${son.thenLabel ?? "the earlier year"}.`,
       now: `The now cue: a high note at the start of a map from the later year.`,
@@ -579,7 +596,7 @@
     const u = unitShort();
     for (const [k, f] of [["a", A], ["b", B]]) {
       $(`cmp-${k}-img`).src = f.image;
-      $(`cmp-${k}-img`).alt = `Sea surface temperature anomaly map, ${f.date}`;
+      $(`cmp-${k}-img`).alt = `${cap(words().map)}, ${f.date}`;
       $(`cmp-${k}-v`).textContent = f.mean === null ? "No data" : `Map average ${signed(f.mean)} ${u}`;
     }
     const items = [];
@@ -593,7 +610,7 @@
       const ra = rung(A.mean), rb = rung(B.mean);
       items.push(ra === rb ? `Planet Chord stays on rung ${ra + 1} of 6.` : `Planet Chord moves from rung ${ra + 1} to rung ${rb + 1} of 6: ${rb > ra ? "rougher" : "smoother"}.`);
     }
-    items.push(`Ocean above the hot line (${signed(score.hotLine)} ${u}): ${Math.round(A.hot * 100)}% to ${Math.round(B.hot * 100)}%.${(A.hot > t.tenseAt) !== (B.hot > t.tenseAt) ? ` The scale turns ${B.hot > t.tenseAt ? "darker" : "calm"} in B.` : ""}`);
+    items.push(`${cap(words().subject)} area above the hot line (${signed(score.hotLine)} ${u}): ${Math.round(A.hot * 100)}% to ${Math.round(B.hot * 100)}%.${(A.hot > t.tenseAt) !== (B.hot > t.tenseAt) ? ` The scale turns ${B.hot > t.tenseAt ? "darker" : "calm"} in B.` : ""}`);
     if (typeof A.nino34Relative === "number" && typeof B.nino34Relative === "number") {
       const ba = bellOn(A), bb = bellOn(B);
       items.push(`Niño 3.4 against the tropics: ${signed(A.nino34Relative)} to ${signed(B.nino34Relative)} ${u}. ${ba === bb ? `The El Niño bell is ${ba ? "on in both" : "silent in both"}.` : `The El Niño bell ${bb ? "rings in B only" : "rings in A only"}.`}`);

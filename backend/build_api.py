@@ -158,6 +158,8 @@ def build_track(track: dict, source: Source, out: Path) -> dict:
         "tuning": track.get("tuning", {}),
         "frames": frames,
     }
+    if source.cfg.get("words"):
+        score["words"] = source.cfg["words"]   # how the page names this map, like {"subject": "planet"}
     path = out / "api" / "scores" / f"{tid}.json"
     path.write_text(json.dumps(score, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return score
@@ -173,17 +175,36 @@ def compare_text(then: dict, now: dict) -> str:
 
 # ---------------------------------------------------------------- everything
 
-def build(config_path: Path) -> dict:
+def build(config_path: Path, only: list[str] | None = None) -> dict:
+    """Build every track, or with `only` just those track ids.
+
+    With `only`, the other tracks keep their files and their entries in the
+    existing tracks.json, and their sources' frames need not be on this computer.
+    """
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
     base = config_path.parent
     out = base / cfg.get("out", "../public")
     (out / "api" / "scores").mkdir(parents=True, exist_ok=True)
 
-    sources = {name: Source(name, s, base) for name, s in cfg["sources"].items()}
+    if only:
+        unknown = set(only) - {t["id"] for t in cfg["tracks"]}
+        if unknown:
+            raise ConfigError(f"No track with id {', '.join(sorted(unknown))} in {config_path.name}")
+        old_path = out / "api" / "tracks.json"
+        old = {t["id"]: t for t in json.loads(old_path.read_text(encoding="utf-8"))["tracks"]} if old_path.exists() else {}
+        missing = [t["id"] for t in cfg["tracks"] if t["id"] not in only and t["id"] not in old]
+        if missing:
+            raise ConfigError(f"--only keeps the other tracks as built, but {', '.join(missing)} "
+                              "is not in tracks.json yet: build everything once first")
+    needed = {t["source"] for t in cfg["tracks"] if not only or t["id"] in only}
+    sources = {name: Source(name, s, base) for name, s in cfg["sources"].items() if name in needed}
     index = {"api": API_VERSION, "generated": date.today().isoformat(),
              "sample": bool(cfg.get("sample", False)), "tracks": []}
     report = []
     for track in cfg["tracks"]:
+        if only and track["id"] not in only:
+            index["tracks"].append(old[track["id"]])   # kept exactly as it was built
+            continue
         src = sources[track["source"]]
         score = build_track(track, src, out)
         frames = score["frames"]
@@ -226,9 +247,15 @@ def build(config_path: Path) -> dict:
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    if len(sys.argv) != 2:
-        sys.exit("Usage: python3 backend/build_api.py backend/tracks.config.json")
+    args = sys.argv[1:]
+    only = None
+    if "--only" in args:
+        k = args.index("--only")
+        only = [x for x in args[k + 1:k + 2] for x in x.split(",") if x]
+        args = args[:k] + args[k + 2:]
+    if len(args) != 1 or (only is not None and not only):
+        sys.exit("Usage: python3 backend/build_api.py backend/tracks.config.json [--only track-id[,track-id]]")
     try:
-        build(Path(sys.argv[1]))
+        build(Path(args[0]), only)
     except (ConfigError, FileNotFoundError, ValueError) as e:
         sys.exit(f"Error: {e}")

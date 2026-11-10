@@ -114,6 +114,32 @@ const server = http.createServer((q, r) => {
   });
   console.log("offline:", JSON.stringify(stats));
 
+  // A track without Niño 3.4 data (A3, GISTEMP): no bell, no box, its own words, and still accessible.
+  const plain = await page.evaluate(async () => {
+    const index = await (await fetch("api/tracks.json")).json();
+    for (const t of index.tracks) {
+      const s = await (await fetch(t.score)).json();
+      if (!s.frames.some((f) => typeof f.nino34Relative === "number")) return t.id;
+    }
+    return null;
+  });
+  if (plain) {
+    await page.click(`label[for="track-${plain}"]`);
+    await page.waitForFunction("document.getElementById('stage-h').textContent !== 'The ocean, live'", null, { timeout: 8000 });
+    const shown = await page.evaluate(() => ({
+      heading: document.getElementById("stage-h").textContent,
+      bellHidden: document.querySelector(".ov-bell").hidden,
+      ninoRowHidden: document.getElementById("s-nino").parentElement.hidden,
+      globeBox: window.globe ? window.globe.ninoOn : "no globe handle",
+      date: document.getElementById("date").textContent,
+    }));
+    await page.click("#describe");
+    await page.waitForTimeout(300);
+    console.log(`no-Niño track ${plain}:`, JSON.stringify(shown), "| describe:", (await page.textContent("#live")).slice(0, 70));
+    const axe2 = await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
+    console.log(`axe violations on ${plain}:`, axe2.violations.length, axe2.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", "));
+  }
+
   console.log("page errors:", errors.length, errors.slice(0, 5));
   await browser.close();
   server.close();

@@ -26,6 +26,29 @@
           720
         ]
       ]
+    },
+    "gistemp": {
+      "title": "Global Temperature Anomalies from 1880 to 2025",
+      "url": "https://svs.gsfc.nasa.gov/5603",
+      "credit": "NASA Scientific Visualization Studio. Data: GISS Surface Temperature Analysis (GISTEMP v4), NASA GISS",
+      "framesDir": "../data/gistemp/yearly",
+      "firstDate": "1880-07-01",
+      "lastDate": "2025-07-01",
+      "colorbar": "../data/gistemp/colorbar.png",
+      "range": [
+        -2,
+        2
+      ],
+      "units": "degrees C",
+      "hotLine": 1,
+      "leftLon": -180,
+      "landColors": [],
+      "ignoreBoxes": [],
+      "words": {
+        "subject": "planet",
+        "map": "surface temperature anomaly map",
+        "dates": "year"
+      }
     }
   },
   "tracks": [
@@ -71,6 +94,26 @@
         ],
         "spreadMax": 3,
         "tenseAt": 0.25
+      }
+    },
+    {
+      "id": "a3-warming-world",
+      "code": "A3",
+      "title": "Warming World",
+      "subtitle": "Land and ocean, 1880 to 2025",
+      "description": "Every fifth year from 1880 to 2025, land and ocean, compared with 1951 to 1980. Each moment is one year's average. Grey places had no measurements yet, and stay silent.",
+      "source": "gistemp",
+      "select": {
+        "every": 5
+      },
+      "nino34": false,
+      "tuning": {
+        "ladder": [
+          -0.5,
+          1.5
+        ],
+        "spreadMax": 1.5,
+        "tenseAt": 0.4
       }
     }
   ]

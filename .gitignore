@@ -4,3 +4,5 @@ data/sst/
 # Regenerate with: npm run sample
 data/sample/
 __pycache__/
+# GISTEMP video and frames (SVS 5603)
+data/gistemp/

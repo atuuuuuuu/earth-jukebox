@@ -25596,6 +25596,7 @@ var EJ = (() => {
     const t = { ladder: [-1, 2], spreadMax: 3, tenseAt: 0.25, ...score.tuning };
     const left = score.leftLon ?? -180;
     const quarters = [0, 4, 8, 12].map((s) => lonName(left + s * 22.5));
+    const subject = score.words?.subject ?? "ocean";
     const parts = [
       `Key. Higher pitch means warmer than normal. The lowest note is ${signed(lo, 0)} ${u}, the highest ${signed(hi, 0)} ${u}, on one fixed scale for the whole track. Normal is the middle note.`,
       `Warmer than normal plays a bright, buzzy note. Colder than normal plays a soft, round note.`,
@@ -25603,10 +25604,10 @@ var EJ = (() => {
       `Silence is land, or no data.`,
       `A soft tick marks each quarter of the map: ${quarters.join(", ")}.`,
       `The low steady hum is the zero line: 0 ${u}, no change from normal.`,
-      `When more than ${Math.round(t.tenseAt * 100)} percent of the ocean is above the hot line of ${signed(score.hotLine)} ${u}, the scale turns darker.`,
+      `When more than ${Math.round(t.tenseAt * 100)} percent of the ${subject} is above the hot line of ${signed(score.hotLine)} ${u}, the scale turns darker.`,
       `Planet Chord mode plays the whole map at once: the chord grows rougher as the map average rises from ${signed(t.ladder[0], 0)} to ${signed(t.ladder[1], 0)} ${u}, brighter when the map is uneven, and the ticks count the hot patches.`
     ];
-    if (typeof score.ninoLine === "number") {
+    if (typeof score.ninoLine === "number" && score.frames.some((f) => typeof f.nino34Relative === "number")) {
       parts.push(`A bright bell at the start of a moment means El Ni\xF1o: the Ni\xF1o 3.4 box in the Pacific is more than ${signed(score.ninoLine)} ${u} warmer than the tropical ocean as a whole.`);
     }
     const labels = [...new Set(score.frames.map((f) => f.label).filter(Boolean))];

@@ -147,6 +147,30 @@ class Backend(unittest.TestCase):
     def test_api_passes_the_validator(self):
         self.assertEqual(validate_api.check(self.public), [])
 
+    def test_only_rebuilds_one_track_and_keeps_the_rest(self):
+        """--only builds one track; the others keep their files and index entries untouched,
+        and their sources need not be on this computer (here: a source with no frames)."""
+        out = self.tmp / "only"
+        shutil.copytree(self.public, out)
+        cfg = json.loads(self.config.read_text(encoding="utf-8"))
+        cfg["out"] = "only"
+        cfg["sources"]["missing"] = dict(cfg["sources"]["sst"], framesDir="no-such-folder")
+        cfg["sources"]["sst"]["words"] = {"subject": "planet", "map": "test map"}
+        cfg["tracks"][1]["source"] = "missing"          # A2's source is not on this computer
+        cfg["tracks"][0]["nino34"] = False
+        path = self.tmp / "only.config.json"
+        path.write_text(json.dumps(cfg), encoding="utf-8")
+        a2_before = (out / "api/scores/a2-el-nino.json").read_bytes()
+        index = build_api.build(path, only=["a1-ocean-fever"])
+        self.assertEqual([t["id"] for t in index["tracks"]], ["a1-ocean-fever", "a2-el-nino"])
+        self.assertEqual((out / "api/scores/a2-el-nino.json").read_bytes(), a2_before)
+        a1 = json.loads((out / "api/scores/a1-ocean-fever.json").read_text(encoding="utf-8"))
+        self.assertEqual(a1["words"], {"subject": "planet", "map": "test map"})
+        self.assertFalse(any("nino34Relative" in f for f in a1["frames"]), "no Niño fields when nino34 is off")
+        self.assertEqual(validate_api.check(out), [])
+        with self.assertRaises(build_api.ConfigError):
+            build_api.build(path, only=["no-such-track"])
+
     def test_validator_catches_a_broken_score(self):
         broken = self.tmp / "broken"
         shutil.copytree(self.public, broken)

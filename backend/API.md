@@ -66,6 +66,7 @@ are extra, and the engine ignores them until the Audio role uses them.
 | `ninoLine` | *new.* El Niño line: 0.5 degrees C, NOAA's threshold. It applies to `nino34Relative` |
 | `leftLon` | *new.* Longitude at the map's left edge: -180 for a standard map, 0 for one centred on the Pacific |
 | `tuning` | Sound settings for this track, read by the engine |
+| `words` | *new, optional.* How the page names this map, like `{"subject": "planet", "map": "surface temperature anomaly map"}`. Missing on ocean tracks: the page then says "ocean" |
 | `frames` | The frames, in the order they play |
 
 Each frame:
@@ -80,7 +81,7 @@ Each frame:
 | `clusters` | Number of separate hot patches |
 | `columns` | 16 values, west to east from `leftLon`, for the Scan. `null` = land or no data: stay silent |
 | `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each, for the listening cursor |
-| `nino34` | *new.* Average anomaly of the Niño 3.4 box (5S to 5N, 170W to 120W), as the map shows it |
+| `nino34` | *new.* Only on tracks with `"nino34": true` (the default); a track without them never rings the bell. Average anomaly of the Niño 3.4 box (5S to 5N, 170W to 120W), as the map shows it |
 | `tropics` | *new.* Average anomaly of the whole tropical ocean, 20S to 20N |
 | `nino34Relative` | *new.* `nino34` minus `tropics`, the way NOAA judges El Niño. **Ring the bell when it is above `ninoLine`** |
 | `valid` | *new.* Share of the Earth's area with data. About 0.6 to 0.7 for an ocean map |

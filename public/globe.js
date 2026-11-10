@@ -35,6 +35,7 @@ uniform float uStrip;          // scan strip 0..15, or -1
 uniform float uHead;           // playhead longitude, gliding through the strip being played
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
 uniform float uBell;           // 0..1, the El Niño bell glow
+uniform float uNinoOn;         // 1 when the track has Niño 3.4 data, else the box is not drawn
 uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 
@@ -113,9 +114,9 @@ void main() {
     float dash = step(0.5, fract((lon + lat) / 3.0));
     float e = max(edgeX, edgeY);
     vec3 boxCol = mix(vec3(0.85, 0.95, 1.0), vec3(1.0, 0.95, 0.6), uBell);
-    col = mix(col, boxCol, e * (0.35 + 0.55 * uBell) * mix(dash, 1.0, uBell));
+    col = mix(col, boxCol, uNinoOn * e * (0.35 + 0.55 * uBell) * mix(dash, 1.0, uBell));
     float inBox = step(dx, 25.0) * step(dy, 5.0);
-    col += inBox * uBell * 0.22 * vec3(1.0, 0.9, 0.5);
+    col += uNinoOn * inBox * uBell * 0.22 * vec3(1.0, 0.9, 0.5);
   }
 
   // Soft light from the upper left, never so dark that the data is hard to read.
@@ -181,6 +182,7 @@ void main() {
       this.nextDraw = 0;
       this.cell = [-1, -1];
       this.bell = 0;
+      this.ninoOn = true;   // false for tracks without Niño 3.4 data
       this.mix = 1;
       this.dataOn = true;
       this.scale = 0.9;
@@ -224,7 +226,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uDataOn", "uPx"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uNinoOn", "uDataOn", "uPx"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -408,6 +410,7 @@ void main() {
       gl.uniform1f(this.u.uHead, this.headLon === undefined ? 999 : this.headLon);
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
       gl.uniform1f(this.u.uBell, this.bell);
+      gl.uniform1f(this.u.uNinoOn, this.ninoOn ? 1 : 0);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
