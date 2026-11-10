@@ -319,7 +319,7 @@
     setTime(i);
     showFrame(i);
     window.framesSeen = (window.framesSeen || 0) + 1;
-    if ($("announce").checked && playing) {
+    if ($("announce")?.checked && playing) {
       const m = f.mean;
       const how = m === null ? "no data" : Math.abs(m) < 0.05 ? "about normal" : `${Math.abs(m).toFixed(1)} degrees ${m > 0 ? "warmer" : "colder"} than normal`;
       say(`${niceDate(f.date)}${f.label ? `, ${f.label === son.thenLabel ? "then" : "now"}` : ""}. Ocean ${how}.${bellOn(f) ? " El Niño bell." : ""}`);
@@ -506,7 +506,7 @@
     const r = el.getBoundingClientRect();
     return [clamp((e.clientX - r.left) / r.width, 0, 0.9999), clamp((e.clientY - r.top) / r.height, 0, 0.9999)];
   };
-  $("flat-frame").addEventListener("click", (e) => {
+  $("flat-frame")?.addEventListener("click", (e) => {
     const [fx, fy] = fracs(e.currentTarget, e);
     pickSpot({ lon: leftLon() + fx * 360, lat: 90 - fy * 180 });
   });
@@ -525,7 +525,7 @@
   // ---------- Learn the sounds ----------
   // Example values, labelled as examples. They show the mapping; they are not data.
   let demoTimer;
-  $("learn-list").addEventListener("click", async (e) => {
+  $("learn-list")?.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-demo]");
     if (!btn) return;
     stopForSpeech();

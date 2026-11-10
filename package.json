@@ -8,7 +8,7 @@
     "validate": "python3 backend/validate_api.py public",
     "test:backend": "python3 -m unittest discover backend/tests -v",
     "build": "esbuild src/engine.js --bundle --format=iife --global-name=EJ --outfile=public/bundle.js",
-    "serve": "python3 -m http.server -d public 8000",
+    "serve": "python3 scripts/serve.py 8000",
     "test": "node test/run.cjs"
   },
   "dependencies": {
