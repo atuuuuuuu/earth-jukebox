@@ -246,5 +246,5 @@ to show the long-term warming trend.
 
 Check the 2026 Project Submission guide (out 13 Nov) on code written before the
 event, and declare AI help on your project page. Say what actually happened,
-for example: "Parts of our code were written with an AI assistant (Claude). We
+for example: "Parts of our code were written with an AI assistant. We
 reviewed, tested and adapted it, and ran every step on NASA's data ourselves."

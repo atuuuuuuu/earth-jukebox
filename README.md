@@ -17,7 +17,7 @@ browser (frontend).
 - **No framework, no new packages.** The globe is about 350 lines of plain WebGL.
 
 ```
-AGENTS.md  rules for AI coding assistants (CLAUDE.md points to it)
+AGENTS.md  rules for AI coding assistants
 backend/   Python: NASA frames -> static JSON API     (see backend/README.md, backend/API.md)
 public/    the website: index.html, styles.css, app.js, globe.js, textures/, api/, frames/
 src/       engine.js: Tone.js sonifier (Scan, Planet Chord, Strict mode, A-then-B sequences)
