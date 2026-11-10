@@ -25207,8 +25207,8 @@ var EJ = (() => {
   var clamp2 = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
   var euclid = (hits, steps) => Array.from({ length: steps }, (_, i) => i * hits % steps < hits);
   var LAYERS = [
-    { id: "lead", label: "Melody", note: "the 16 scan notes, or none in Planet Chord" },
-    { id: "tick", label: "Ticks", note: "map quarters in Scan, hot patches in Planet Chord" },
+    { id: "lead", label: "Melody", note: "the 16 scan notes: bright for warmer than normal, soft for colder" },
+    { id: "tick", label: "Ticks and knock", note: "a knock starts each map; ticks mark map quarters in Scan, hot patches in Planet Chord" },
     { id: "drone", label: "Zero hum", note: "the low steady tone for no change" },
     { id: "pad", label: "Chord", note: "the Planet Chord pad" },
     { id: "bell", label: "El Ni\xF1o bell", note: "rings when the Ni\xF1o 3.4 box is hot" },
@@ -25217,9 +25217,10 @@ var EJ = (() => {
   var TEMPO = 84;
   var STEPS = 16;
   var SCALES = {
-    calm: ["C3", "D3", "E3", "G3", "A3", "C4", "D4", "E4", "G4", "A4", "C5", "D5"],
-    tense: ["C3", "Db3", "E3", "G3", "Ab3", "C4", "Db4", "E4", "G4", "Ab4", "C5", "Db5"]
+    calm: ["C3", "D3", "E3", "G3", "A3", "C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5", "G5", "A5"],
+    tense: ["C3", "Db3", "E3", "G3", "Ab3", "C4", "Db4", "E4", "G4", "Ab4", "C5", "Db5", "E5", "G5", "Ab5"]
   };
+  var CURVE = 0.5;
   var LADDER = [
     ["C3", "G3", "C4", "G4"],
     ["C3", "G3", "E4", "B4"],
@@ -25253,6 +25254,11 @@ var EJ = (() => {
       this.span = score.range[1] - score.range[0];
       this.tune = { ladder: [-1, 2], spreadMax: 3, tenseAt: 0.25, ...score.tuning };
       this.norm = (v) => clamp2((v - score.range[0]) / this.span);
+      this.maxAbs = Math.max(Math.abs(score.range[0]), Math.abs(score.range[1])) || 1;
+      this.curved = (v) => {
+        const u = clamp2(v / this.maxAbs, -1, 1);
+        return (Math.sign(u) * Math.abs(u) ** CURVE + 1) / 2;
+      };
       this.nodes = [];
       this.disposed = false;
       const labels = [...new Set(score.frames.map((f) => f.label).filter(Boolean))];
@@ -25266,7 +25272,15 @@ var EJ = (() => {
       const n = this.norm(v);
       if (this.strict) return 220 * 2 ** (2 * n);
       const scale = frame.hot > this.tune.tenseAt ? SCALES.tense : SCALES.calm;
-      return scale[Math.round(n * (scale.length - 1))];
+      return scale[Math.round(this.curved(v) * (scale.length - 1))];
+    }
+    // Loudness: further from normal is louder, but even a near-normal note stays clearly audible.
+    loudness(v) {
+      return 0.45 + 0.55 * clamp2(Math.abs(v) / (this.span / 2));
+    }
+    // Warmer than normal plays the bright voice, colder the soft one. Strict uses one plain sine.
+    voiceFor(v) {
+      return this.strict || v < 0 ? this.leadCold : this.leadWarm;
     }
     // True when this frame should ring the El Niño bell. Data, not decoration.
     bellFor(f) {
@@ -25304,16 +25318,31 @@ var EJ = (() => {
         return g;
       };
       this.pan = keep(new Panner(0).connect(out));
-      this.lead = keep(new Synth({
-        oscillator: { type: this.strict ? "sine" : "triangle" },
-        envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.25 },
-        volume: -8
-      }).connect(layer("lead", this.pan)));
+      const leadOut = layer("lead", this.pan);
+      this.leadCold = keep(new Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: this.strict ? 0.01 : 0.03, decay: 0.25, sustain: 0.3, release: 0.35 },
+        volume: this.strict ? -8 : -5
+      }).connect(leadOut));
+      const warmTone = keep(new Filter({ type: "lowpass", frequency: 2600, Q: 1 }).connect(leadOut));
+      this.leadWarm = this.strict ? this.leadCold : keep(new Synth({
+        oscillator: { type: "sawtooth" },
+        envelope: { attack: 5e-3, decay: 0.18, sustain: 0.2, release: 0.2 },
+        volume: -13
+      }).connect(warmTone));
+      this.lead = this.leadCold;
       const tick = keep(new NoiseSynth({
         noise: { type: "pink" },
         envelope: { attack: 1e-3, decay: 0.05, sustain: 0 },
         volume: -24
       }).connect(layer("tick", out)));
+      const knock = keep(new MembraneSynth({
+        pitchDecay: 0.02,
+        octaves: 3,
+        envelope: { attack: 1e-3, decay: 0.18, sustain: 0, release: 0.1 },
+        volume: -14
+      }).connect(this.layers.tick));
+      this.synths = { tick, knock };
       this.zero = Frequency(this.pitch(0, { hot: 0 })).transpose(-24);
       this.drone = keep(new Synth({
         oscillator: { type: "sine" },
@@ -25341,6 +25370,7 @@ var EJ = (() => {
         envelope: { attack: 5e-3, decay: 0.15, sustain: 0, release: 0.1 },
         volume: -20
       }).connect(layer("cue", out)));
+      Object.assign(this.synths, { pad, filter, bell, cue });
       const draw = getDraw();
       transport.scheduleRepeat((time) => {
         if (this.halted) return;
@@ -25356,16 +25386,16 @@ var EJ = (() => {
           }, time);
         }
         if (s === 0) {
+          knock.triggerAttackRelease("C2", "16n", time, 0.8);
           if (this.bellFor(f)) bell.triggerAttackRelease("C6", "8n", time, 0.9);
           if (f.label) cue.triggerAttackRelease(f.label === this.thenLabel ? "C3" : "C5", "16n", time, 0.6);
         }
         if (this.mapping === "scan") {
-          if (s % 4 === 0) tick.triggerAttackRelease("32n", time);
+          if (s % 4 === 0 && s > 0) tick.triggerAttackRelease("32n", time);
           const v = f.columns[s];
           if (v !== null) {
-            const loudness = 0.25 + 0.75 * clamp2(Math.abs(v) / (this.span / 2));
             this.pan.pan.setValueAtTime(this.panFor(-1 + 2 * (s + 0.5) / STEPS), time);
-            this.lead.triggerAttackRelease(this.pitch(v, f), "16n", time, loudness);
+            this.voiceFor(v).triggerAttackRelease(this.pitch(v, f), "16n", time, this.loudness(v));
           }
         } else {
           if (s === 0 && f.mean !== null) {
@@ -25461,15 +25491,74 @@ var EJ = (() => {
       this.mono = mono;
       if (mono && this.pan) this.pan.pan.rampTo(0, 0.02);
     }
-    // One note for the map cell under the listening cursor.
-    async probe(col, row) {
+    // One note for the map cell under the listening cursor. frameIndex defaults to the current moment.
+    async probe(col, row, frameIndex = this.index) {
       await start();
       if (!await this.ensureWired() || this.disposed) return "";
-      const v = this.frame().grid[row][col];
+      const f = this.score.frames[clamp2(Math.round(frameIndex), 0, this.score.frames.length - 1)];
+      const v = f.grid[row][col];
       if (v === null) return "Land or no data";
       this.pan.pan.rampTo(this.panFor(-1 + 2 * (col + 0.5) / 36), 0.02);
-      this.lead.triggerAttackRelease(this.pitch(v, this.frame()), "8n");
+      this.voiceFor(v).triggerAttackRelease(this.pitch(v, f), "8n", void 0, this.loudness(v));
       return `${signed(v)} ${this.score.units}`;
+    }
+    // Example sounds for "Learn the sounds". Each plays now and returns how long it lasts, in seconds.
+    // The example values are labelled as examples on the page; they are not data.
+    async demo(kind) {
+      await start();
+      if (!await this.ensureWired() || this.disposed) return 0;
+      const now2 = now() + 0.05;
+      const calm = { hot: 0 };
+      const gap = 0.45;
+      const note = (v, t, pan = 0) => {
+        this.pan.pan.setValueAtTime(this.panFor(pan), t);
+        this.voiceFor(v).triggerAttackRelease(this.pitch(v, calm), "8n", t, this.loudness(v));
+      };
+      const ramp = (vals, pans = vals.map(() => 0)) => {
+        vals.forEach((v, i) => note(v, now2 + i * gap, pans[i]));
+        return vals.length * gap + 0.4;
+      };
+      const m = this.maxAbs;
+      const { tick, knock, pad, filter, bell, cue } = this.synths;
+      switch (kind) {
+        case "normal":
+          return ramp([0, 0]);
+        case "warmer":
+          return ramp([0, m * 0.15, m * 0.4, m * 0.75]);
+        case "colder":
+          return ramp([0, -m * 0.15, -m * 0.4, -m * 0.75]);
+        case "land":
+          note(m * 0.25, now2);
+          note(m * 0.25, now2 + gap * 3);
+          return gap * 3 + 0.5;
+        case "sweep":
+          return ramp([0, 0, 0, 0, 0], [-1, -0.5, 0, 0.5, 1]);
+        case "knock":
+          knock.triggerAttackRelease("C2", "16n", now2, 0.8);
+          [1, 2, 3].forEach((k) => tick.triggerAttackRelease("32n", now2 + k * gap));
+          knock.triggerAttackRelease("C2", "16n", now2 + 4 * gap, 0.8);
+          return 4 * gap + 0.5;
+        case "bell":
+          bell.triggerAttackRelease("C6", "8n", now2, 0.9);
+          return 1.6;
+        case "then":
+          cue.triggerAttackRelease("C3", "16n", now2, 0.8);
+          return 0.6;
+        case "now":
+          cue.triggerAttackRelease("C5", "16n", now2, 0.8);
+          return 0.6;
+        case "hum":
+          this.drone.triggerAttackRelease(this.zero, 1.8, now2);
+          return 2.4;
+        case "chord": {
+          filter.frequency.setValueAtTime(700, now2);
+          pad.triggerAttackRelease(LADDER[0], 1.6, now2, 0.7);
+          pad.triggerAttackRelease(LADDER[LADDER.length - 1], 1.6, now2 + 2.2, 0.7);
+          return 4.6;
+        }
+        default:
+          return 0;
+      }
     }
     free() {
       for (const node of this.nodes.splice(0)) {
@@ -25508,8 +25597,9 @@ var EJ = (() => {
     const left = score.leftLon ?? -180;
     const quarters = [0, 4, 8, 12].map((s) => lonName(left + s * 22.5));
     const parts = [
-      `Key. Higher pitch means warmer than normal. The lowest note is ${signed(lo, 0)} ${u}, the highest ${signed(hi, 0)} ${u}, on one fixed scale for the whole track.`,
-      `Scan mode plays each map moment as ${STEPS} notes, west to east, moving from your left ear to your right. Louder notes are further from normal.`,
+      `Key. Higher pitch means warmer than normal. The lowest note is ${signed(lo, 0)} ${u}, the highest ${signed(hi, 0)} ${u}, on one fixed scale for the whole track. Normal is the middle note.`,
+      `Warmer than normal plays a bright, buzzy note. Colder than normal plays a soft, round note.`,
+      `Scan mode plays each map moment as ${STEPS} notes, west to east, moving from your left ear to your right. Louder notes are further from normal. A low knock starts each new map.`,
       `Silence is land, or no data.`,
       `A soft tick marks each quarter of the map: ${quarters.join(", ")}.`,
       `The low steady hum is the zero line: 0 ${u}, no change from normal.`,

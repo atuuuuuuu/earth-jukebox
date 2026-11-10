@@ -37,9 +37,9 @@
         <a class="cta ghost" href="#elnino">What is El Niño?</a>
       </div>
       <ol class="steps" aria-label="How to use Earth Jukebox">
-        <li><a href="#listen"><span class="n" aria-hidden="true">1</span><span><b>Listen</b>Pick a track and press Play. The globe shows what is playing.</span></a></li>
-        <li><a href="#explore"><span class="n" aria-hidden="true">2</span><span><b>Explore</b>Compare two dates, or tap any spot on the ocean to hear it.</span></a></li>
-        <li><a href="#guide"><span class="n" aria-hidden="true">3</span><span><b>Understand</b>Find out what every sound means.</span></a></li>
+        <li><a href="#learn"><span class="n" aria-hidden="true">1</span><span><b>Learn the sounds</b>One minute. Hear what warm, cold, land and El Niño sound like.</span></a></li>
+        <li><a href="#listen"><span class="n" aria-hidden="true">2</span><span><b>Listen</b>Pick a track and press Play. The globe shows what is playing.</span></a></li>
+        <li><a href="#explore"><span class="n" aria-hidden="true">3</span><span><b>Explore</b>Compare two dates, or click any spot on the map to hear it.</span></a></li>
       </ol>
     </div>
 
@@ -58,10 +58,34 @@
     </div>
   </section>
 
-  <!-- Step 1: Listen -->
-  <div id="listen" class="band" tabindex="-1">
+  <!-- Step 1: Learn the sounds -->
+  <div id="learn" class="band" tabindex="-1">
     <div class="band-head">
       <span class="band-n" aria-hidden="true">1</span>
+      <div><h2 class="band-h">Learn the sounds</h2><p>Press each button. It plays an example, then says what it means. The examples are made up to teach the sounds; everything after this step is real NASA data.</p></div>
+    </div>
+    <section class="panel" aria-labelledby="learn-h">
+      <h3 id="learn-h" class="sr-only">Example sounds</h3>
+      <div id="learn-list" class="learn">
+        <button type="button" data-demo="normal"><b>Normal</b><span>The middle note: no change from usual</span></button>
+        <button type="button" data-demo="warmer"><b>Warmer</b><span>Rising, bright, buzzy notes</span></button>
+        <button type="button" data-demo="colder"><b>Colder</b><span>Falling, soft, round notes</span></button>
+        <button type="button" data-demo="sweep"><b>West to east</b><span>Left ear to right ear</span></button>
+        <button type="button" data-demo="land"><b>Land</b><span>A gap of silence</span></button>
+        <button type="button" data-demo="knock"><b>New map</b><span>A low knock, then quarter ticks</span></button>
+        <button type="button" data-demo="bell"><b>El Niño bell</b><span>The Pacific is running hot</span></button>
+        <button type="button" data-demo="chord"><b>Planet Chord</b><span>Smooth (cool) then rough (hot)</span></button>
+        <button type="button" data-demo="hum"><b>Zero hum</b><span>The low "normal" line underneath</span></button>
+        <button type="button" data-demo="then" class="needs-labels"><b>Then</b><span>Low cue: the earlier year</span></button>
+        <button type="button" data-demo="now" class="needs-labels"><b>Now</b><span>High cue: the later year</span></button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Step 2: Listen -->
+  <div id="listen" class="band" tabindex="-1">
+    <div class="band-head">
+      <span class="band-n" aria-hidden="true">2</span>
       <div><h2 class="band-h">Listen</h2><p>Choose a track, press Play, and watch the globe. The white strip on the globe is the part of the ocean you are hearing.</p></div>
     </div>
 
@@ -111,6 +135,8 @@
           <button id="describe" type="button">Describe this moment</button>
           <button id="key" type="button">Key</button>
         </div>
+        <label class="check"><input id="announce" type="checkbox" aria-describedby="announce-hint"> Say the date of each map</label>
+        <p id="announce-hint" class="hint tight">While playing, says the date and whether the ocean is warmer or colder than normal as each new map starts.</p>
         <label class="check"><input id="speak" type="checkbox" aria-describedby="speak-hint"> Read aloud</label>
         <p id="speak-hint" class="hint tight">Also speaks with your device's voice. Leave off if you use a screen reader.</p>
 
@@ -141,12 +167,12 @@
                 <span id="badge" class="badge" hidden></span>
               </div>
               <div class="overlay ov-bell" aria-hidden="true"><span id="bell" class="bell">El Niño bell: off</span></div>
-              <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Tap the ocean to hear one spot.</p>
+              <p class="overlay ov-hint" aria-hidden="true">Drag to turn. Click the ocean to hear one spot.</p>
             </div>
           </div>
 
           <figure id="flat-view" class="flat" hidden>
-            <div class="frame">
+            <div class="frame clickable" id="flat-frame">
               <img id="map-img" alt="" width="1024" height="512">
               <div id="marker" aria-hidden="true"></div>
               <div id="cursor-box" aria-hidden="true"></div>
@@ -154,7 +180,7 @@
           </figure>
 
           <div class="stage-foot">
-            <p class="hint-narrow" aria-hidden="true">Drag the globe to turn it. Tap the ocean to hear one spot.</p>
+            <p class="hint-narrow" aria-hidden="true">Click or tap the ocean, on the globe or the flat map, to hear one spot.</p>
             <p id="stats" class="stats"></p>
             <div class="legend">
               <div class="bar" aria-hidden="true"></div>
@@ -195,28 +221,28 @@
     </div>
   </div>
 
-  <!-- Step 2: Explore -->
+  <!-- Step 3: Explore -->
   <div id="explore" class="band" tabindex="-1">
     <div class="band-head">
-      <span class="band-n" aria-hidden="true">2</span>
+      <span class="band-n" aria-hidden="true">3</span>
       <div><h2 class="band-h">Explore</h2><p>Hear how the ocean changed between two dates, or zoom in on one place.</p></div>
     </div>
 
     <section id="compare" class="panel" aria-labelledby="compare-h">
       <h3 id="compare-h">Hear the change</h3>
-      <p class="hint lead">Pick two moments. You hear A, then B, in the sound chosen in the player. The list below says what changed.</p>
+      <p class="hint lead">Pick two moments. You hear A, then B, in the sound chosen in the player. The list says what changed. Click either map to hear one spot on that date.</p>
       <div class="cmp-layout">
         <div class="cmp">
           <div id="cmp-a-card" class="cmp-card">
             <label for="cmp-a">Moment A</label>
             <select id="cmp-a"></select>
-            <img id="cmp-a-img" alt="" width="1024" height="512">
+            <div class="frame clickable cmp-frame" data-cmp="a"><img id="cmp-a-img" alt="" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
             <p id="cmp-a-v" class="v"></p>
           </div>
           <div id="cmp-b-card" class="cmp-card">
             <label for="cmp-b">Moment B</label>
             <select id="cmp-b"></select>
-            <img id="cmp-b-img" alt="" width="1024" height="512">
+            <div class="frame clickable cmp-frame" data-cmp="b"><img id="cmp-b-img" alt="" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
             <p id="cmp-b-v" class="v"></p>
           </div>
         </div>
@@ -229,7 +255,7 @@
 
     <section id="cursor-panel" class="panel" aria-labelledby="cursor-h">
       <h3 id="cursor-h">Listen to one spot</h3>
-      <p class="hint lead" id="cursor-hint">Each move plays one 10 degree square of the current map and says its temperature. The globe turns to show it. You can also tap the globe.</p>
+      <p class="hint lead" id="cursor-hint">Each move plays one 10 degree square of the current map and says its temperature. The globe turns to show it, and the yellow box marks it on the flat map. You can also click the globe or the flat map.</p>
       <div class="cursor-layout">
         <fieldset class="bare">
           <legend>Move the cursor</legend>
@@ -254,11 +280,11 @@
     </section>
   </div>
 
-  <!-- Step 3: Understand -->
+  <!-- More: the full key and settings -->
   <div id="guide" class="band" tabindex="-1">
     <div class="band-head">
-      <span class="band-n" aria-hidden="true">3</span>
-      <div><h2 class="band-h">Understand</h2><p>Every sound stands for something in the data. Nothing is added for decoration.</p></div>
+      <span class="band-n" aria-hidden="true">i</span>
+      <div><h2 class="band-h">Full key and settings</h2><p>Every sound stands for something in the data. Nothing is added for decoration.</p></div>
     </div>
     <div class="guide-grid">
       <section id="howto" class="panel" aria-labelledby="howto-h">

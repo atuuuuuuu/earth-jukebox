@@ -30,7 +30,7 @@ const server = http.createServer((q, r) => {
   console.log("context before gesture:", await page.evaluate("EJ.Tone.getContext().state"), "| globe:", await page.evaluate("window.globeReady ? 'WebGL' : 'flat map fallback'"));
 
   // Keyboard only: tab until the Play button has focus, then press Space.
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 30; i++) {
     await page.keyboard.press("Tab");
     if (await page.evaluate("document.activeElement.id === 'play'")) break;
   }
@@ -67,6 +67,19 @@ const server = http.createServer((q, r) => {
     await page.waitForTimeout(300);
     console.log("globe tap:", await page.textContent("#live"));
   }
+
+  // Flat map: clicking a spot plays it, like the globe.
+  await page.click('input[name="view"][value="flat"]');
+  const fm = await page.locator("#flat-frame").boundingBox();
+  await page.mouse.click(fm.x + fm.width * 0.1, fm.y + fm.height * 0.5);
+  await page.waitForTimeout(300);
+  console.log("flat map click:", await page.textContent("#live"), "->", await page.evaluate("window.lastProbe"));
+  await page.click('input[name="view"][value="globe"]');
+
+  // Learn the sounds: the example plays, then its meaning is spoken.
+  await page.click('#learn-list button[data-demo="warmer"]');
+  await page.waitForFunction("document.getElementById('live').textContent.startsWith('Warmer')", null, { timeout: 8000 });
+  console.log("learn the sounds:", (await page.textContent("#live")).slice(0, 60));
 
   // Hear the change: plays A then B once, then stops by itself.
   await page.click("#cmp-play");

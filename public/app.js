@@ -319,6 +319,11 @@
     setTime(i);
     showFrame(i);
     window.framesSeen = (window.framesSeen || 0) + 1;
+    if ($("announce").checked && playing) {
+      const m = f.mean;
+      const how = m === null ? "no data" : Math.abs(m) < 0.05 ? "about normal" : `${Math.abs(m).toFixed(1)} degrees ${m > 0 ? "warmer" : "colder"} than normal`;
+      say(`${niceDate(f.date)}${f.label ? `, ${f.label === son.thenLabel ? "then" : "now"}` : ""}. Ocean ${how}.${bellOn(f) ? " El Niño bell." : ""}`);
+    }
     if (bellOn(f)) {
       if (globe) globe.ringBell();
       const b = $("bell"); b.classList.remove("ring"); void b.offsetWidth; b.classList.add("ring");
@@ -400,6 +405,8 @@
     $("ax-w").textContent = lonShort(leftLon());
     $("ax-m").textContent = lonShort(leftLon() + 180);
     $("ax-e").textContent = lonShort(leftLon() + 360);
+    const paired = new Set(score.frames.map((f) => f.label).filter(Boolean)).size >= 2;
+    document.querySelectorAll("#learn-list .needs-labels").forEach((b) => { b.hidden = !paired; });
     renderKey();
     drawSpark();
     fillCompare();
@@ -493,6 +500,57 @@
   $("lon").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", lonText(e.target.value)); setSpin(false); probe(); });
   $("lat").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", latText(e.target.value)); setSpin(false); probe(); });
 
+  // ---------- Click a 2D map to hear one spot ----------
+  // x and y are fractions across the image. The frames start at leftLon and span 360 by 180 degrees.
+  const fracs = (el, e) => {
+    const r = el.getBoundingClientRect();
+    return [clamp((e.clientX - r.left) / r.width, 0, 0.9999), clamp((e.clientY - r.top) / r.height, 0, 0.9999)];
+  };
+  $("flat-frame").addEventListener("click", (e) => {
+    const [fx, fy] = fracs(e.currentTarget, e);
+    pickSpot({ lon: leftLon() + fx * 360, lat: 90 - fy * 180 });
+  });
+  document.querySelectorAll(".cmp-frame").forEach((el) => el.addEventListener("click", async (e) => {
+    const [fx, fy] = fracs(el, e);
+    const c = Math.floor(fx * 36), r = Math.floor(fy * 18);
+    const which = el.dataset.cmp;
+    const i = Number($(`cmp-${which}`).value);
+    const b = el.querySelector(".cmp-box");
+    Object.assign(b.style, { left: `${(c / 36) * 100}%`, top: `${(r / 18) * 100}%`, width: `${100 / 36}%`, height: `${100 / 18}%` });
+    b.hidden = false;
+    const value = await son.probe(c, r, i);
+    if (value) say(`Moment ${which.toUpperCase()}, ${niceDate(score.frames[i].date)}. ${lonText(c)}, ${latText(r)}: ${value}`);
+  }));
+
+  // ---------- Learn the sounds ----------
+  // Example values, labelled as examples. They show the mapping; they are not data.
+  let demoTimer;
+  $("learn-list").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-demo]");
+    if (!btn) return;
+    stopForSpeech();
+    clearTimeout(demoTimer);
+    const m = Math.max(Math.abs(score.range[0]), Math.abs(score.range[1]));
+    const ex = [0.15, 0.4, 0.75].map((k) => (m * k).toFixed(1));
+    const u = score.units;
+    const t = tune();
+    const text = {
+      normal: `That is normal: the same temperature as usual for that place and time of year. It is the middle note. Every other note is measured from it.`,
+      warmer: `Warmer than normal: normal, then ${ex.join(", ")} ${u} warmer. The warmer the sea, the higher, brighter and louder the note.`,
+      colder: `Colder than normal: normal, then ${ex.join(", ")} ${u} colder. The colder the sea, the lower the note, and it sounds soft and round.`,
+      sweep: `West to east. Each map plays from the far west in your left ear to the far east in your right ear. Use headphones, or tick Mono in settings for one ear.`,
+      land: `Land. A note, then silence where the scan crosses land, then the sea again.`,
+      knock: `A new map. The low knock starts each map, and soft ticks mark each quarter of the way across.`,
+      bell: `The El Niño bell. It rings at the start of a map when the Niño 3.4 box in the Pacific is more than ${signedSpeech(score.ninoLine ?? 0)} ${u} warmer than the tropics.`,
+      chord: `Planet Chord, smooth then rough. In Planet Chord mode the whole ocean plays as one chord. A smooth chord means a cool ocean on average, up to ${signedSpeech(t.ladder[0])} ${u}; a rough chord means a hot one, ${signedSpeech(t.ladder[1])} ${u} or more.`,
+      hum: `The zero hum. A low steady tone under the music that stands for normal. It never changes.`,
+      then: `The then cue: a low note at the start of a map from ${son.thenLabel ?? "the earlier year"}.`,
+      now: `The now cue: a high note at the start of a map from the later year.`,
+    }[btn.dataset.demo];
+    const secs = await son.demo(btn.dataset.demo);
+    demoTimer = setTimeout(() => say(text), secs * 1000);
+  });
+
   // ---------- Hear the change ----------
   const cmpA = $("cmp-a"), cmpB = $("cmp-b");
   const fillCompare = () => {
@@ -515,6 +573,7 @@
     explainCompare();
   };
   const explainCompare = () => {
+    document.querySelectorAll(".cmp-box").forEach((b) => { b.hidden = true; });
     const ia = Number(cmpA.value), ib = Number(cmpB.value);
     const A = score.frames[ia], B = score.frames[ib];
     const u = unitShort();

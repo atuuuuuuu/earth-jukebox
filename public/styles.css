@@ -297,7 +297,8 @@ input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--
 .cmp-card { border: 2px solid transparent; border-radius: 12px; padding: 12px; background: var(--panel-2); }
 .cmp-card.live { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.25); }
 .cmp-card label { display: block; font-weight: 700; margin-bottom: 6px; }
-.cmp-card img { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; border-radius: 8px; margin-top: 10px; background: #2a2f38; }
+.cmp-frame { margin-top: 10px; border-radius: 8px; }
+.cmp-box { position: absolute; border: 2px solid #ffdc4d; outline: 2px solid #000; border-radius: 2px; pointer-events: none; }
 .cmp-card .v { margin: 8px 0 0; font-weight: 800; }
 .cmp-side { display: grid; gap: 12px; }
 #cmp-play { width: 100%; min-height: 52px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -324,3 +325,18 @@ input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--
 
 footer { max-width: 1320px; margin: 0 auto; padding: 24px 16px 40px; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line-soft); }
 footer p { margin: 6px 0; }
+
+/* ---------- Clickable 2D maps ---------- */
+.clickable { cursor: crosshair; }
+.clickable img { pointer-events: none; }
+
+/* ---------- Learn the sounds ---------- */
+.learn { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.learn button {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left;
+  min-height: 72px; padding: 10px 14px; background: var(--panel-2); border: 2px solid transparent; border-radius: 12px;
+}
+.learn button:hover { border-color: var(--line); }
+.learn button b::before { content: "\25B6"; font-size: 0.75em; margin-right: 8px; color: var(--accent); vertical-align: 1px; }
+.learn button span { font-weight: 500; color: var(--muted); font-size: 0.88rem; line-height: 1.35; }
+@media (max-width: 599px) { .learn { grid-template-columns: 1fr 1fr; } .learn button { min-height: 80px; } }
