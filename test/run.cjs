@@ -124,8 +124,10 @@ const server = http.createServer((q, r) => {
     return null;
   });
   if (plain) {
-    await page.click(`label[for="track-${plain}"]`);
-    await page.waitForFunction("document.getElementById('stage-h').textContent !== 'The ocean, live'", null, { timeout: 8000 });
+    // Headless Chrome on some Macs stops producing animation frames after the offline renders above,
+    // so Playwright's "stable" check never passes. Click the radio directly and poll on a timer instead.
+    await page.evaluate((id) => document.getElementById(`track-${id}`).click(), plain);
+    await page.waitForFunction("document.getElementById('stage-h').textContent !== 'The ocean, live'", null, { timeout: 8000, polling: 100 });
     const shown = await page.evaluate(() => ({
       heading: document.getElementById("stage-h").textContent,
       bellHidden: document.querySelector(".ov-bell").hidden,
@@ -133,7 +135,7 @@ const server = http.createServer((q, r) => {
       globeBox: window.globe ? window.globe.ninoOn : "no globe handle",
       date: document.getElementById("date").textContent,
     }));
-    await page.click("#describe");
+    await page.evaluate(() => document.getElementById("describe").click());
     await page.waitForTimeout(300);
     console.log(`no-Niño track ${plain}:`, JSON.stringify(shown), "| describe:", (await page.textContent("#live")).slice(0, 70));
     const axe2 = await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
