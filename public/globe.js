@@ -52,6 +52,25 @@ float line(float d, float px) {
   return 1.0 - smoothstep(hw, hw + w * uPx, d);
 }
 
+// How much a frame colour is data. Pure grey (land, ice) has almost no saturation: no data.
+// Near-zero ocean is a bright cream, so brightness keeps it.
+float dataOf(vec3 c) {
+  float hi = max(c.r, max(c.g, c.b));
+  float sat = hi - min(c.r, min(c.g, c.b));
+  return max(smoothstep(0.018, 0.045, sat), smoothstep(0.74, 0.80, hi));
+}
+// Black ink: NASA's coastlines and borders, drawn into some frames (A3, GISTEMP).
+// Grey land in the other frames is never this dark (always above 0.24), so they have none.
+float inkOf(vec3 c) {
+  float hi = max(c.r, max(c.g, c.b));
+  float sat = hi - min(c.r, min(c.g, c.b));
+  return (1.0 - smoothstep(0.06, 0.24, hi)) * (1.0 - smoothstep(0.03, 0.08, sat));
+}
+vec3 frameAt(vec2 uv) {
+  uv.x = fract(uv.x);
+  return mix(texture2D(uData0, uv).rgb, texture2D(uData1, uv).rgb, uMix);
+}
+
 void main() {
   float lon = vLL.x, lat = vLL.y;
   vec2 uvImg = vec2(mod(lon - uLeftLon + 360.0, 360.0) / 360.0, (90.0 - lat) / 180.0);
@@ -62,15 +81,22 @@ void main() {
   vec3 earth = texture2D(uEarth, uvEarth).rgb;
 
   // The NASA frames paint land and ice grey. Grey means "no data": show the planet there.
-  // Pure grey (land, ice) has almost no saturation; near-zero ocean is a bright cream, so brightness keeps it.
-  float hi = max(data.r, max(data.g, data.b));
-  float sat = hi - min(data.r, min(data.g, data.b));
-  float isData = max(smoothstep(0.018, 0.045, sat), smoothstep(0.74, 0.80, hi));
-  // Some frames (A3, GISTEMP) have NASA's coastlines and borders drawn in black. Black is ink, not
-  // missing data: keep it, or the planet's ocean shows through as a second, offset coastline.
-  // Grey land in the other frames is never this dark (always above 0.24).
-  float ink = (1.0 - smoothstep(0.06, 0.24, hi)) * (1.0 - smoothstep(0.03, 0.08, sat));
-  isData = max(isData, ink);
+  float isData = dataOf(data);
+  // A line of black ink is kept only where data lies all round it. Where the frame has no data,
+  // the planet's own coastline shows instead, so the two never sit side by side, out of line.
+  float ink = inkOf(data);
+  if (ink > 0.0) {
+    float sum = 0.0, n = 0.0;
+    for (int k = 0; k < 8; k++) {
+      float a = float(k) * 0.785398;
+      vec3 c = frameAt(uvImg + vec2(cos(a) / 360.0, sin(a) / 180.0) * 0.9);   // 0.9 degrees away
+      float w = 1.0 - inkOf(c);
+      sum += w * dataOf(c);
+      n += w;
+    }
+    float around = n > 0.5 ? sum / n : 1.0;
+    isData = max(isData, ink * smoothstep(0.6, 0.95, around));
+  }
   // The NASA date stamp sits in the bottom-left corner of every frame: never paint it on the globe.
   isData *= 1.0 - smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
   isData *= uDataOn;
