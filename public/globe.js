@@ -66,6 +66,11 @@ void main() {
   float hi = max(data.r, max(data.g, data.b));
   float sat = hi - min(data.r, min(data.g, data.b));
   float isData = max(smoothstep(0.018, 0.045, sat), smoothstep(0.74, 0.80, hi));
+  // Some frames (A3, GISTEMP) have NASA's coastlines and borders drawn in black. Black is ink, not
+  // missing data: keep it, or the planet's ocean shows through as a second, offset coastline.
+  // Grey land in the other frames is never this dark (always above 0.24).
+  float ink = (1.0 - smoothstep(0.06, 0.24, hi)) * (1.0 - smoothstep(0.03, 0.08, sat));
+  isData = max(isData, ink);
   // The NASA date stamp sits in the bottom-left corner of every frame: never paint it on the globe.
   isData *= 1.0 - smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
   isData *= uDataOn;
