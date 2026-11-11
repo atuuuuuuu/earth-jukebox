@@ -141,7 +141,7 @@ nothing else.
 ## Rebuild one track only
 
 ```bash
-python3 backend/build_api.py backend/tracks.config.json --only a3-warming-world
+python3 backend/build_api.py backend/tracks.config.json --only a2-el-nino
 ```
 
 Builds just that track. The other tracks keep their files and their entries in
@@ -155,59 +155,7 @@ has numbers on it. Add a new entry under `"sources"` with its frames, dates,
 colour bar and `range`, then a track that uses it. Give the source `"words"`
 (`{"subject": "planet", "map": "..."}`) so the page names it right, and set
 `"nino34": false` on its tracks if it is not a sea temperature map. The frontend
-needs no other change: the new track appears in `tracks.json`. A3 (GISTEMP, SVS
-5603) was added this way: see "A3: 145 years" below.
-
-## A3: 145 years of the whole planet (SVS 5603)
-
-Track A3, Warming World, plays NASA's GISTEMP v4 surface temperature, land and
-ocean, every fifth year from 1880 to 2025, compared with 1951 to 1980.
-
-**1. Download** from [SVS 5603](https://svs.gsfc.nasa.gov/5603) into `data/gistemp/`:
-`GISTEMP_2025_equirectangular_2048p.mp4` (120 MB, under "Equirectangular and
-Science on a Sphere Content") and `Map_HD_2025_nosmoothing.png` (the 2025 map
-with the labelled colour bar). For the check in step 4, also download NASA's
-table [GLB.Ts+dSST.csv](https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv).
-
-**2. Prepare** (OpenCV only, no ffmpeg):
-
-```bash
-python3 backend/prepare_gistemp.py data/gistemp
-```
-
-**3. Build only A3**, leaving A1 and A2 as they are:
-
-```bash
-python3 backend/build_api.py backend/tracks.config.json --only a3-warming-world
-python3 backend/validate_api.py public
-```
-
-**4. Check against NASA's own numbers:**
-
-```bash
-python3 backend/gistemp_check.py backend/tracks.config.json data/gistemp/GLB.Ts+dSST.csv
-```
-
-On 10 Nov 2026 this gave: 146 years, correlation 0.998 with NASA's published
-yearly global mean, typical difference 0.03 degrees C, largest 0.06 (1923).
-
-**What we had to work out, and how we know it is right**
-
-- **The flat video has no colour bar of its own.** Its colours are the labelled
-  map's palette, but spread over -2 to +2 degrees C instead of -4 to +4. We found
-  this by sampling the flat video's last frame and NASA's labelled 2025 map
-  (Robinson projection) at the same 9,072 places: read with -2 to +2, the two
-  agree to 0.02 degrees C on average, 98% of places within 0.25 degrees C.
-  Places above +2 degrees C read as +2, so A3's hottest values are a floor.
-- **The video has no dates on it.** It holds 1741 different frames, then holds
-  the last one for 2 seconds: one frame per month of 12-month averages, from
-  Jan-Dec 1880 to Jan-Dec 2025. Every 12th frame is one calendar year. The
-  match with NASA's January-to-December means confirms the dates.
-- **Grey means no measurements**, mostly before 1950 (Africa, South America,
-  Antarctica). Grey is far from every bar colour, so it reads as no data and the
-  listening cursor is silent there. A3 is 81% mapped in 1880, 94% today.
-- A3 has no El Niño bell (`"nino34": false`): the bell's threshold is defined
-  for sea temperature, not for yearly land-and-ocean averages.
+needs no other change: the new track appears in `tracks.json`.
 
 ## Explaining it to the judges
 

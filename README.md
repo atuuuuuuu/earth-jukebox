@@ -6,7 +6,7 @@ browser (frontend).
 
 ## What it does
 
-- **Three tracks from two NASA visualizations.** A1 Ocean Fever and A2 El Niño: then vs now play sea surface temperature (SVS 5176, May 2024 to Nov 2026). A3 Warming World plays 145 years of land and ocean temperature (GISTEMP, SVS 5603, 1880 to 2025). A3's numbers match NASA's published yearly global means to within 0.06 °C (`backend/gistemp_check.py`).
+- **Two tracks from NASA sea surface temperature.** A1 Ocean Fever and A2 El Niño: then vs now (SVS 5176, May 2024 to Nov 2026).
 - **A 3D globe painted with the real NASA map.** Every moment's sea surface temperature frame is wrapped onto a WebGL globe, with NASA Blue Marble showing the land. It spins, you drag it, and it crossfades from month to month.
 - **The globe shows the music.** The strip being played lights up as it sweeps west to east, the Niño 3.4 box glows when the El Niño bell rings, and the listening cursor is a yellow square.
 - **Tap the ocean to hear it.** Tapping the globe plays that 10 degree square and says its real temperature anomaly from the data grid. Moving the cursor sliders turns the globe to the spot.

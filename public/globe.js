@@ -59,7 +59,7 @@ float dataOf(vec3 c) {
   float sat = hi - min(c.r, min(c.g, c.b));
   return max(smoothstep(0.018, 0.045, sat), smoothstep(0.74, 0.80, hi));
 }
-// Black ink: NASA's coastlines and borders, drawn into some frames (A3, GISTEMP).
+// Black ink: NASA's coastlines and borders, drawn into some NASA frames.
 // Grey land in the other frames is never this dark (always above 0.24), so they have none.
 float inkOf(vec3 c) {
   float hi = max(c.r, max(c.g, c.b));

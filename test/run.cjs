@@ -114,7 +114,7 @@ const server = http.createServer((q, r) => {
   });
   console.log("offline:", JSON.stringify(stats));
 
-  // A track without Niño 3.4 data (A3, GISTEMP): no bell, no box, its own words, and still accessible.
+  // A track without Niño 3.4 data, if there is one: no bell, no box, its own words, and still accessible.
   const plain = await page.evaluate(async () => {
     const index = await (await fetch("api/tracks.json")).json();
     for (const t of index.tracks) {

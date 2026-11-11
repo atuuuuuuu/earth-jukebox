@@ -36,23 +36,6 @@
         "url": "https://svs.gsfc.nasa.gov/5176",
         "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC"
       }
-    },
-    {
-      "id": "a3-warming-world",
-      "code": "A3",
-      "title": "Warming World",
-      "subtitle": "Land and ocean, 1880 to 2025",
-      "description": "Every fifth year from 1880 to 2025, land and ocean, compared with 1951 to 1980. Each moment is one year's average. Grey places had no measurements yet, and stay silent.",
-      "score": "api/scores/a3-warming-world.json",
-      "frames": 30,
-      "firstDate": "1880-07-01",
-      "lastDate": "2025-07-01",
-      "units": "degrees C",
-      "source": {
-        "title": "Global Temperature Anomalies from 1880 to 2025",
-        "url": "https://svs.gsfc.nasa.gov/5603",
-        "credit": "NASA Scientific Visualization Studio. Data: GISS Surface Temperature Analysis (GISTEMP v4), NASA GISS"
-      }
     }
   ]
 }
