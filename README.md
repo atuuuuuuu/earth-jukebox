@@ -148,6 +148,13 @@ ffmpeg and a 338 MB download), then `npm run api && npm run validate`.
 `npm run sample` builds a small API from synthetic maps for testing. It **replaces**
 the real data in `public/api`; restore it with `git checkout public/api public/frames`.
 
+## AI assistance
+
+Built with help from an AI coding assistant, Claude Code (Anthropic). It wrote and reviewed
+much of the code, tests and documentation; `AGENTS.md` holds the rules it worked under.
+The team decided what to build, chose the data, and reviewed and tested every change.
+All data comes from the NASA and partner sources listed below; no AI-generated data or images are used.
+
 ## Data and credits
 
 - Sea surface temperature anomaly: [NASA Scientific Visualization Studio, SVS 5176](https://svs.gsfc.nasa.gov/5176).
