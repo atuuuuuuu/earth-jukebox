@@ -440,6 +440,7 @@
   $("play").addEventListener("click", async () => {
     if (playing) { son.pause(); playing = false; setPlayButton(); idleVisuals(); if (comparing) { son.cancelSequence(); resetCompareUI(); } return; }
     if (comparing || son.queue) { son.cancelSequence(); resetCompareUI(); }
+    stopTrend(false);
     playing = true; setPlayButton();
     const mine = son;
     const ok = await son.play();
@@ -447,6 +448,7 @@
   });
 
   const stopForSpeech = () => {
+    stopTrend(false);
     if (playing) { son.pause(); playing = false; setPlayButton(); idleVisuals(); }
     if (son.queue || comparing) { son.cancelSequence(); resetCompareUI(); }
   };
@@ -628,6 +630,7 @@
   $("cmp-play").addEventListener("click", async () => {
     if (comparing) { onSequenceEnd(); return; }
     if (playing) { son.pause(); playing = false; }
+    stopTrend(false);
     const a = Number(cmpA.value), b = Number(cmpB.value);
     comparing = true; cmpFrames = 0;
     $("cmp-play").textContent = "Stop";
@@ -635,6 +638,129 @@
     const ok = await son.playSequence([a, b]);
     if (!ok) { playing = false; setPlayButton(); resetCompareUI(); }
   });
+
+  // ---------- Year by year: global temperature, CO2 and Arctic sea ice as one sound ----------
+  // Data: public/data/climate.json, built by scripts/climate_data.py. Every value it plays is in that file.
+  const YR = {
+    hz: (t) => 350 + 160 * t,              // 0 degrees = 350 Hz, +1.5 = 590 Hz, +3 = 830 Hz
+    alarmAt: 1.5,                          // the Paris Agreement limit, vs 1880-1900
+    bright: (c) => (c == null ? 0 : clamp((c - 280) / (430 - 280))),   // pre-industrial 280 ppm = pure, 430 ppm = brightest
+    secs: 0.25,                            // per year while playing
+    tc: 0.03,                              // setTargetAtTime time constant: glides with no clicks while scrubbing
+  };
+  let climate = null, yrSound = null, yrTimer = null, yrIdle = null;
+  const yrRows = () => climate.years;
+  const yrIce = () => { const v = yrRows().map((r) => r.ice).filter((x) => x != null); return [Math.min(...v), Math.max(...v)]; };
+  // Less ice = more wind, on one fixed scale for the whole record (its own low and high).
+  const yrWind = (ice) => { if (ice == null) return null; const [lo, hi] = yrIce(); return clamp((hi - ice) / (hi - lo)); };
+  const yrText = (r) => `${r.year}: ${signed(r.temp, 2)} degrees C${r.temp >= YR.alarmAt ? ", over the 1.5 degree line" : ""}. ` +
+    (r.co2 != null ? `CO2 ${Math.round(r.co2)} ppm. ` : "No CO2 record yet. ") +
+    (r.ice != null ? `Arctic sea ice ${r.ice.toFixed(2)} million square kilometres.` : "No sea ice record yet.");
+  const yrSummary = () => {
+    const ys = yrRows(), a = ys[0], z = ys[ys.length - 1];
+    const firstAlarm = ys.find((r) => r.temp >= YR.alarmAt);
+    const co2 = ys.filter((r) => r.co2 != null), ice = ys.filter((r) => r.ice != null);
+    const low = ice.reduce((m, r) => (r.ice < m.ice ? r : m));
+    return `${a.year} to ${z.year}. Global temperature went from ${signed(a.temp, 2)} to ${signed(z.temp, 2)} °C compared with 1880 to 1900, so the tone rose from ${Math.round(YR.hz(a.temp))} to ${Math.round(YR.hz(z.temp))} Hz. ` +
+      (firstAlarm ? `The alarm first sounds in ${firstAlarm.year}, the first year at 1.5 °C or more. ` : "No year reached 1.5 °C, so the alarm never sounds. ") +
+      `CO₂ rose from ${Math.round(co2[0].co2)} ppm in ${co2[0].year} to ${Math.round(co2[co2.length - 1].co2)} ppm in ${co2[co2.length - 1].year}, so the tone grows brighter. ` +
+      `September Arctic sea ice went from ${ice[0].ice.toFixed(2)} million km² in ${ice[0].year} to ${ice[ice.length - 1].ice.toFixed(2)} in ${ice[ice.length - 1].year}, lowest ${low.ice.toFixed(2)} in ${low.year}, so the wind grows louder.`;
+  };
+  const yrShow = (i) => {
+    const r = yrRows()[i], n = yrRows().length;
+    $("year").value = i;
+    $("year").setAttribute("aria-valuetext", yrText(r));
+    $("yr-year").textContent = r.year;
+    $("yr-alarm").hidden = r.temp < YR.alarmAt;
+    $("yr-temp").innerHTML = `${signed(r.temp, 2)} °C<small>${Math.round(YR.hz(r.temp))} Hz</small>`;
+    $("yr-co2").innerHTML = r.co2 != null ? `${Math.round(r.co2)} ppm<small>${Math.round(YR.bright(r.co2) * 100)}% bright</small>` : `–<small>Record starts 1959</small>`;
+    $("yr-ice").innerHTML = r.ice != null ? `${r.ice.toFixed(2)} M km²<small>Wind ${Math.round(yrWind(r.ice) * 100)}%</small>` : `–<small>Record starts 1979</small>`;
+    const c = $("yr-chart").querySelector(".cur"), x = n <= 1 ? 50 : (i / (n - 1)) * 100;
+    c.setAttribute("x1", x); c.setAttribute("x2", x);
+  };
+  const yrDrawChart = () => {
+    const ys = yrRows(), n = ys.length, lo = Math.min(-0.2, ...ys.map((r) => r.temp)), hi = Math.max(1.7, ...ys.map((r) => r.temp));
+    const y = (v) => 40 - ((v - lo) / (hi - lo)) * 40, svg = $("yr-chart");
+    svg.querySelector(".mean").setAttribute("d", ys.map((r, i) => `${i ? "L" : "M"}${((i / (n - 1)) * 100).toFixed(2)} ${y(r.temp).toFixed(2)}`).join(" "));
+    for (const [cls, v] of [["zero", 0], ["alarm-line", YR.alarmAt]]) { const l = svg.querySelector("." + cls); l.setAttribute("y1", y(v)); l.setAttribute("y2", y(v)); }
+    $("yr-ax-a").textContent = ys[0].year; $("yr-ax-b").textContent = ys[n - 1].year; $("yr-first").textContent = ys[0].year;
+  };
+  // Glide every voice to year i. setTargetAtTime never jumps, so dragging the slider fast does not click.
+  const yrSet = (i) => {
+    if (!yrSound) return;
+    const r = yrRows()[i], s = yrSound, now = EJ.Tone.now(), go = (param, v) => param.setTargetAtTime(v, now, YR.tc);
+    const wind = yrWind(r.ice);
+    go(s.sine.frequency, YR.hz(r.temp)); go(s.harm.frequency, YR.hz(r.temp));
+    go(s.harmGain.gain, 0.5 * YR.bright(r.co2));
+    go(s.alarmGain.gain, r.temp >= YR.alarmAt ? 0.06 : 0);
+    go(s.noiseGain.gain, wind == null ? 0 : 0.04 + 0.3 * wind);
+    go(s.filter.frequency, wind == null ? 400 : 400 + 2600 * wind);
+  };
+  const yrStart = async () => {
+    if (yrSound) return;
+    await EJ.Tone.start();
+    const T = EJ.Tone;
+    const master = new T.Gain(0).toDestination();
+    const s = {
+      master,
+      sine: new T.Oscillator({ type: "sine", frequency: 350 }),
+      harm: new T.Oscillator({ type: "custom", partials: [0, 0.6, 0.45, 0.35, 0.28, 0.22], frequency: 350 }),   // overtones 2 to 6 only
+      harmGain: new T.Gain(0),
+      alarm: new T.Oscillator({ type: "sawtooth", frequency: 880 }),
+      alarmGain: new T.Gain(0),
+      noise: new T.Noise("white"),
+      filter: new T.Filter(400, "lowpass"),
+      noiseGain: new T.Gain(0),
+    };
+    s.sine.connect(master); s.harm.chain(s.harmGain, master); s.alarm.chain(s.alarmGain, master); s.noise.chain(s.filter, s.noiseGain, master);
+    [s.sine, s.harm, s.alarm, s.noise].forEach((o) => o.start());
+    master.gain.setTargetAtTime(0.3 * (settings.volume / 100), T.now(), YR.tc);
+    yrSound = s;
+  };
+  const yrStop = () => {
+    if (!yrSound) return;
+    const s = yrSound; yrSound = null;
+    s.master.gain.setTargetAtTime(0, EJ.Tone.now(), YR.tc);
+    setTimeout(() => Object.values(s).forEach((n) => n.dispose()), 300);
+  };
+  const stopTrend = (finished) => {
+    clearInterval(yrTimer); yrTimer = null; clearTimeout(yrIdle);
+    yrStop();
+    $("trend-play").textContent = "Play every year";
+    if (finished) say(yrSummary());
+  };
+  $("trend-play").addEventListener("click", async () => {
+    if (!climate) return;
+    if (yrTimer) { stopTrend(false); return; }
+    stopForSpeech();
+    let i = Number($("year").value);
+    if (i >= yrRows().length - 1) i = 0;
+    await yrStart(); yrShow(i); yrSet(i);
+    $("trend-play").textContent = "Stop";
+    yrTimer = setInterval(() => {
+      const next = Number($("year").value) + 1;   // reads the slider, so scrubbing while playing moves the playhead
+      if (next >= yrRows().length) { stopTrend(true); return; }
+      yrShow(next); yrSet(next);
+    }, YR.secs * 1000);
+  });
+  // Scrub: dragging or arrow keys play the year, and the sound fades out shortly after you stop.
+  $("year").addEventListener("input", async () => {
+    if (!climate) return;
+    const i = Number($("year").value);
+    yrShow(i);
+    if (yrTimer) { yrSet(i); return; }
+    if (playing || comparing) stopForSpeech();
+    await yrStart(); yrSet(i);
+    clearTimeout(yrIdle);
+    yrIdle = setTimeout(() => { if (!yrTimer) yrStop(); }, 900);
+  });
+  fetch("data/climate.json").then((r) => r.json()).then((d) => {
+    climate = d;
+    $("year").max = yrRows().length - 1;
+    yrDrawChart(); yrShow(0);
+    $("trend-text").textContent = yrSummary();
+    $("trend-src").innerHTML = "Data: " + d.sources.map((s) => `<a href="${s.url}">${s.title}</a>`).join(", ") + `. Temperatures are compared with ${d.baseline.replace("-", " to ")}.`;
+  }).catch(() => { $("trend-text").textContent = "Could not load the yearly climate data."; $("trend-play").disabled = true; $("year").disabled = true; });
 
   // ---------- Key, as a list ----------
   const renderKey = () => {
@@ -654,6 +780,7 @@
     settings.volume = Number(e.target.value);
     e.target.setAttribute("aria-valuetext", `${settings.volume} percent`);
     son.setVolume(settings.volume);
+    if (yrSound) yrSound.master.gain.setTargetAtTime(0.3 * (settings.volume / 100), EJ.Tone.now(), YR.tc);
   });
   // Mixer: one native checkbox per sound. Ticked = you hear it.
   $("mixer-list").innerHTML = EJ.LAYERS.map((l) =>

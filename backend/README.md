@@ -25,7 +25,7 @@ NASA video ──ffmpeg──> frames ──build_api.py──> public/api/*.jso
 | `inspect_frame.py` | Checks one frame by eye (the Gate 1 test) |
 | `nino_check.py` | Compares one month's El Niño numbers with NOAA's monthly discussion |
 | `make_fixture.py` | Makes synthetic maps with known answers, for tests and the sample API |
-| `tests/test_backend.py` | 16 tests: known answers in, the same answers must come out |
+| `tests/test_backend.py` | 17 tests: known answers in, the same answers must come out |
 
 ## Set up once
 
@@ -42,7 +42,7 @@ On Windows, type `py` where these notes say `python3`. Install the libraries:
 pip install numpy scipy opencv-python-headless
 ```
 
-Then run the tests from the project folder. All 16 should say `ok`:
+Then run the tests from the project folder. All 17 should say `ok`:
 
 ```bash
 python3 -m unittest discover backend/tests -v

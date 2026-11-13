@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Earth Jukebox: NASA ocean temperature as music</title>
 <meta name="description" content="Listen to NASA's sea surface temperature data on a 3D globe. An accessible sonification for NASA Space Apps 2026.">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 <a class="skip" href="#player">Skip to the player</a>
@@ -236,13 +236,13 @@
           <div id="cmp-a-card" class="cmp-card">
             <label for="cmp-a">Moment A</label>
             <select id="cmp-a"></select>
-            <div class="frame clickable cmp-frame" data-cmp="a"><img id="cmp-a-img" alt="" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
+            <div class="frame clickable cmp-frame" data-cmp="a"><img id="cmp-a-img" alt="" loading="lazy" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
             <p id="cmp-a-v" class="v"></p>
           </div>
           <div id="cmp-b-card" class="cmp-card">
             <label for="cmp-b">Moment B</label>
             <select id="cmp-b"></select>
-            <div class="frame clickable cmp-frame" data-cmp="b"><img id="cmp-b-img" alt="" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
+            <div class="frame clickable cmp-frame" data-cmp="b"><img id="cmp-b-img" alt="" loading="lazy" width="1024" height="512"><div class="cmp-box" aria-hidden="true" hidden></div></div>
             <p id="cmp-b-v" class="v"></p>
           </div>
         </div>
@@ -251,6 +251,42 @@
           <div id="cmp-result" class="cmp-result"></div>
         </div>
       </div>
+    </section>
+
+    <section id="trend" class="panel" aria-labelledby="trend-h">
+      <h3 id="trend-h">Year by year: the whole planet since <span id="yr-first">1880</span></h3>
+      <p class="hint lead" id="trend-hint">Three yearly records, played together as one sound. Press Play to hear every year in order, or drag the year slider to scrub. The slider also works with the arrow keys and tells your screen reader each year's numbers.</p>
+      <ul class="yr-key">
+        <li><b>Pitch, a pure sine wave: global temperature.</b> 350 Hz is the 1880 to 1900 average; every degree warmer is 160 Hz higher.</li>
+        <li><b>Alarm, a harsh buzz at 880 Hz:</b> the year is 1.5 degrees or more above 1880 to 1900, the Paris Agreement limit.</li>
+        <li><b>Brightness: carbon dioxide.</b> More CO₂ adds overtones, from a pure tone at 280 ppm (pre-industrial) to a bright one at 430 ppm. Silent before 1959, when the Mauna Loa record starts.</li>
+        <li><b>Wind: Arctic sea ice in September.</b> Less ice, louder and brighter wind. No wind before 1979, when satellite records start.</li>
+      </ul>
+      <div class="yr-panel">
+        <div class="yr-now" aria-hidden="true">
+          <p id="yr-year" class="yr-year">–</p>
+          <p id="yr-alarm" class="yr-alarm" hidden>Over 1.5 °C</p>
+        </div>
+        <dl class="yr-stats" aria-hidden="true">
+          <div><dt>Temperature</dt><dd id="yr-temp">–</dd></div>
+          <div><dt>CO₂</dt><dd id="yr-co2">–</dd></div>
+          <div><dt>Arctic ice, Sept</dt><dd id="yr-ice">–</dd></div>
+        </dl>
+      </div>
+      <svg id="yr-chart" class="spark yr-chart" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+        <line class="alarm-line" x1="0" x2="100" y1="0" y2="0"/>
+        <line class="zero" x1="0" x2="100" y1="0" y2="0"/>
+        <path class="mean" d=""/>
+        <line class="cur" x1="0" x2="0" y1="0" y2="40"/>
+      </svg>
+      <div class="yr-axis" aria-hidden="true"><span id="yr-ax-a"></span><span>Temperature vs 1880 to 1900 · dashed: 1.5 °C</span><span id="yr-ax-b"></span></div>
+      <div class="slider">
+        <label for="year">Year</label>
+        <input id="year" type="range" min="0" max="0" value="0" step="1" aria-describedby="trend-hint">
+      </div>
+      <button id="trend-play" type="button">Play every year</button>
+      <p id="trend-text" class="about"></p>
+      <p class="hint" id="trend-src"></p>
     </section>
 
     <section id="cursor-panel" class="panel" aria-labelledby="cursor-h">
@@ -326,8 +362,8 @@
   <p>Made for NASA Space Apps 2026. Not an official NASA product. Sound synthesised live with <a href="https://tonejs.github.io/">Tone.js</a>; the globe is drawn with plain WebGL.</p>
 </footer>
 
-<script src="bundle.js?v=5"></script>
+<script src="bundle.js?v=6"></script>
 <script src="globe.js?v=7"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

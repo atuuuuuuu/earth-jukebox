@@ -92,8 +92,21 @@ const server = http.createServer((q, r) => {
   console.log("time slider:", await page.getAttribute("#time", "aria-valuetext"));
 
   // Automated accessibility scan.
+  // Year by year: scrubbing gives each year's numbers; Play runs to the last year, then speaks the summary.
+  await page.waitForFunction("Number(document.getElementById('year').max) > 100", null, { timeout: 8000, polling: 100 });
+  const yr = await page.evaluate(() => {
+    const s = document.getElementById("year");
+    s.value = s.max; s.dispatchEvent(new Event("input"));
+    return s.getAttribute("aria-valuetext");
+  });
+  console.log("year slider:", yr);
+  await page.evaluate(() => { const s = document.getElementById("year"); s.value = s.max - 6; s.dispatchEvent(new Event("input")); document.getElementById("trend-play").click(); });
+  await page.waitForFunction("document.getElementById('trend-play').textContent === 'Stop'", null, { timeout: 5000, polling: 100 });
+  await page.waitForFunction("document.getElementById('trend-play').textContent === 'Play every year' && document.getElementById('live').textContent.includes('Global temperature')", null, { timeout: 15000, polling: 200 });
+  console.log("year by year:", (await page.textContent("#live")).slice(0, 110));
+
   await page.evaluate(axeSource);
-  const axe = await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
+  const axe =await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
   console.log("axe violations:", axe.violations.length, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", "), "| rules passed:", axe.passes.length);
 
   // Offline renders of each mapping: non-silent, not clipping, and the two maps differ.

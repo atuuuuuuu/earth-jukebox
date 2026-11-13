@@ -212,7 +212,7 @@ input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--
 .stage-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 12px; overflow: hidden; margin: 0; padding: 0; }
 .seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.seg label { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; cursor: pointer; font-weight: 700; font-size: 0.95rem; }
+.seg label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; cursor: pointer; font-weight: 700; font-size: 0.95rem; }
 .seg label:has(input:checked) { background: var(--panel-3); color: #ffe2a3; }
 .seg label + label { border-left: 2px solid var(--line); }
 .seg input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
@@ -236,6 +236,7 @@ input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--
 .badge.then { color: #bfe0ff; border-color: var(--cold); }
 .badge.now { color: #ffd2bd; border-color: var(--warm); }
 .ov-bell { right: 20px; bottom: 16px; text-align: right; }
+@media (max-width: 479px) { .ov-bell { top: 14px; right: 14px; bottom: auto; } }   /* phones: the date fills the bottom row */
 .bell {
   display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 0.9rem;
   border: 2px solid rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.45); color: var(--muted);
@@ -301,7 +302,7 @@ input[type="range"] { width: 100%; height: 44px; margin: 0; accent-color: var(--
 .cmp-box { position: absolute; border: 2px solid #ffdc4d; outline: 2px solid #000; border-radius: 2px; pointer-events: none; }
 .cmp-card .v { margin: 8px 0 0; font-weight: 800; }
 .cmp-side { display: grid; gap: 12px; }
-#cmp-play { width: 100%; min-height: 52px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#cmp-play, #trend-play { width: 100%; min-height: 52px; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .cmp-result { margin: 0; padding: 12px 14px; border-radius: 12px; background: #08111f; border: 1px solid var(--line-soft); font-size: 0.93rem; }
 .cmp-result ul { margin: 0; padding-left: 1.2em; }
 .cmp-result li { margin: 4px 0; }
@@ -340,3 +341,23 @@ footer p { margin: 6px 0; }
 .learn button b::before { content: "\25B6"; font-size: 0.75em; margin-right: 8px; color: var(--accent); vertical-align: 1px; }
 .learn button span { font-weight: 500; color: var(--muted); font-size: 0.88rem; line-height: 1.35; }
 @media (max-width: 599px) { .learn { grid-template-columns: 1fr 1fr; } .learn button { min-height: 80px; } }
+/* Year by year */
+.yr-key { margin: 0 0 16px; padding-left: 1.2em; color: var(--muted); font-size: 0.95rem; }
+.yr-key li { margin: 4px 0; }
+.yr-key b { color: var(--text); }
+.yr-panel { display: grid; gap: 12px; align-items: center; }
+@media (min-width: 640px) { .yr-panel { grid-template-columns: auto minmax(0, 1fr); gap: 24px; } }
+.yr-now { display: flex; align-items: center; gap: 12px; min-height: 64px; }   /* fixed height: no jump when the alarm shows */
+.yr-year { margin: 0; font-size: clamp(2.4rem, 9vw, 3.4rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.yr-alarm { margin: 0; padding: 4px 12px; border-radius: 999px; border: 2px solid var(--warm); color: #ffd2bd; font-weight: 800; }
+.yr-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.yr-stats div { background: var(--panel-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.yr-stats dt { color: var(--muted); font-size: 0.8rem; }
+.yr-stats dd { margin: 2px 0 0; font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.yr-stats small { display: block; color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+@media (max-width: 420px) { .yr-stats { grid-template-columns: 1fr; } .yr-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; } .yr-stats dd { text-align: right; } }
+.yr-chart { height: 72px; margin: 16px 0 4px; }
+.yr-chart .alarm-line { stroke: var(--warm); stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.yr-axis { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
+#trend-play { max-width: 420px; margin-top: 4px; }
+#trend-text { margin-top: 16px; }
