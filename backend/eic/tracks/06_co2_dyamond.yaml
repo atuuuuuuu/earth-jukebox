@@ -1,0 +1,68 @@
+# Track 06 — DYAMOND global carbon dioxide (rotating globe, 14 Jan – 3 Mar 2020)
+id: 06_co2_dyamond
+title: "Carbon Dioxide Around the Globe, Early 2020"
+short: "Carbon Dioxide"
+builder: co2_dyamond
+
+source:
+  video: 06_CO2_DYAMOND/dyamondPointCloud_12-1-2023b_dyamond_co2_anim_globe_orbit_1080p30_h265.mp4
+  svs_id: 5196
+  url: https://svs.gsfc.nasa.gov/5196/
+  svs_title: "DYAMOND Global Carbon Dioxide"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: "AJ Christensen (SSAI), Greg Shirah (NASA/GSFC), Helen-Nicole Kostis (USRA), Mark SubbaRao (NASA/GSFC)"
+  dataset: "DYAMOND, the experimental coupled GEOS-MITgcm model (NASA GEOS)"
+
+geometry:
+  # Measured from the union of all frames: the globe is a 956 px disc centred in the 1920x1080 frame.
+  cx: 954
+  cy: 538
+  radius: 478
+  lat0: 0                # latitude at the disc centre (view is equatorial; checked on Sri Lanka)
+  half_width: 10         # the scan line reads a strip 21 px wide through the centre
+  # Longitude under the line, read from landmarks (Oman's tip, 60°E, is on the line at frame 392).
+  lon_at_frame0: 126
+  lon_per_frame: -0.169
+
+time:
+  # The date label advances exactly one hour per frame, starting 14 Jan 2020 22:00 UTC.
+  start: "2020-01-14T22:00:00"
+  hours_per_frame: 1
+  frames_per_step: 3     # one data step = 3 hours = 0.1 s of video
+  steps_per_section: 56  # 56 steps = 168 hours = one week
+  section_title: "Carbon dioxide, week by week"
+
+extraction:
+  rows: 50               # 3° of latitude each, 75°N at the top to 75°S
+  lat_top: 75
+  lat_step: 3
+  sat_lo: 0.22           # below this colour saturation it is bare land or ice, not CO2
+  sat_hi: 0.40
+  gamma: 0.6             # lifts faint tan haze so low levels stay audible
+  smooth_steps: 1        # temporal smoothing radius, in steps
+
+media:
+  width: 1280
+  height: 720
+  crf: 24
+
+legend:
+  summary: >
+    The globe turns slowly from Asia across Africa to the Americas while seven weeks of
+    early 2020 go by. A fixed scan line runs down the middle of the Earth, pole to pole,
+    and reads the carbon dioxide that passes under it.
+  method: >
+    Everything you hear sits on the scan line. Stereo runs along the line: the north (top
+    of the globe) sounds in your left ear, the south (bottom) in your right. Latitude is
+    also pitch: 17 bands of 9°, the farther north, the higher the note.
+  items:
+    - sound: "Deep hum"
+      meaning: "All the carbon dioxide on the line. It grows louder and brighter as carbon dioxide builds, and turns tense and slightly dissonant over the densest plumes. It is quiet over clean ocean air."
+    - sound: "Ringing notes"
+      meaning: "Dense plumes from fires, cities and industry, played as their thickest part crosses the line. Louder = denser; the very densest ring in a darker, minor colour."
+    - sound: "Soft heartbeat"
+      meaning: "One double beat for each day of data, at midnight UTC. Carbon dioxide over land really does pulse daily, as fires and plants follow the Sun."
+  caveat: >
+    NASA's colour key for this visualization has no numbers, so levels are relative:
+    faint tan is the least carbon dioxide shown, orange is more, red is the most. Values
+    are read from the colours of the video frames, not from the model output.

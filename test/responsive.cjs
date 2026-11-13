@@ -5,7 +5,7 @@ const { chromium } = require("playwright");
 const http = require("http"), fs = require("fs"), path = require("path");
 
 const root = path.join(__dirname, "../public");
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg" };
+const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".webp": "image/webp", ".mp3": "audio/mpeg", ".mp4": "video/mp4" };
 const server = http.createServer((q, r) => {
   const f = path.join(root, q.url === "/" ? "index.html" : q.url.split("?")[0]);
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); r.end(d); });
@@ -24,7 +24,7 @@ function audit(touch) {
     const r = el.getBoundingClientRect();
     if (r.right > vw + 1 && !el.closest(".sr-only,.skip")) out.cut.push(`${name(el)} right=${Math.round(r.right)}`);
   }
-  if (touch) for (const el of document.querySelectorAll("button, a, select, input, label.check, .opts label, .seg label")) {
+  if (touch) for (const el of document.querySelectorAll("button, a, select, input, label.check, .seg label")) {
     if (!visible(el) || el.closest(".skip")) continue;
     // A radio or checkbox counts through its label, which is the real touch target.
     const t = el.closest(".track") || ((el.type === "radio" || el.type === "checkbox") && el.closest("label")) || el;   // a track card is clickable all over
@@ -56,9 +56,16 @@ function audit(touch) {
     page.on("pageerror", (e) => errors.push(String(e)));
     await page.goto("http://localhost:8124/");
     await page.waitForFunction("window.ready === true");
-    await page.check('input[name="view"][value="flat"]');   // the flat map must fit too
-    const flat = await page.evaluate(audit, touch);
-    await page.check('input[name="view"][value="globe"]');
+    // Both kinds of stage must fit: NASA's video (carbon dioxide), then the globe (track 1).
+    const video = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === "carbon-dioxide")?.id);
+    let flat = { cut: [], overflow: 0 };
+    if (video) {
+      await page.evaluate((id) => document.getElementById(id).click(), video);
+      await page.waitForFunction("window.son && window.son.score.id === 'carbon-dioxide'");
+      flat = await page.evaluate(audit, touch);
+      await page.evaluate(() => document.querySelector('input[name="track"]').click());
+      await page.waitForFunction("window.son && window.son.score.id !== 'carbon-dioxide'");
+    }
     const r = await page.evaluate(audit, touch);
     r.cut = [...new Set([...r.cut, ...flat.cut])];
     r.overflow = Math.max(r.overflow, flat.overflow);
@@ -68,7 +75,7 @@ function audit(touch) {
     for (const x of [...r.cut, ...r.small, ...errors]) console.log("     " + x);
     if (shots) {
       fs.mkdirSync(shots, { recursive: true });
-      for (const id of ["intro", "player", "stage", "compare", "trend", "cursor-panel"]) await page.locator("#" + id).screenshot({ path: path.join(shots, `${w}-${id}.png`) });
+      for (const id of ["tracks", "player", "sounds", "explore", "settings"]) await page.locator("#" + id).screenshot({ path: path.join(shots, `${w}-${id}.png`) });
     }
     await ctx.close();
   }

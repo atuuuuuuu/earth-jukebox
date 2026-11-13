@@ -1,40 +1,82 @@
 {
   "api": 1,
-  "generated": "2026-11-10",
+  "generated": "2026-11-14",
   "sample": false,
   "tracks": [
     {
-      "id": "a1-ocean-fever",
-      "code": "A1",
-      "title": "Ocean Fever",
-      "subtitle": "Sea surface temperature",
-      "description": "The whole ocean, about one frame a month, scanned west to east. A bell rings while the Niño 3.4 box is above the El Niño line.",
-      "score": "api/scores/a1-ocean-fever.json",
-      "frames": 31,
-      "firstDate": "2024-05-18",
-      "lastDate": "2026-11-04",
-      "units": "degrees C",
+      "id": "night-lights",
+      "code": "1",
+      "title": "Earth at night",
+      "subtitle": "City lights, 2012 to 2023",
+      "description": "One slow scan across the Earth at night for each year from 2012 to 2023. Bright cities ring notes; a deep hum follows all the light.",
+      "score": "api/scores/night-lights.json",
+      "frames": 12,
+      "firstDate": "2012-07-01",
+      "lastDate": "2023-07-01",
+      "when": "2012 to 2023",
+      "units": "share of the brightest light",
+      "engine": "sweep",
       "source": {
-        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
-        "url": "https://svs.gsfc.nasa.gov/5176",
-        "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC"
+        "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
+        "url": "https://svs.gsfc.nasa.gov/5313/",
+        "credit": "NASA's Scientific Visualization Studio, visualizer Kel Elkins (USRA). Data: Black Marble: Next Generation (Suomi NPP VIIRS, NASA/NOAA)"
       }
     },
     {
-      "id": "a2-el-nino",
-      "code": "A2",
-      "title": "El Niño: then vs now",
-      "subtitle": "Same day, 2025 and 2026",
-      "description": "The first of each month in 2025, then the same day in 2026, back to back.",
-      "score": "api/scores/a2-el-nino.json",
-      "frames": 22,
-      "firstDate": "2025-01-01",
-      "lastDate": "2026-11-01",
-      "units": "degrees C",
+      "id": "night-change",
+      "code": "2",
+      "title": "Night lights: what changed",
+      "subtitle": "2012 compared with 2023",
+      "description": "NASA's map of how night lights changed from 2012 to 2023, scanned once, slowly. A rising pair of notes is new light; a low falling cello is light that dimmed.",
+      "score": "api/scores/night-change.json",
+      "frames": 1,
+      "firstDate": "2023-07-01",
+      "lastDate": "2023-07-01",
+      "when": "Change from 2012 to 2023",
+      "units": "change in light",
+      "engine": "sweep",
       "source": {
-        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
-        "url": "https://svs.gsfc.nasa.gov/5176",
-        "credit": "NASA Scientific Visualization Studio. Data: MUR SST v4.1, NASA JPL PO.DAAC"
+        "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
+        "url": "https://svs.gsfc.nasa.gov/5313/",
+        "credit": "NASA's Scientific Visualization Studio, visualizer Kel Elkins (USRA). Data: Black Marble: Next Generation (Suomi NPP VIIRS, NASA/NOAA)"
+      }
+    },
+    {
+      "id": "carbon-dioxide",
+      "code": "3",
+      "title": "Carbon dioxide",
+      "subtitle": "Seven weeks of early 2020",
+      "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
+      "score": "api/scores/carbon-dioxide.json",
+      "frames": 7,
+      "firstDate": "2020-01-14",
+      "lastDate": "2020-02-25",
+      "when": "Week from 14 January 2020 to Week from 25 February 2020",
+      "units": "share of the densest carbon dioxide",
+      "engine": "sweep",
+      "source": {
+        "title": "DYAMOND Global Carbon Dioxide",
+        "url": "https://svs.gsfc.nasa.gov/5196/",
+        "credit": "NASA's Scientific Visualization Studio, visualizer AJ Christensen (SSAI), Greg Shirah (NASA/GSFC), Helen-Nicole Kostis (USRA), Mark SubbaRao (NASA/GSFC). Data: DYAMOND, the experimental coupled GEOS-MITgcm model (NASA GEOS)"
+      }
+    },
+    {
+      "id": "lightning",
+      "code": "4",
+      "title": "Lightning",
+      "subtitle": "2017 to 2023, in 14 parts",
+      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. Each stormy place plays a drop-like note; listen to the storms swing north and south with the seasons.",
+      "score": "api/scores/lightning.json",
+      "frames": 14,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "Part 1 of 14 to Part 14 of 14",
+      "units": "share of the most lightning",
+      "engine": "sweep",
+      "source": {
+        "title": "Lightning Events Detected from the International Space Station (ISS) 2017-2023",
+        "url": "https://svs.gsfc.nasa.gov/5011/",
+        "credit": "NASA's Scientific Visualization Studio. Data: Lightning Imaging Sensor (LIS) on the ISS, quality-controlled science data (NASA GHRC DAAC)"
       }
     }
   ]

@@ -26,6 +26,36 @@ def is_date(s) -> bool:
         return False
 
 
+def check_sweep(public: Path, s: dict, where: str) -> list[str]:
+    """A sweep score names the fine grid the sweep engine plays: it must exist and match the frames."""
+    out: list[str] = []
+    sw = s.get("sweep") or {}
+    src = public / str(sw.get("src", ""))
+    if not src.is_file():
+        return [f"{where}: sweep data not found: {src}"]
+    data = json.loads(src.read_text(encoding="utf-8"))
+    g = data.get("grid") or {}
+    cells = g.get("cols", 0) * g.get("rows", 0)
+    chapter = next((c for c in data.get("chapters", []) if c.get("id") == sw.get("chapter")), None)
+    if chapter is None:
+        return [f"{where}: sweep chapter '{sw.get('chapter')}' not in {src.name}"]
+    if not g and len(data.get("line") or []) != data.get("steps", -1) * data.get("rows", -1):
+        out.append(f"{where}: spin sweep data must hold steps x rows values in 'line'")
+    if len(chapter["frames"]) != len(s.get("frames") or []):
+        out.append(f"{where}: {len(s.get('frames') or [])} frames but sweep chapter has {len(chapter['frames'])}")
+    for n, (f, fine) in enumerate(zip(s.get("frames") or [], chapter["frames"]), 1):
+        if fine.get("image") and f.get("image") != fine.get("image"):
+            out.append(f"{where} frame {n}: image differs from the sweep data")
+        if not g:   # spin sweep: one line of rows per step, shared by the whole chapter
+            continue
+        arrays = [k for k in ("core", "glow", "gain", "loss") if k in fine]
+        if not arrays or any(len(fine[k]) != cells for k in arrays):
+            out.append(f"{where} frame {n}: sweep arrays must each hold {cells} cells")
+    if not (s.get("legend") or {}).get("items"):
+        out.append(f"{where}: a sweep score needs a legend with items (the Key reads it)")
+    return out
+
+
 def check(public: Path) -> list[str]:
     problems: list[str] = []
     bad = problems.append
@@ -71,8 +101,8 @@ def check(public: Path) -> list[str]:
             for k in FRAME_KEYS:
                 if k not in f:
                     bad(f"{at}: missing '{k}'")
-            if not is_date(f.get("date")):
-                bad(f"{at}: date '{f.get('date')}' is not YYYY-MM-DD")
+            if not is_date(f.get("date")) and not (f.get("date") is None and f.get("when")):
+                bad(f"{at}: date '{f.get('date')}' is not YYYY-MM-DD (a sweep map with a 'when' may have none)")
             if not (public / str(f.get("image", ""))).is_file():
                 bad(f"{at}: image not found: {f.get('image')}")
             if not in_range(f.get("mean")):
@@ -95,10 +125,15 @@ def check(public: Path) -> list[str]:
             grid = f.get("grid") or []
             if len(grid) != GRID_ROWS or any(len(r) != GRID_COLS or not all(in_range(x) for x in r) for r in grid):
                 bad(f"{at}: grid must be {GRID_ROWS} rows of {GRID_COLS} numbers or nulls inside the range")
-            if not isinstance(f.get("text"), str) or not f["text"].startswith(str(f.get("date"))):
-                bad(f"{at}: text must start with the frame's date")
+            # Yearly tracks speak only the year ("words.dates": "year"), so their text starts with it.
+            stamp = f.get("when") or (str(f.get("date"))[:4] if (s.get("words") or {}).get("dates") == "year" else str(f.get("date")))
+            if not isinstance(f.get("text"), str) or not f["text"].startswith(stamp):
+                bad(f"{at}: text must start with '{stamp}'")
 
-        if not any("label" in f for f in frames):
+        if s.get("engine") == "sweep":
+            problems.extend(check_sweep(public, s, where))
+
+        if not any("label" in f for f in frames) and all(f.get("date") for f in frames):
             dates = [f.get("date") for f in frames]
             if dates != sorted(dates):
                 bad(f"{where}: frames are not in date order")

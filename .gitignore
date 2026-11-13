@@ -4,3 +4,9 @@ data/sst/
 # Regenerate with: npm run sample
 data/sample/
 __pycache__/
+# NASA EIC videos for backend/eic (set EJ_RESOURCES, or put them here)
+data/eic/
+# backend/eic debug heatmaps (python -m pipeline.validate)
+backend/eic/debug/
+# Python environment for backend/eic (pip install -r backend/eic/pipeline/requirements.txt)
+.venv/

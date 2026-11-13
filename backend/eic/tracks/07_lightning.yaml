@@ -1,0 +1,55 @@
+# Track 07 — Lightning seen from the ISS, 2017–2023 (Science On a Sphere version: a flat world map)
+id: 07_lightning
+title: "Lightning Around the World, Month by Month"
+short: "Lightning"
+builder: lightning
+
+source:
+  # The SOS movie is equirectangular (4096x2048, 180 W at the left edge), so no globe geometry is needed.
+  video: 07_Lightning/iss_lightning_sos_yearly_07312023_2048p60.mp4
+  svs_id: 5011
+  url: https://svs.gsfc.nasa.gov/5011/
+  svs_title: "Lightning Events Detected from the International Space Station (ISS) 2017-2023"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: ""
+  dataset: "Lightning Imaging Sensor (LIS) on the ISS, quality-controlled science data (NASA GHRC DAAC)"
+
+time:
+  # Each frame shows a 10-day roving window. The movie has no date label and its speed is uneven,
+  # so it is cut into equal parts, in order; no dates are guessed. The span is from NASA's page.
+  span: "March 2017 to July 2023"
+  parts: 14                  # about two parts per northern summer and winter
+  sample_every: 6            # well under one 10-day window, so no strike is missed
+
+extraction:
+  work: [1920, 960]          # 16 px per 3-degree cell
+  grid: { cols: 120, rows: 60 }
+  yellow_lo: 40              # (R+G)/2 - B below this: grey base map, white grid lines
+  yellow_hi: 150
+  red_min: 110
+
+media:
+  width: 2048
+  height: 1024
+  webp_quality: 82
+
+playback:
+  seconds_per_sweep: 11
+
+legend:
+  summary: >
+    Lightning seen from the International Space Station from March 2017 to July 2023, in 14 equal
+    parts, in order. A scan line crosses the world once per part, west to east.
+  method: >
+    Everything you hear sits on the scan line. Places in the north sound higher and in your left
+    ear; places in the south sound lower and in your right. Listen to the storms swing north and
+    south and back again as the seasons turn, about seven times.
+  items:
+    - sound: "Drop-like notes"
+      meaning: "Places with a lot of lightning, played as the scan line crosses them. Louder = more lightning."
+    - sound: "Deep hum"
+      meaning: "All the lightning under the scan line. It is quiet over calm ocean and swells over stormy land like Central Africa or the Amazon."
+  caveat: >
+    Values are read from the colours of NASA's video, not from the satellite measurements, so
+    they are relative. The sensor sees only from about 55 degrees north to 55 degrees south. NASA's
+    movie has no dates, so the parts are equal stretches of the movie, not calendar months.

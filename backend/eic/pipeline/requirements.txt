@@ -1,0 +1,4 @@
+numpy>=1.26
+opencv-python-headless>=4.9
+PyYAML>=6.0
+imageio-ffmpeg>=0.5   # bundled ffmpeg for web-sized video copies

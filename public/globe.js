@@ -38,6 +38,9 @@ uniform float uBell;           // 0..1, the El Niño bell glow
 uniform float uNinoOn;         // 1 when the track has Niño 3.4 data, else the box is not drawn
 uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
+uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
+uniform float uSweep;          // 1 when the scan line moves freely at uHead (sweep tracks)
+uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 new light, 2 dimmed)
 
 float lonDist(float a, float b) { return abs(mod(a - b + 540.0, 360.0) - 180.0); }
 float band(float d, float w) { return 1.0 - smoothstep(0.0, w, d); }
@@ -98,7 +101,8 @@ void main() {
     isData = max(isData, ink * smoothstep(0.6, 0.95, around));
   }
   // The NASA date stamp sits in the bottom-left corner of every frame: never paint it on the globe.
-  isData *= 1.0 - smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
+  isData = mix(isData, 1.0, uFull);
+  isData *= 1.0 - (1.0 - uFull) * smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
   isData *= uDataOn;
   vec3 land = earth * 0.82;
   vec3 col = mix(land, data, isData);
@@ -125,6 +129,26 @@ void main() {
     // one clear line when it reaches the strip edge.
     float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
     col = mix(col, vec3(1.0, 0.9, 0.55), 0.95 * ph);
+  }
+
+  // Sweep tracks: one thin scan line moving west to east. The part not yet heard rests dimmer.
+  if (uSweep > 0.5 && uHead < 900.0) {
+    col *= mix(1.0, 0.6, step(uHead, lon));
+    float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
+    col = mix(col, vec3(1.0, 0.85, 0.5), 0.95 * ph);
+  }
+
+  // A soft ring at each place a note just played, growing as it fades.
+  for (int k = 0; k < 6; k++) {
+    vec4 p = uPing[k];
+    if (p.z >= 1.0) continue;
+    float dx = lonDist(lon, p.x) * cos(radians(lat)), dy = lat - p.y;
+    float d = sqrt(dx * dx + dy * dy);
+    float fade = 1.0 - p.z;
+    float ring = (1.0 - smoothstep(0.0, 1.2, abs(d - (1.5 + 6.0 * p.z)))) * fade;
+    float core = (1.0 - smoothstep(0.0, 1.8, d)) * fade;
+    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : vec3(1.0, 0.66, 0.41);
+    col = mix(col, pc, clamp(0.8 * ring + core, 0.0, 1.0));
   }
 
   // Listening cursor: one 10 degree cell.
@@ -217,6 +241,10 @@ void main() {
       this.mix = 1;
       this.dataOn = true;
       this.scale = 0.9;
+      this.full = false;      // true: the frame covers the whole planet (night lights)
+      this.headFn = null;     // sweep tracks: () => scan line longitude, or null when silent
+      this.headSpeed = 0;
+      this.pings = [];
       this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
       const gl = canvas.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
       if (!gl) throw new Error("WebGL is not available");
@@ -257,7 +285,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uNinoOn", "uDataOn", "uPx"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uNinoOn", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -308,6 +336,11 @@ void main() {
     }
 
     ringBell() { this.bell = 1; }
+    // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
+    ping(lon, lat, kind = 0) {
+      this.pings.push({ lon, lat, kind, born: performance.now() });
+      if (this.pings.length > 6) this.pings.shift();
+    }
     // The music reached strip s at audio time `at` (seconds on this.clock); it lasts `seconds`.
     // The playhead glides through it on the audio clock, so it matches what you hear even if frames bunch up.
     step(s, seconds, at) {
@@ -395,10 +428,18 @@ void main() {
       const h = this.head();
       this.headPos = h;
       this.headLon = h < 0 ? 999 : this.leftLon + h * 22.5;
-      if (this.follow && h >= 0) {
+      if (this.headFn) {
+        // Sweep tracks: the line's longitude comes straight from the audio clock.
+        const l = this.headFn();
+        const prev = this.headLon2;
+        this.headLon = l == null ? 999 : l;
+        this.headSpeed = l != null && prev != null ? clamp(wrap(l - prev) / Math.max(dt, 1e-3), 0, 200) : 0;
+        this.headLon2 = l;
+      }
+      if (this.follow && this.headLon < 900) {
         // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
         const diff = wrap(this.headLon - this.yaw);
-        const moving = !still && h < this.strip + 2 ? 22.5 / this.stepDur : 0;
+        const moving = still ? 0 : this.headFn ? this.headSpeed : h < this.strip + 2 ? 22.5 / this.stepDur : 0;
         this.yaw = still ? wrap(this.headLon) : wrap(this.yaw + moving * dt + diff * Math.min(1, dt * 5));
         this.targetYaw = this.yaw;   // stay here when the music stops
       } else if (this.targetYaw !== null && this.targetYaw !== undefined) {
@@ -444,6 +485,16 @@ void main() {
       gl.uniform1f(this.u.uNinoOn, this.ninoOn ? 1 : 0);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
+      gl.uniform1f(this.u.uFull, this.full ? 1 : 0);
+      gl.uniform1f(this.u.uSweep, this.headFn ? 1 : 0);
+      const now = performance.now(), pings = new Float32Array(24);
+      for (let k = 0; k < 6; k++) {
+        const p = this.pings[k];
+        let age = p ? (now - p.born) / 1700 : 1;
+        if (this.reduced.matches) age = age < 0.7 ? 0 : 1;   // no growing rings: a steady dot, then gone
+        pings.set(p ? [p.lon, p.lat, Math.min(1, age), p.kind] : [0, 0, 1, 0], k * 4);
+      }
+      gl.uniform4fv(this.u.uPing, pings);
       gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
     }
 

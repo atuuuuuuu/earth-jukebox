@@ -1,0 +1,81 @@
+# Track 01 — Night Lights 2012–2023 (flat map, EIC 32:9 display version)
+id: 01_night_lights
+title: "Earth at Night, 2012–2023"
+short: "Night Lights"
+builder: night_lights
+
+source:
+  # Path relative to resources_root (see pipeline/config.py; override with EJ_RESOURCES env var)
+  video: 01_NightLights/nightlights_flat_series_and_change_wZooms_13_EIC_2160p30_h265.mp4
+  svs_id: 5313
+  url: https://svs.gsfc.nasa.gov/5313/
+  svs_title: "Change in Night Lights between 2012 and 2023 - EIC Version"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: "Kel Elkins (USRA)"
+  dataset: "Black Marble: Next Generation (Suomi NPP VIIRS, NASA/NOAA)"
+
+geometry:
+  # The 7680x2160 EIC frame shows the world ~1.8 times side by side.
+  # We read the left copy: x in [0, 3840), full height. It is equirectangular,
+  # stretched to 16:9. Calibrated against 10 cities (9 within 0.4°).
+  map_x0: 0
+  map_width: 3840
+  map_height: 2160
+  lon_at_x0: -168.65        # longitude of column 0 of the left copy
+  # Non-data overlays inside the left copy (full-frame pixel rects: x0, y0, x1, y1)
+  masks:
+    - [3700, 1150, 3840, 1300]   # change-map colour bar + its labels (Pacific, ~170°W 10–17°S)
+
+chapters:
+  years:
+    # Frame windows read from the year label (label changes at frames 15, 33, 51 ...).
+    # We take the median of a few frames in the middle of each window.
+    first_year: 2012
+    boundaries: [0, 15, 33, 51, 69, 86, 104, 122, 139, 157, 175, 193, 286]
+  change:
+    frames: [320, 600]          # change map held still from ~291 to ~629
+    title: "Change in lighting intensity, 2012 to 2023"
+    # Colour bar: orange = lights out (-1), white = no change (0), purple = new lights (+1)
+    key_search_rect: [3700, 1200, 4420, 1265]   # full-frame rect that contains the bar
+    key_values: [-1.0, 1.0]
+
+extraction:
+  grid: { cols: 120, rows: 60 }   # 3° x 3° cells, row 0 = 90°N, col 0 = 180°W
+  tophat_px: 31                   # background (base map) removal kernel at full res
+  noise_floor: 8                  # excess luminance below this = no light
+  warm_min: 0.08                  # lights are yellow; snow/ice texture is neutral grey
+  bright_keep: 60                 # saturated (white) city cores pass regardless of warmth
+  median_frames: 5
+  max_key_distance: 28            # Lab distance; farther = "no data"
+
+media:
+  width: 2048                     # display images are true 2:1 equirectangular
+  height: 1024
+  webp_quality: 82
+
+playback:
+  seconds_per_sweep: 15.5         # one west->east sweep per year (3° column every ~129 ms)
+  change_seconds_per_sweep: 18    # slower sweep for the change map
+  crossfade: 0.6
+
+legend:
+  summary: >
+    A slow scan line moves west to east across the night-time Earth, once per year
+    from 2012 to 2023, then once, more slowly, across a map of how lighting changed.
+  method: >
+    Everything you hear sits on the scan line. Stereo runs along the line: lights near
+    the top of the map (north) sound in your left ear, lights near the bottom (south) in
+    your right. Latitude is also pitch: the map is split into 20 bands of 6°, each with
+    its own note, and the farther north, the higher the note. West to east is time.
+  items:
+    - sound: "Ringing notes"
+      meaning: "Bright city cores, played the moment the scan line crosses them. Louder note = brighter city; the pitch and the ear it sounds in tell you how far north it is."
+    - sound: "Deep hum"
+      meaning: "A low drone under everything. It swells and brightens with the total light under the line, leans toward the ear where most of that light is, and falls silent over oceans and dark land."
+    - sound: "Rising pair of notes (change map)"
+      meaning: "New or brighter lights since 2012 (purple on the map)."
+    - sound: "Low falling cello (change map)"
+      meaning: "Lights that dimmed or went out since 2012 (orange on the map)."
+  caveat: >
+    Values are read from the colours and brightness of NASA's video frames, not
+    from the original satellite measurements, so they are relative levels.

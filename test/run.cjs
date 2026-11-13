@@ -1,161 +1,193 @@
+// Browser test of the real page: keyboard only, every player key, speech text, sound level,
+// error state, no keyboard trap, and axe (WCAG 2.2 AA rules) on every track.
+// Usage: npm test. Fails (exit 1) on any check marked FAIL.
 const { chromium } = require("playwright");
 const http = require("http"), fs = require("fs"), path = require("path");
 const axeSource = fs.readFileSync(path.join(__dirname, "../node_modules/axe-core/axe.min.js"), "utf8");
 
 const root = path.join(__dirname, "../public");
+const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg", ".webp": "image/webp", ".mp3": "audio/mpeg", ".mp4": "video/mp4" };
 const server = http.createServer((q, r) => {
-  if (q.url === "/favicon.ico") { r.writeHead(204); r.end(); return; }   // real Chrome asks for one; the site has none
+  if (q.url === "/favicon.ico") { r.writeHead(204); r.end(); return; }
   const f = path.join(root, q.url === "/" ? "index.html" : q.url.split("?")[0]);
-  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".jpg": "image/jpeg" };
-  fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { "Content-Type": types[path.extname(f)] || "application/octet-stream" }); r.end(d); });
+  fs.readFile(f, (e, d) => {
+    if (e) { r.writeHead(404); r.end(); return; }
+    const type = types[path.extname(f)] || "application/octet-stream";
+    const m = /^bytes=(\d*)-(\d*)$/.exec(q.headers.range || "");   // byte ranges, like GitHub Pages: videos need them
+    if (m && (m[1] || m[2])) {
+      const start = m[1] ? Number(m[1]) : Math.max(0, d.length - Number(m[2]));
+      const end = m[1] && m[2] ? Math.min(d.length - 1, Number(m[2])) : d.length - 1;
+      r.writeHead(206, { "Content-Type": type, "Content-Range": `bytes ${start}-${end}/${d.length}`, "Accept-Ranges": "bytes", "Content-Length": end - start + 1 });
+      r.end(d.subarray(start, end + 1));
+      return;
+    }
+    r.writeHead(200, { "Content-Type": type, "Accept-Ranges": "bytes" }); r.end(d);
+  });
 }).listen(8123);
 
+let failures = 0;
+const check = (name, ok, detail = "") => { if (!ok) failures++; console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? ` | ${detail}` : ""}`); };
+const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa','best-practice'] })";
+
 (async () => {
-  // SwiftShader gives headless Chromium WebGL, so the globe is tested too.
   const launch = { args: ["--autoplay-policy=user-gesture-required", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] };
-  // Playwright's own Chromium does not support every OS (for example macOS 13): fall back to installed Google Chrome.
   let browser;
   try { browser = await chromium.launch(launch); }
-  catch (e) {
-    browser = await chromium.launch({ ...launch, channel: "chrome" }).catch(() => { throw e; });
-    console.log("browser: Playwright Chromium unavailable here, using installed Google Chrome");
+  catch (e) { browser = await chromium.launch({ ...launch, channel: "chrome" }).catch(() => { throw e; }); }
+
+  // ---- Error state: the track list cannot load.
+  {
+    const page = await browser.newPage();
+    await page.route("**/api/tracks.json", (r) => r.fulfill({ status: 500, body: "" }));
+    await page.goto("http://localhost:8123/");
+    await page.waitForSelector("#alert:not([hidden])", { timeout: 8000 });
+    const alert = await page.textContent("#alert");
+    check("error state: alert with a way to retry", alert.includes("could not load") && await page.isVisible("#alert button"), alert.slice(0, 60));
+    await page.close();
   }
-  const page = await browser.newPage();
+
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://localhost:8123/");
-  await page.waitForFunction("window.ready === true");
+  await page.waitForFunction("window.ready === true", null, { timeout: 15000 });
+  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.textContent("#live")).trim(); };
+  check("ready message tells the next step", (await live(300)).includes("Press Tab to reach the player, then Space"), await live(0));
+  check("no sound before a key press", await page.evaluate("EJ.Tone.getContext().state !== 'running' || !son.playing"));
 
-  console.log("context before gesture:", await page.evaluate("EJ.Tone.getContext().state"), "| globe:", await page.evaluate("window.globeReady ? 'WebGL' : 'flat map fallback'"));
+  // ---- Keyboard only: the first Tab is the skip link, and it lands in the player's keyboard area.
+  await page.keyboard.press("Tab");
+  check("first Tab: skip link", await page.evaluate("document.activeElement.classList.contains('skip')"));
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(100);
+  check("skip link focuses the keyboard area", await page.evaluate("document.activeElement.id === 'keys'"));
 
-  // Keyboard only: tab until the Play button has focus, then press Space.
-  for (let i = 0; i < 30; i++) {
-    await page.keyboard.press("Tab");
-    if (await page.evaluate("document.activeElement.id === 'play'")) break;
-  }
-  console.log("focus on:", await page.evaluate("document.activeElement.id"));
+  // ---- Shortcuts are scoped to the player (WCAG 2.1.4): W outside the player does nothing.
+  await page.evaluate(() => document.getElementById("title").setAttribute("tabindex", "-1"));
+  await page.focus("#title");
+  await page.evaluate(() => { document.getElementById("live").textContent = "x"; });
+  await page.keyboard.press("w");
+  check("W outside the player is ignored", (await live()) === "x");
+  await page.focus("#keys");
+
+  // ---- Play from the keyboard area, and hear it.
   await page.keyboard.press("Space");
-  await page.waitForFunction("EJ.Tone.getContext().state === 'running' && EJ.Tone.getTransport().state === 'started'", null, { timeout: 8000 });
-  console.log("context after Space:", await page.evaluate("EJ.Tone.getContext().state"), "| button:", await page.textContent("#play"));
+  await page.waitForFunction("son.playing === true", null, { timeout: 15000 });
+  check("Space plays", (await live(400)).startsWith("Playing"), await live(0));
+  await page.evaluate("window.meter = new EJ.Tone.Meter(); EJ.Tone.getDestination().connect(window.meter); window.peak = -Infinity; setInterval(() => { const v = window.meter.getValue(); if (v > window.peak) window.peak = v; }, 20);");
+  await page.waitForTimeout(4000);
+  const peak = await page.evaluate("Math.round(window.peak * 10) / 10");
+  check("sound is playing, not clipping", peak > -40 && peak < 0, `peak ${peak} dB`);
+  check("globe follows the scan line", await page.evaluate("window.globe ? window.globe.headLon < 900 : true"));
 
-  await page.evaluate("window.meter = new EJ.Tone.Meter(); EJ.Tone.getDestination().connect(window.meter); window.peak = -Infinity; window.mi = setInterval(() => { const v = window.meter.getValue(); if (v > window.peak) window.peak = v; }, 20);");
-  await page.waitForTimeout(6500);
-  console.log("live peak dB:", await page.evaluate("Math.round(window.peak * 10) / 10"), "| frames seen:", await page.evaluate("window.framesSeen"));
-  console.log("slider follows playback:", await page.getAttribute("#time", "aria-valuetext"));
+  await page.keyboard.press("w");
+  const w = await live();
+  check("W: where am I", w.startsWith("You are in the player. Track 1 of") && w.includes("scan line is at"), w.slice(0, 120));
+  await page.keyboard.press("ArrowRight");
+  check("Right arrow: next map", (await live()).startsWith("2013, map 2 of 12"), await live(0));
+  check("map slider follows", (await page.getAttribute("#map", "aria-valuetext")).startsWith("2013"));
+  await page.keyboard.press("Home");
+  check("Home: first map", (await live()).startsWith("2012, map 1"));
+  await page.keyboard.press("ArrowLeft");
+  check("Left arrow at the start says so", (await live()).startsWith("Already at the first map"));
+  await page.keyboard.press("h");
+  check("H: every key", (await live()).startsWith("Player keys. Space: play or pause."));
+  await page.keyboard.press("d");
+  const d = await live();
+  check("D: describe pauses and says the map", d.startsWith("Paused. 2012.") && d.endsWith("Press Space to play."), d.slice(0, 80));
+  check("D paused the sound", !(await page.evaluate("son.playing")));
+  await page.keyboard.press("s");
+  check("S: what the sounds mean", (await live()).includes("scan line"));
+  await page.keyboard.press("m");
+  check("M: mono toggles", (await live()) === "Mono on." && await page.isChecked("#mono"));
+  await page.keyboard.press("m");
 
-  // Describe pauses the music and fills the live region.
-  await page.click("#describe");
-  await page.waitForTimeout(200);
-  console.log("after describe:", await page.evaluate("EJ.Tone.getTransport().state"), "|", await page.textContent("#live"));
+  // ---- Buttons work the same; Space on a focused button is native.
+  await page.focus("#where");
+  await page.keyboard.press("Space");
+  check("Where am I button", (await live()).startsWith("You are in the player"));
 
-  // Listening cursor by arrow key.
+  // ---- Every track, by number key: loads, plays, and passes axe.
+  await page.evaluate(axeSource);
+  const ids = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].map((r) => r.value));
+  for (let k = 0; k < ids.length; k++) {
+    await page.focus("#keys");
+    if (k > 0) {
+      await page.keyboard.press(String(k + 1));
+      await page.waitForFunction(`window.son && son.score.id === "${ids[k]}" && !document.getElementById('play').disabled`, null, { timeout: 15000 });
+      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 5000, polling: 50 }).catch(() => {});
+      check(`key ${k + 1}: track ${ids[k]} chosen and announced`, (await live(0)).startsWith(`Track ${k + 1} of ${ids.length}`), await live(0));
+    }
+    await page.keyboard.press("Space");
+    await page.waitForFunction("son.playing", null, { timeout: 15000 });
+    await page.evaluate("window.peak = -Infinity; window.framesSeen = 0");
+    await page.waitForTimeout(2500);
+    const tp = await page.evaluate("Math.round(window.peak * 10) / 10");
+    const extra = ids[k] === "carbon-dioxide"
+      ? await page.evaluate("Math.abs(document.getElementById('video').currentTime - son.mediaTime()).toFixed(2)") : null;
+    check(`${ids[k]}: plays`, tp > -40 && tp < 0, `peak ${tp} dB${extra !== null ? `, video off by ${extra} s` : ""}`);
+    if (extra !== null) check(`${ids[k]}: NASA video in step with the sound`, Number(extra) < 0.4);
+    await page.keyboard.press("w");
+    check(`${ids[k]}: where am I`, (await live()).includes(`Track ${k + 1} of`));
+    await page.keyboard.press("Space");   // pause
+    const axe = await page.evaluate(AXE);
+    check(`${ids[k]}: axe`, axe.violations.length === 0, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", ") || `${axe.passes.length} rules passed`);
+    // Hear an example, then its meaning is spoken.
+    const demo = await page.evaluate(() => { const b = document.querySelector("#demos button"); b.click(); return b.querySelector("b").textContent; });
+    await page.waitForFunction("document.getElementById('live').textContent.length > 20 && !document.getElementById('live').textContent.startsWith('Paused')", null, { timeout: 8000, polling: 100 });
+    check(`${ids[k]}: example "${demo}" plays and explains`, true, (await live(0)).slice(0, 60));
+    // Explore one place.
+    await page.click("#places button:first-child");
+    await page.waitForTimeout(400);
+    const pr = await live(0);
+    check(`${ids[k]}: Ulaanbaatar button`, pr.startsWith("Ulaanbaatar.") && !!(await page.evaluate("window.lastProbe")), pr.slice(0, 110));
+    // Offline render for Save as audio file.
+    const wav = await page.evaluate(async () => {
+      const b = await son.renderOffline(6);
+      const l = b.getChannelData(0), r = b.getChannelData(1);
+      let pk = 0, sum = 0;
+      for (let i = 0; i < l.length; i++) { pk = Math.max(pk, Math.abs(l[i]), Math.abs(r[i])); sum += l[i] * l[i]; }
+      return { peakDb: +(20 * Math.log10(pk)).toFixed(1), rmsDb: +(10 * Math.log10(sum / l.length)).toFixed(1) };
+    });
+    check(`${ids[k]}: audio file render`, wav.peakDb < 0 && wav.rmsDb > -50, JSON.stringify(wav));
+  }
+
+  // ---- Sliders keep their own arrow keys and speak each spot.
   await page.focus("#lon");
   await page.keyboard.press("ArrowRight");
-  await page.waitForTimeout(200);
-  console.log("cursor:", await page.getAttribute("#lon", "aria-valuetext"), "->", await page.evaluate("window.lastProbe"));
+  await page.waitForTimeout(400);
+  check("west-east slider: arrow key plays a spot", /degrees/.test(await live(0)), (await live(0)).slice(0, 90));
 
-  await page.evaluate("document.getElementById('lon').value = 5; document.getElementById('lon').dispatchEvent(new Event('input', {bubbles:true}))");
-  await page.waitForTimeout(200);
-  console.log("cursor over ocean:", await page.getAttribute("#lon", "aria-valuetext"), "->", await page.evaluate("window.lastProbe"));
+  // ---- Escape stops everything, from anywhere.
+  await page.focus("#keys");
+  await page.keyboard.press("Space");
+  await page.waitForFunction("son.playing", null, { timeout: 10000 });
+  await page.focus("#volume");
+  await page.keyboard.press("Escape");
+  check("Escape stops sound and says so", (await live()) === "Stopped." && !(await page.evaluate("son.playing")));
 
-  // Tap the middle of the globe: it should play and name that spot.
-  if (await page.evaluate("window.globeReady")) {
-    await page.evaluate("window.scrollTo(0, 0)");
-    const g = await page.locator("#globe").boundingBox();
-    await page.mouse.click(g.x + g.width / 2, g.y + g.height / 2);
-    await page.waitForTimeout(300);
-    console.log("globe tap:", await page.textContent("#live"));
+  // ---- No keyboard trap: Tab visits every control and leaves the page.
+  // Start on the skip link, then Tab until focus leaves the page: every stop is recorded.
+  await page.focus(".skip");
+  const seen = ["skip"];
+  for (let i = 0; i < 150; i++) {
+    await page.keyboard.press("Tab");
+    const id = await page.evaluate(() => { const a = document.activeElement; return a === document.body ? "BODY" : a.classList.contains("skip") ? "skip" : a.id || a.textContent.trim().slice(0, 20) || a.tagName; });
+    if (id === "BODY" || id === "skip") break;
+    seen.push(id);
   }
+  const want = ["keys", "play", "prev", "next", "where", "describe", "help", "lon", "lat", "volume", "announce", "mono", "speak", "save"];
+  const missing = want.filter((x) => !seen.includes(x));
+  check("Tab walks the whole page without a trap", !missing.length && seen.length < 150, `${seen.length} stops${missing.length ? `, never reached: ${missing}` : ""}`);
+  // Every focused control shows a visible focus ring.
+  await page.focus("#play");
+  const ring = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
+  check("focus ring visible", ring !== "none", ring);
 
-  // Flat map: clicking a spot plays it, like the globe.
-  await page.click('input[name="view"][value="flat"]');
-  const fm = await page.locator("#flat-frame").boundingBox();
-  await page.mouse.click(fm.x + fm.width * 0.1, fm.y + fm.height * 0.5);
-  await page.waitForTimeout(300);
-  console.log("flat map click:", await page.textContent("#live"), "->", await page.evaluate("window.lastProbe"));
-  await page.click('input[name="view"][value="globe"]');
-
-  // Learn the sounds: the example plays, then its meaning is spoken.
-  await page.click('#learn-list button[data-demo="warmer"]');
-  await page.waitForFunction("document.getElementById('live').textContent.startsWith('Warmer')", null, { timeout: 8000 });
-  console.log("learn the sounds:", (await page.textContent("#live")).slice(0, 60));
-
-  // Hear the change: plays A then B once, then stops by itself.
-  await page.click("#cmp-play");
-  await page.waitForFunction("document.getElementById('cmp-play').textContent.startsWith('Play')", null, { timeout: 20000 });
-  console.log("hear the change finished:", await page.evaluate("EJ.Tone.getTransport().state"), "| waveform samples:", await page.evaluate("(son.waveform() || []).length"));
-
-  // Time slider by arrow key.
-  await page.focus("#time");
-  await page.keyboard.press("ArrowRight");
-  console.log("time slider:", await page.getAttribute("#time", "aria-valuetext"));
-
-  // Automated accessibility scan.
-  // Year by year: scrubbing gives each year's numbers; Play runs to the last year, then speaks the summary.
-  await page.waitForFunction("Number(document.getElementById('year').max) > 100", null, { timeout: 8000, polling: 100 });
-  const yr = await page.evaluate(() => {
-    const s = document.getElementById("year");
-    s.value = s.max; s.dispatchEvent(new Event("input"));
-    return s.getAttribute("aria-valuetext");
-  });
-  console.log("year slider:", yr);
-  await page.evaluate(() => { const s = document.getElementById("year"); s.value = s.max - 6; s.dispatchEvent(new Event("input")); document.getElementById("trend-play").click(); });
-  await page.waitForFunction("document.getElementById('trend-play').textContent === 'Stop'", null, { timeout: 5000, polling: 100 });
-  await page.waitForFunction("document.getElementById('trend-play').textContent === 'Play every year' && document.getElementById('live').textContent.includes('Global temperature')", null, { timeout: 15000, polling: 200 });
-  console.log("year by year:", (await page.textContent("#live")).slice(0, 110));
-
-  await page.evaluate(axeSource);
-  const axe =await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
-  console.log("axe violations:", axe.violations.length, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", "), "| rules passed:", axe.passes.length);
-
-  // Offline renders of each mapping: non-silent, not clipping, and the two maps differ.
-  const stats = await page.evaluate(async () => {
-    const index = await (await fetch("api/tracks.json")).json();
-    const score = await (await fetch(index.tracks[0].score)).json();
-    const out = {};
-    const t0 = performance.now();
-    for (const [name, opt] of [["scan", { mapping: "scan" }], ["chord", { mapping: "state" }], ["strict", { mapping: "scan", strict: true }]]) {
-      const b = await EJ.renderOffline(score, opt, 12);
-      const d = b.getChannelData(0); const r = b.getChannelData(1);
-      let peak = 0, sum = 0, side = 0;
-      for (let i = 0; i < d.length; i++) { peak = Math.max(peak, Math.abs(d[i]), Math.abs(r[i])); sum += d[i] * d[i]; side += (d[i] - r[i]) ** 2; }
-      out[name] = { peakDb: +(20 * Math.log10(peak)).toFixed(1), rmsDb: +(10 * Math.log10(sum / d.length)).toFixed(1), stereoDiff: +(side / d.length).toExponential(2) };
-    }
-    out.ms = Math.round(performance.now() - t0);
-    return out;
-  });
-  console.log("offline:", JSON.stringify(stats));
-
-  // A track without Niño 3.4 data, if there is one: no bell, no box, its own words, and still accessible.
-  const plain = await page.evaluate(async () => {
-    const index = await (await fetch("api/tracks.json")).json();
-    for (const t of index.tracks) {
-      const s = await (await fetch(t.score)).json();
-      if (!s.frames.some((f) => typeof f.nino34Relative === "number")) return t.id;
-    }
-    return null;
-  });
-  if (plain) {
-    // Headless Chrome on some Macs stops producing animation frames after the offline renders above,
-    // so Playwright's "stable" check never passes. Click the radio directly and poll on a timer instead.
-    await page.evaluate((id) => document.getElementById(`track-${id}`).click(), plain);
-    await page.waitForFunction("document.getElementById('stage-h').textContent !== 'The ocean, live'", null, { timeout: 8000, polling: 100 });
-    const shown = await page.evaluate(() => ({
-      heading: document.getElementById("stage-h").textContent,
-      bellHidden: document.querySelector(".ov-bell").hidden,
-      ninoRowHidden: document.getElementById("s-nino").parentElement.hidden,
-      globeBox: window.globe ? window.globe.ninoOn : "no globe handle",
-      date: document.getElementById("date").textContent,
-    }));
-    await page.evaluate(() => document.getElementById("describe").click());
-    await page.waitForTimeout(300);
-    console.log(`no-Niño track ${plain}:`, JSON.stringify(shown), "| describe:", (await page.textContent("#live")).slice(0, 70));
-    const axe2 = await page.evaluate("axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice'] })");
-    console.log(`axe violations on ${plain}:`, axe2.violations.length, axe2.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", "));
-  }
-
-  console.log("page errors:", errors.length, errors.slice(0, 5));
+  check("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
   await browser.close();
   server.close();
+  console.log(failures ? `${failures} check(s) failed` : "all checks passed");
+  process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error(e); server.close(); process.exit(1); });

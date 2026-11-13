@@ -3,9 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "sample": "python3 backend/make_fixture.py data/sample && python3 backend/build_api.py backend/sample.config.json",
-    "api": "python3 backend/build_api.py backend/tracks.config.json",
-    "climate": "python3 scripts/climate_data.py",
+    "api": "python3 backend/build_sweep.py backend/sweep.config.json",
+    "eic": "cd backend/eic && \"$INIT_CWD/.venv/bin/python\" -m pipeline.run --track",
     "validate": "python3 backend/validate_api.py public",
     "test:backend": "python3 -m unittest discover backend/tests -v",
     "build": "esbuild src/engine.js --bundle --format=iife --global-name=EJ --minify --outfile=public/bundle.js",

@@ -1,166 +1,120 @@
 # Earth Jukebox
 
-**Listen to NASA's ocean temperature maps.** Earth Jukebox turns NASA sea surface
-temperature maps into music in your browser. Warmer than normal sounds higher,
-colder sounds lower, and the ocean plays from your left ear (west) to your right (east).
-A 3D globe shows what you are hearing, but you never need it: everything works by
-ear and by keyboard alone.
+**Hear NASA's views of Earth.** Earth Jukebox turns visualizations from NASA's Earth Information
+Center into sound: city lights at night, carbon dioxide, and lightning. A scan line crosses the world
+from west to east, and whatever it crosses plays. North sounds higher and in your left ear, south
+lower and in your right.
+
+It is made for blind and low-vision listeners first. A first-time screen reader user can open it and
+use it alone: the page says what to press next, every action is a button, and the player answers
+"Where am I?" at any moment. A 3D globe shows what is playing, but you never need it.
 
 Built for **NASA Space Apps 2026: The Earth Information Jukebox**.
 
-## Why
+## Tracks
 
-Climate data is almost always a picture: a coloured map, a chart, a globe. For a
-blind or low-vision person, the picture says nothing. Earth Jukebox makes the same
-NASA data something you can hear, with every sound standing for a real number in the
-map and nothing added for decoration.
+| # | Track | NASA resource |
+| --- | --- | --- |
+| 1 | **Earth at night**, one scan per year, 2012 to 2023 | Resource 1: [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
+| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map | Resource 1 |
+| 3 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | Resource 6: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
+| 4 | **Lightning**, one scan per month of the year, 2017 to 2023 | Resource 7: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
 
-## What you can do
+## Using it without sight
 
-| | |
+1. Open the page. The first **Tab** is "Skip to the player".
+2. Choose a track in the track list with the arrow keys.
+3. Tab to the player's **keyboard area** and press **Space**.
+
+In the keyboard area (and on any player button):
+
+| Key | Does |
 | --- | --- |
-| **Learn the sounds** | One minute of example buttons: warm, cold, land, a new map, the El Niño bell. |
-| **Listen to a track** | **A1 Ocean Fever**: 31 monthly maps, May 2024 to Nov 2026. **A2 El Niño: then vs now**: the same day in 2025 and 2026, back to back. |
-| **Two ways to hear a map** | *Scan*: 16 notes sweep west to east. *Planet Chord*: the whole ocean as one chord that gets rougher as it warms. *Strict mode*: plain tones at the exact pitch. |
-| **Year by year, 1880 to 2025** | The whole planet as one sound. A sine wave's pitch is global temperature (350 Hz at the 1880–1900 average, +160 Hz per degree), a buzz at 880 Hz sounds in years at 1.5 °C or more, CO₂ makes the tone brighter, and shrinking Arctic sea ice makes the wind louder. Press Play or scrub the slider; it glides with no clicks. |
-| **Hear the change** | Pick two dates and hear A, then B, with a plain-language list of what changed. |
-| **Listen to one spot** | Tap the globe or the map, move two sliders, or jump to a place (Niño 3.4, Gulf Stream, the sea beside Tokyo...). It plays that 10° square and says its temperature. |
-| **El Niño bell** | Rings when the Niño 3.4 box is warmer than the tropics by more than the El Niño line. |
-| **Save as WAV** | Download one pass of a track with your mixer settings. |
+| Space | Play or pause |
+| Left, Right | Previous or next map (year, week or month) |
+| Home, End | First or last map |
+| W | Where am I: track, map, where the scan line is, the last note and which ear |
+| D | Describe this map (pauses first) |
+| S | What the sounds mean |
+| H | Every key |
+| 1 to 4 | Choose a track |
+| M | Mono on or off |
+| Escape | Stop all sound and speech, from anywhere |
 
-Accessibility is the point, not an add-on: native HTML controls, keyboard only, one
-live region that speaks only when you ask, an optional device voice for listeners
-without a screen reader, mono mode, reduced motion, a flat map when WebGL is
-missing, and 44 px touch targets from 320 px phones to desktops.
+The single-letter keys work only inside the player, so they never clash with screen reader keys
+(WCAG 2.1.4). The keyboard area is `role="application"`, so NVDA and JAWS switch to focus mode there
+by themselves. Every key is also a button. Below the player: **What the sounds mean** (each sound with
+an example button), **Explore one place** (city buttons and two sliders: hear one 10 degree square),
+and **Settings** (volume, speed, mono, say each new map, read aloud, save as audio file). Settings
+are remembered on the device.
 
 ## Run it
 
-The repository already contains the processed NASA data and the built audio engine,
-so the website runs with only Python (any version from 3.10):
+The processed NASA data and the built audio engine are in the repository, so the site runs with only
+Python 3.10+:
 
 ```bash
-git clone https://github.com/atuuuuuuu/earth-jukebox.git
-cd earth-jukebox
-python3 scripts/serve.py 8000
+python3 scripts/serve.py 8000      # no-cache server with byte ranges (Safari needs them for video)
 ```
 
-Open <http://localhost:8000>, put on headphones, press **Start listening**, then **Play**.
-With a keyboard: press Tab until Play has focus, then Space.
-
-Browsers only allow sound after a click or key press, so nothing plays on page load.
-On an iPhone, turn the silent switch off: iOS mutes web audio in silent mode.
+Open <http://localhost:8000>, put on headphones, and follow "Start here". Browsers only allow
+sound after a key press or click, so nothing plays on page load.
 
 ## Develop and test
 
-You need Node 20+ and Python 3.10+.
-
 ```bash
-npm install                       # Tone.js, esbuild, Playwright, axe-core
-npm run build                     # bundle src/engine.js into public/bundle.js
-npm run validate                  # check public/api against backend/API.md: prints "API OK"
-npm test                          # browser test: keyboard play, audio level, globe, year by year, axe accessibility
-npm run test:responsive           # 320 to 1440 px: no sideways scroll, no overlaps, touch targets >= 44 px
-
-pip install numpy scipy opencv-python-headless
-npm run test:backend              # 17 backend tests with known answers
+npm install                        # Tone.js, esbuild, Playwright, axe-core
+npm run build                      # bundle Tone.js into public/bundle.js (global EJ)
+npm run api                        # 3-degree grids -> public/api scores (standard library only)
+npm run validate                   # check public/api against backend/API.md: prints "API OK"
+npm test                           # the real page, keyboard only: every key, speech, sound level, axe, no trap
+npm run test:responsive            # 320 to 1440 px: no sideways scroll, touch targets >= 44 px
+python3 -m unittest backend/tests/test_sweep.py   # known-answer tests for the score builder
 ```
 
-The browser tests need Chromium (`npx playwright install chromium`). Where Playwright
-has no build for your OS, they use your installed Google Chrome instead.
-`npm run test:responsive -- /tmp/shots` also saves screenshots of each section at each width.
+To rebuild a track from NASA's video, put the video in `data/eic/` (see each `backend/eic/tracks/*.yaml`
+for the file and URL), then:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
+npm run eic -- 07_lightning        # or 01_night_lights, 06_co2_dyamond
+npm run api && npm run validate
+```
 
 ## How it works
 
-```mermaid
-flowchart LR
-  A["NASA SVS 5176<br/>SST anomaly video"] -->|ffmpeg| B["Map frames<br/>(JPEG)"]
-  B -->|"backend/build_api.py<br/>read each pixel off the colour bar"| C["public/api/*.json<br/>numbers per map"]
-  B --> D["public/frames/*.jpg"]
-  C -->|fetch| E["src/engine.js<br/>Tone.js sonifier"]
-  C -->|fetch| F["public/app.js<br/>page, text, controls"]
-  D --> G["public/globe.js<br/>plain WebGL globe"]
-  E --> H(("Sound"))
-  F --> E
-  F --> G
-```
-
-1. **Backend (Python, run once).** NASA publishes the maps as a video. ffmpeg
-   extracts the frames, and `backend/analyze.py` reads every pixel's colour against
-   NASA's own colour bar to get the temperature anomaly in °C. For each map it writes
-   16 west-to-east strip averages, an 18 × 36 grid, the map average, the hot area,
-   and the Niño 3.4 value relative to the tropics.
-2. **The API is static JSON.** No server and no database: the site runs from plain
-   files on GitHub Pages. `backend/API.md` is the contract between the two halves,
-   and `npm run validate` enforces it.
-3. **Frontend (plain JavaScript).** `src/engine.js` turns each map into notes with
-   Tone.js. `public/app.js` drives the page and `public/globe.js` draws the globe in
-   about 450 lines of WebGL.
-
-### Year by year
-
-`public/data/climate.json` joins three yearly records: NASA GISTEMP v4 global temperature
-(1880 onward), NOAA's Mauna Loa CO₂ (1959 onward) and NSIDC's September Arctic sea ice
-extent (1979 onward). `npm run climate` downloads them again and rebuilds the file.
-GISTEMP is published against 1951–1980; the script moves it onto 1880–1900 so the
-1.5 °C alarm means what the Paris Agreement means. Before a record starts, its sound is
-silent and the page says so: nothing is filled in.
-
-Each voice glides to the new year with `setTargetAtTime` (time constant 0.03 s), so
-dragging the slider fast never clicks.
-
-## Design decisions
-
-- **One fixed scale per track.** A note means the same temperature in every map, so
-  you can hear change over time. The scale is never stretched to fit one map.
-- **Temperature anomaly, not temperature.** The maps show how far each spot is from
-  its normal for that place and time of year, which is what makes warming audible.
-- **Niño 3.4 relative to the tropics** (NOAA's relative index), so the bell follows
-  El Niño itself, not the warming of the whole ocean.
-- **No framework.** Plain HTML, CSS and JavaScript keep the page light on phones and
-  every control a native, screen-reader-friendly element.
-- **The globe never shows anything the sound and text do not.** The scan strip, the
-  cursor box and the Niño 3.4 box all come from the score, and the flat map and text
-  carry the same information.
-
-## Project layout
-
-```
-public/      the website (deployed as is)
-  index.html, styles.css, app.js, globe.js
-  bundle.js  built from src/engine.js (committed so a fresh clone runs)
-  api/       generated JSON: tracks.json and one score per track
-  frames/    generated map images, 1024 × 512
-  textures/  NASA Blue Marble for the land on the globe
-  data/      climate.json: yearly temperature, CO₂ and sea ice (Year by year)
-src/         engine.js: the Tone.js sonifier
-backend/     Python: NASA frames to the JSON API (see backend/README.md, backend/API.md)
-test/        run.cjs (browser + axe), responsive.cjs (layouts), ACCESSIBILITY.md (10-minute test with a screen reader user)
-scripts/     serve.py (no-cache local server), climate_data.py (builds public/data/climate.json), roughness.py (checks the chord ladder)
-AGENTS.md    rules for AI coding assistants working in this repo
-```
-
-## Rebuild the data
-
-The processed data is already in `public/`. To rebuild it from NASA's video, follow
-"On the day: real NASA data" in [`backend/README.md`](backend/README.md) (needs
-ffmpeg and a 338 MB download), then `npm run api && npm run validate`.
-
-`npm run sample` builds a small API from synthetic maps for testing. It **replaces**
-the real data in `public/api`; restore it with `git checkout public/api public/frames`.
-
-## AI assistance
-
-Built with help from an AI coding assistant, Claude Code (Anthropic). It wrote and reviewed
-much of the code, tests and documentation; `AGENTS.md` holds the rules it worked under.
-The team decided what to build, chose the data, and reviewed and tested every change.
-All data comes from the NASA and partner sources listed below; no AI-generated data or images are used.
+1. **Reading NASA's video** (`backend/eic/`, team RUSTMN's pipeline, numpy and OpenCV). Each track's
+   YAML says how. Night lights: the 8K EIC video, calibrated against 10 cities, lights separated from
+   the base map. Carbon dioxide: a thin line through the centre of NASA's turning globe, read every 3
+   hours of model time. Lightning: NASA's Science On a Sphere movie is already a flat world map;
+   yellow strike pixels are averaged over every frame in each calendar month. Output: a 3 degree grid
+   per map in `public/data/` and map images in `public/media/`.
+2. **Scores** (`backend/build_sweep.py`, standard library). Pools the grid to 10 degree squares, adds
+   statistics and the spoken description of every map (naming the cities in the busiest squares), and
+   writes `public/api/` following `backend/API.md`. `backend/validate_api.py` checks it.
+3. **Sound** (`public/sweep/`, team RUSTMN's engine on Tone.js). The scan advances one 3 degree column
+   at a time; notes ring as it crosses bright places (vibraphone for lights, kalimba for lightning),
+   a hum follows everything under the line, and carbon dioxide adds tension over dense plumes and a
+   heartbeat for each day.
+4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ## Data and credits
 
-- Sea surface temperature anomaly: [NASA Scientific Visualization Studio, SVS 5176](https://svs.gsfc.nasa.gov/5176).
-  Data: MUR SST v4.1, NASA JPL PO.DAAC.
-- Year by year: [NASA GISTEMP v4](https://data.giss.nasa.gov/gistemp/), [NOAA GML Mauna Loa CO₂](https://gml.noaa.gov/ccgg/trends/data.html), [NSIDC Sea Ice Index v4](https://nsidc.org/data/g02135).
+- Visualizations: NASA's Scientific Visualization Studio, NASA Earth Information Center.
+  Night lights: Kel Elkins (USRA); Black Marble: Next Generation (Suomi NPP VIIRS). Carbon dioxide:
+  AJ Christensen, Greg Shirah, Helen-Nicole Kostis, Mark SubbaRao; DYAMOND, GEOS-MITgcm. Lightning:
+  Lightning Imaging Sensor on the ISS, NASA GHRC DAAC.
+- Values are read from the colours of NASA's videos, so they are relative levels, not satellite units.
+  The lightning video has no date label: dates are spread evenly from March 2017 to July 2023.
 - Land on the globe: [NASA Visible Earth, Blue Marble](https://visibleearth.nasa.gov/collection/1484/blue-marble).
-- Sound: [Tone.js](https://tonejs.github.io/).
+- Sound design and video reading for night lights and carbon dioxide: team RUSTMN (Ulaanbaatar).
+- Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via
+  [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts). Sound: [Tone.js](https://tonejs.github.io/).
+
+## AI assistance
+
+Built with help from an AI coding assistant, Claude Code (Anthropic). It wrote and reviewed much of
+the code, tests and documentation; `AGENTS.md` holds the rules it worked under. The team decided what
+to build, chose the data, and reviewed and tested the changes. No data, images or audio are AI-generated.
 
 Earth Jukebox is not an official NASA product.

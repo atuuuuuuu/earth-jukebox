@@ -1,0 +1,105 @@
+{
+  "out": "../public",
+  "tracks": [
+    {
+      "id": "night-lights",
+      "code": "1",
+      "title": "Earth at night",
+      "subtitle": "City lights, 2012 to 2023",
+      "description": "One slow scan across the Earth at night for each year from 2012 to 2023. Bright cities ring notes; a deep hum follows all the light.",
+      "data": "data/01_night_lights.json",
+      "chapter": "years",
+      "units": "share of the brightest light",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "night lights map",
+        "dates": "year",
+        "what": "light",
+        "top": "brightest",
+        "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
+      },
+      "summary": "A slow scan line moves west to east across the Earth at night, once for each year from 2012 to 2023."
+    },
+    {
+      "id": "night-change",
+      "code": "2",
+      "title": "Night lights: what changed",
+      "subtitle": "2012 compared with 2023",
+      "description": "NASA's map of how night lights changed from 2012 to 2023, scanned once, slowly. A rising pair of notes is new light; a low falling cello is light that dimmed.",
+      "data": "data/01_night_lights.json",
+      "chapter": "change",
+      "units": "change in light",
+      "range": [
+        -1,
+        1
+      ],
+      "hotLine": 0.3,
+      "words": {
+        "subject": "planet",
+        "map": "map of change in night lights",
+        "dates": "year",
+        "what": "change",
+        "top": "strongest",
+        "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
+      },
+      "summary": "A slow scan line moves west to east once across NASA's map of how night lights changed from 2012 to 2023."
+    },
+    {
+      "id": "carbon-dioxide",
+      "code": "3",
+      "title": "Carbon dioxide",
+      "subtitle": "Seven weeks of early 2020",
+      "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
+      "data": "data/06_co2_dyamond.json",
+      "chapter": "weeks",
+      "mapping": "co2",
+      "units": "share of the densest carbon dioxide",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "carbon dioxide globe",
+        "dates": "week",
+        "what": "carbon dioxide",
+        "top": "densest",
+        "missing": "not crossed by the scan line this week, so there is no reading here. Try another week."
+      }
+    },
+    {
+      "id": "lightning",
+      "code": "4",
+      "title": "Lightning",
+      "subtitle": "2017 to 2023, in 14 parts",
+      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. Each stormy place plays a drop-like note; listen to the storms swing north and south with the seasons.",
+      "data": "data/07_lightning.json",
+      "chapter": "parts",
+      "instrument": "kalimba",
+      "units": "share of the most lightning",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "lightning map",
+        "dates": "part",
+        "what": "lightning",
+        "top": "most",
+        "missing": "outside what the space station can see. Its sensor covers only about 55 degrees north to 55 degrees south."
+      },
+      "latRange": [
+        -55,
+        55
+      ]
+    }
+  ]
+}

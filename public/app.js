@@ -1,831 +1,517 @@
-// app.js: the page. Loads the backend API, drives the Sonifier (bundle.js, global EJ) and the globe (globe.js).
+// app.js: the page. Loads the track list and scores (backend/API.md), plays them with the sweep
+// engine (public/sweep/), and shows them on the globe (globe.js). Every action is a button or a
+// form control; single-key shortcuts work only inside the player, so they never fight a screen reader.
 (async () => {
   const $ = (id) => document.getElementById(id);
-  const live = $("live");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(`ej:${k}`); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(`ej:${k}`, JSON.stringify(v)); } catch { /* private mode: not remembered */ } },
+  };
 
-  // The live region speaks only when the listener acts. Clearing first makes repeats speak again.
-  // "Read aloud" also speaks through the device's voice, for listeners without a screen reader.
+  // ---------- Speaking ----------
+  // One polite live region. Clearing it first makes a repeated message speak again.
   let sayTimer;
   const say = (text) => {
     clearTimeout(sayTimer);
-    live.textContent = "";
-    sayTimer = setTimeout(() => { live.textContent = text; }, 50);
+    $("live").textContent = "";
+    sayTimer = setTimeout(() => { $("live").textContent = text; }, 60);
     if ($("speak").checked && "speechSynthesis" in window) {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = 0.95;
+      u.rate = 1;
       speechSynthesis.speak(u);
     }
   };
+  const showError = (text, retry) => {
+    const el = $("alert");
+    el.hidden = false;
+    el.innerHTML = "";
+    const p = document.createElement("p"); p.textContent = text; p.style.margin = "0";
+    el.append(p);
+    if (retry) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn"; b.textContent = "Try again";
+      b.addEventListener("click", () => location.reload());
+      el.append(b);
+    }
+  };
 
-  // Backend API: the track list, then the chosen track's score (see backend/API.md).
+  // ---------- Words ----------
+  const wrapLon = (l) => ((((l + 180) % 360) + 360) % 360) - 180;
+  const lonWords = (l) => { l = wrapLon(l); const a = Math.round(Math.abs(l)); return a === 0 || a === 180 ? `${a} degrees` : `${a} degrees ${l < 0 ? "west" : "east"}`; };
+  const latWords = (l) => (Math.abs(l) < 0.5 ? "the equator" : `${Math.round(Math.abs(l))} degrees ${l < 0 ? "south" : "north"}`);
+  const sentences = (t) => t.split(/(?<=\.)\s+(?=[A-Z])/);
+  const earOf = (pos) => ($("mono").checked || Math.abs(pos) < 0.33 ? "in the centre" : pos < 0 ? "in your left ear" : "in your right ear");
+
+  // ---------- Settings, remembered on this device ----------
+  const settings = {
+    volume: store.get("volume", 80), bpm: store.get("bpm", 84), mono: store.get("mono", false),
+  };
+  $("volume").value = settings.volume;
+  $("mono").checked = settings.mono;
+  $("announce").checked = store.get("announce", true);
+  $("speak").checked = store.get("speak", false);
+  const speedRadio = document.querySelector(`input[name="speed"][value="${settings.bpm}"]`);
+  if (speedRadio) speedRadio.checked = true;
+  const volText = () => `${settings.volume} percent`;
+  $("volume").setAttribute("aria-valuetext", volText());
+
+  // ---------- Load the tracks ----------
   let index;
   try {
-    index = await (await fetch("api/tracks.json")).json();
+    const r = await fetch("api/tracks.json");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    index = await r.json();
   } catch (e) {
     $("track-list").innerHTML = "";
-    say("Could not load the tracks. Open the page through a web server, for example npm run serve, not as a file.");
-    throw e;
+    say("");
+    showError("The tracks could not load. Check your connection and that the page is served by a web server, then try again.", true);
+    return;
+  }
+  const tracks = (index.tracks || []).filter((t) => t.engine === "sweep");
+  if (!tracks.length) {
+    $("track-list").innerHTML = '<p class="muted">There are no tracks yet.</p>';
+    say("There are no tracks yet.");
+    return;
   }
   const scores = new Map();
-  const getScore = async (track) => {
-    if (!scores.has(track.id)) scores.set(track.id, fetch(track.score).then((r) => r.json()));
-    return scores.get(track.id);
+  const getScore = (t) => {
+    if (!scores.has(t.id)) {
+      scores.set(t.id, fetch(t.score).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .catch((e) => { scores.delete(t.id); throw e; }));
+    }
+    return scores.get(t.id);
   };
 
-  $("sample-note").hidden = !index.sample;
-  const totalFrames = index.tracks.reduce((n, t) => n + (t.frames || 0), 0);
-  $("chip-frames").textContent = index.sample ? "sample only" : `${totalFrames} NASA maps`;
-
-  // Footer credits: one line per distinct source.
-  const credits = $("credits");
-  const seen = new Set();
-  for (const t of index.tracks) {
-    if (!t.source || seen.has(t.source.url)) continue;
-    seen.add(t.source.url);
-    const line = document.createElement("span");
-    const a = document.createElement("a");
-    a.href = t.source.url; a.textContent = t.source.title;
-    line.append("Source: ", a, `. ${t.source.credit}.`);
-    if (credits.childNodes.length) credits.append(document.createElement("br"));
-    credits.append(line);
-  }
-
-  // Track list, built from the data.
-  const list = $("track-list");
-  list.innerHTML = "";
-  index.tracks.forEach((t, i) => {
-    const id = `track-${t.id}`;
+  // Track list: native radios, so arrow keys move between tracks.
+  $("track-list").innerHTML = "";
+  tracks.forEach((t, i) => {
     const div = document.createElement("div");
     div.className = "track";
-    div.innerHTML = `<input type="radio" name="track"><label><span class="code"></span><span class="title"></span></label><p class="sub"></p>`;
+    div.innerHTML = `<input type="radio" name="track"><label><span class="t-no"></span> <span class="t-title"></span><span class="sr-only">. </span><span class="t-sub"></span></label>`;
     const input = div.querySelector("input");
-    input.id = id; input.value = t.id; input.checked = i === 0;
-    input.setAttribute("aria-describedby", `${id}-sub`);
-    div.querySelector("label").htmlFor = id;
-    div.querySelector(".code").textContent = t.code;
-    div.querySelector(".title").textContent = t.title;
-    const sub = div.querySelector(".sub");
-    sub.id = `${id}-sub`; sub.textContent = t.subtitle;
-    list.append(div);
+    input.id = `track-${t.id}`; input.value = t.id; input.checked = i === 0;
+    input.setAttribute("aria-describedby", `${input.id}-desc`);
+    div.querySelector("label").htmlFor = input.id;
+    div.querySelector(".t-no").textContent = `${i + 1}.`;
+    div.querySelector(".t-title").textContent = t.title;
+    const sub = div.querySelector(".t-sub");
+    sub.textContent = t.subtitle;
+    const desc = document.createElement("span");
+    desc.id = `${input.id}-desc`; desc.hidden = true; desc.textContent = t.description;   // read once, as the radio's description
+    div.append(desc);
+    $("track-list").append(div);
   });
 
-  // Player state. Settings live here so they survive track changes and Strict toggles.
-  const settings = { mapping: "scan", strict: false, bpm: EJ.TEMPO, volume: 100, mono: false, muted: [] };
-  let track = index.tracks[0];
-  let score = await getScore(track);
-  let son = null;
-  let playing = false;
-  let comparing = false;
-  let cmpFrames = 0;
-  let gen = 0;
+  // Credits, one per NASA source.
+  const seen = new Set();
+  for (const t of tracks) {
+    if (seen.has(t.source.url)) continue;
+    seen.add(t.source.url);
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = t.source.url; a.textContent = t.source.title;
+    li.append(a, `. ${t.source.credit}.`);
+    $("credits").append(li);
+  }
 
-  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
-  // Sign from the rounded value, so -0.04 reads "0.0", never "−0.0".
-  const signWith = (minus) => (v, d = 1) => { const r = Number(v.toFixed(d)); return `${r > 0 ? "+" : r < 0 ? minus : ""}${Math.abs(r).toFixed(d)}`; };
-  const signed = signWith("−");
-  const signedSpeech = (v) => signWith("-")(v, 1);
-  // Tracks of yearly averages say only the year ("words.dates": "year"); the date marks the middle of that year.
-  const yearly = () => score?.words?.dates === "year";
-  const niceDate = (iso) => yearly() ? iso.slice(0, 4) : new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  const shortDate = (iso) => yearly() ? iso.slice(0, 4) : new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-  const leftLon = () => score.leftLon ?? -180;
-  const wrapLon = (l) => ((l + 540) % 360) - 180;
-  const lonOf = (c) => wrapLon(leftLon() + (Number(c) + 0.5) * 10);
-  const latOf = (r) => 90 - (Number(r) + 0.5) * 10;
-  const lonText = (c) => { const l = lonOf(c); return `${Math.abs(l)} degrees ${l < 0 ? "west" : "east"}`; };
-  const latText = (r) => { const l = latOf(r); return `${Math.abs(l)} degrees ${l < 0 ? "south" : "north"}`; };
-  const lonShort = (l) => { l = wrapLon(l); return Math.abs(l) < 0.5 ? "0°" : Math.abs(Math.abs(l) - 180) < 0.5 ? "180°" : `${Math.round(Math.abs(l))}°${l < 0 ? "W" : "E"}`; };
-  const stripLon = (s) => leftLon() + (s + 0.5) * 22.5;
-  const timeText = (i) => {
-    const f = score.frames[i];
-    const avg = f.mean === null ? "no data" : `map average ${signedSpeech(f.mean)} ${score.units}`;
-    return `${yearly() ? f.date.slice(0, 4) : f.date}${f.label ? ` (${f.label})` : ""}, ${avg}. Moment ${i + 1} of ${score.frames.length}`;
-  };
-  const unitShort = () => (score.units === "degrees C" ? "°C" : score.units);
-  const bellOn = (f) => typeof f.nino34Relative === "number" && typeof score.ninoLine === "number" && f.nino34Relative > score.ninoLine;
-  const tune = () => ({ ladder: [-1, 2], spreadMax: 3, tenseAt: 0.25, ...score.tuning });
-  // Words for this track's map come from the score; tracks without them are ocean tracks.
-  const words = () => ({ subject: "ocean", map: "sea surface temperature anomaly map", ...score.words });
-  const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
-  const hasNino = () => score.frames.some((f) => typeof f.nino34Relative === "number");
-  const hasGaps = () => score.frames.some((f) => f.columns.some((v) => v === null));
-
-  // The anomaly colour scale, matching the legend bar and the NASA frames.
-  const STOPS = ["#0b3d91", "#3d8bff", "#a9d2ff", "#f4ead8", "#ffc28a", "#e0662a", "#8a1f05", "#3d0802"].map((h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16)));
-  const colourFor = (v) => {
-    const t = clamp((v - score.range[0]) / (score.range[1] - score.range[0])) * (STOPS.length - 1);
-    const i = Math.min(STOPS.length - 2, Math.floor(t)), k = t - i;
-    const c = STOPS[i].map((x, j) => Math.round(x + (STOPS[i + 1][j] - x) * k));
-    return `rgb(${c.join(",")})`;
-  };
-
-  // ---------- The globe ----------
+  // ---------- The globe (or a flat image when WebGL is missing) ----------
   let globe = null;
-  const earthImg = new Image();
+  try {
+    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
+    globe.follow = true;
+    globe.ninoOn = false;
+    globe.spin = !reduced.matches;
+    const earth = new Image();
+    earth.onload = () => globe.setEarth(earth);
+    earth.src = "textures/blue-marble.jpg";
+  } catch {
+    globe = null;
+    $("globe").hidden = true;
+  }
+  window.globe = globe;
+  window.globeReady = !!globe;
   const frameImgs = new Map();
   const loadImg = (src) => {
     if (!frameImgs.has(src)) {
-      const im = new Image();
-      im.decoding = "async";
-      const p = new Promise((res) => { im.onload = () => res(im); im.onerror = () => res(null); });
-      im.src = src;
-      frameImgs.set(src, p);
+      frameImgs.set(src, new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
     }
     return frameImgs.get(src);
   };
-  try {
-    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
-    window.globe = globe;
-    earthImg.onload = () => globe.setEarth(earthImg);
-    earthImg.src = "textures/blue-marble.jpg";
-  } catch (err) {
-    // No WebGL: fall back to the flat map, which carries the same information.
-    globe = null;
-    document.querySelector('input[name="view"][value="flat"]').checked = true;
-    document.querySelector('input[name="view"][value="globe"]').disabled = true;
-    $("spin").disabled = true; $("follow").disabled = true;
-  }
-  window.globeReady = !!globe;
 
-  const setView = (v) => {
-    $("globe-view").hidden = v !== "globe";
-    $("flat-view").hidden = v === "globe";
-  };
-  setView(globe ? "globe" : "flat");
-  document.querySelectorAll('input[name="view"]').forEach((r) => r.addEventListener("change", (e) => setView(e.target.value)));
+  // ---------- Player state ----------
+  let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
+  const usesVideo = () => !!score?.frames && score.sweep.mapping === "co2";
+  const n = () => score.frames.length;
+  const pos = () => tracks.indexOf(track) + 1;
+  const whenOf = (i) => score.frames[i].when;
+  // "Part 4 of 14" already counts itself; other names get "map 4 of 14".
+  const mapText = (i) => (/ of \d+$/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, map ${i + 1} of ${n()}`);
 
-  const setSpin = (on) => {
-    $("spin").setAttribute("aria-pressed", String(on));
-    if (!globe) return;
-    globe.spin = on;
-    if (on) { globe.targetYaw = null; globe.targetTilt = null; globe.idleUntil = 0; }
-  };
-  setSpin(!reduced.matches);
-  $("spin").addEventListener("click", () => setSpin($("spin").getAttribute("aria-pressed") !== "true"));
-
-  // Starfield behind the globe, drawn once.
-  (() => {
-    const c = document.createElement("canvas"); c.width = c.height = 480;
-    const g = c.getContext("2d");
-    let seed = 7;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < 260; i++) {
-      const r = rnd() < 0.92 ? rnd() * 0.9 + 0.2 : rnd() * 1.4 + 0.8;
-      g.fillStyle = `rgba(${200 + rnd() * 55 | 0},${210 + rnd() * 45 | 0},255,${0.25 + rnd() * 0.7})`;
-      g.beginPath(); g.arc(rnd() * 480, rnd() * 480, r, 0, Math.PI * 2); g.fill();
-    }
-    $("globe-view").style.setProperty("--stars", `url(${c.toDataURL()})`);
-  })();
-
-  // ---------- Map panel, overlays, melody bars ----------
-  const img = $("map-img"), marker = $("marker"), box = $("cursor-box");
-  const bars = $("bars");
-  for (let s = 0; s < EJ.STEPS; s++) bars.append(document.createElement("span"));
-  let lastBar = -1;
-
-  const drawBars = (f) => {
-    [...bars.children].forEach((el, s) => {
-      const v = f.columns[s];
-      el.classList.toggle("land", v === null);
-      if (v === null) { el.style.height = ""; el.style.background = ""; return; }
-      el.style.height = `${8 + 92 * clamp((v - score.range[0]) / (score.range[1] - score.range[0]))}%`;
-      el.style.background = colourFor(v);
-    });
-  };
-  const lightBar = (s) => {
-    if (lastBar >= 0 && bars.children[lastBar]) bars.children[lastBar].classList.remove("on");
-    lastBar = s;
-    if (s >= 0 && bars.children[s]) bars.children[s].classList.add("on");
+  const setPlayButton = () => {
+    $("play").dataset.state = playing ? "playing" : "paused";
+    $("play-label").textContent = playing ? "Pause" : "Play";
   };
 
-  let shownIndex = -1;
   const showFrame = (i) => {
     const f = score.frames[i];
-    if (img.getAttribute("src") !== f.image) img.src = f.image;
-    img.alt = `${cap(words().map)}, ${f.date}`;
-    $("globe").setAttribute("aria-label", `3D globe of the ${words().map}, ${niceDate(f.date)}. Drag to turn, tap to hear one spot.`);
-    $("date").textContent = niceDate(f.date);
-    const badge = $("badge");
-    if (f.label) {
-      const then = son && f.label === son.thenLabel;
-      badge.hidden = false;
-      badge.textContent = `${then ? "Then" : "Now"}: ${f.label}`;
-      badge.className = `badge ${then ? "then" : "now"}`;
-    } else badge.hidden = true;
-    const nino = bellOn(f);
-    $("stats").textContent = `${f.mean === null ? "No data" : `Whole ${words().subject} ${signed(f.mean)} ${unitShort()} vs normal`}. ${Math.round(f.hot * 100)}% of it is very hot, in ${f.clusters} patches.${nino ? " El Niño bell: on." : ""}`;
-    const bell = $("bell");
-    bell.textContent = `El Niño bell: ${nino ? "on" : "off"}`;
-    bell.classList.toggle("on", nino);
-    drawBars(f);
-    updateSignal(f, null);
-    drawSparkCursor(i);
-    if (globe) loadImg(f.image).then((im) => { if (im && score.frames[shownIndex] === f) globe.setFrame(im); });
-    shownIndex = i;
-    // Preload the next frame so neither view ever flashes.
-    loadImg(score.frames[(i + 1) % score.frames.length].image);
-  };
-  const placeMarker = (step) => { marker.style.left = `${((step + 0.5) / EJ.STEPS) * 100}%`; };
-  const showMarker = () => { marker.hidden = settings.mapping !== "scan"; };
-  const placeBox = () => {
-    const c = Number($("lon").value), r = Number($("lat").value);
-    Object.assign(box.style, { left: `${(c / 36) * 100}%`, top: `${(r / 18) * 100}%`, width: `${100 / 36}%`, height: `${100 / 18}%` });
-    if (globe) globe.cell = [c, r];
-  };
-
-  // ---------- Inside the signal ----------
-  const noteName = (p) => (typeof p === "number" ? `${Math.round(p)} Hz` : p);
-  const updateSignal = (f, s) => {
-    const t = tune();
-    const tense = f.hot > t.tenseAt;
-    $("s-scale").innerHTML = settings.strict ? "Continuous<small>Strict mode: no scale</small>" : tense ? `Darker<small>${Math.round(f.hot * 100)}% hot, over ${Math.round(t.tenseAt * 100)}%</small>` : `Calm<small>${Math.round(f.hot * 100)}% hot, under ${Math.round(t.tenseAt * 100)}%</small>`;
-    $("s-mean").textContent = f.mean === null ? "No data" : `${signed(f.mean)} ${unitShort()}`;
-    $("s-mean").className = f.mean > 0 ? "warm" : f.mean < 0 ? "cold" : "";
-    $("s-hot").innerHTML = `${Math.round(f.hot * 100)}%<small>${f.clusters} hot patches</small>`;
-    $("s-nino").innerHTML = typeof f.nino34Relative === "number" ? `${signed(f.nino34Relative)} ${unitShort()}<small>Bell ${bellOn(f) ? "rings" : "silent"}: line is ${signed(score.ninoLine)}</small>` : "–";
-    if (f.mean !== null) {
-      const [lo, hi] = t.ladder;
-      const rung = Math.round(clamp((f.mean - lo) / (hi - lo)) * 5);
-      $("s-chord").innerHTML = `Rung ${rung + 1} of 6<small>${["smoothest", "smooth", "open", "edgy", "rough", "roughest"][rung]}${settings.mapping === "state" ? ", playing" : ""}</small>`;
-    } else $("s-chord").textContent = "–";
-    if (s === null || settings.mapping !== "scan") {
-      $("s-strip").innerHTML = settings.mapping === "scan" ? "–<small>Press Play</small>" : "Whole map<small>Planet Chord plays it all at once</small>";
-      $("s-value").textContent = "–"; $("s-note").textContent = "–";
-      return;
+    $("map").value = i;
+    $("map").setAttribute("aria-valuetext", mapText(i));
+    $("stage-when").textContent = f.when;
+    const label = `${(f.alt || score.words.map).replace(/\.$/, "")}. ${n() > 1 ? `Map ${i + 1} of ${n()}.` : ""}`.trim();
+    if (usesVideo()) $("video-wrap").setAttribute("aria-label", label);
+    else $("globe").setAttribute("aria-label", `3D globe: ${label}`);
+    $("map-img").alt = label;
+    if (!usesVideo()) {
+      if (globe) loadImg(f.image).then((im) => { if (im && score.frames[i] === f) globe.setFrame(im); });
+      else { $("map-img").src = f.image; }
+      loadImg(score.frames[(i + 1) % n()].image);   // the next map, ready before it is needed
     }
-    const v = f.columns[s];
-    $("s-strip").innerHTML = `${lonShort(stripLon(s))}<small>Strip ${s + 1} of ${EJ.STEPS}</small>`;
-    if (v === null) { $("s-value").innerHTML = "Land<small>Silence</small>"; $("s-note").textContent = "Rest"; return; }
-    $("s-value").textContent = `${signed(v)} ${unitShort()}`;
-    $("s-value").className = v > 0 ? "warm" : v < 0 ? "cold" : "";
-    const loud = Math.round(100 * (0.25 + 0.75 * clamp(Math.abs(v) / ((score.range[1] - score.range[0]) / 2))));
-    $("s-note").innerHTML = `${noteName(son.pitch(v, f))}<small>Loudness ${loud}%</small>`;
+    syncVideo(true);
   };
 
-  // ---------- Timeline sparkline ----------
-  const spark = $("spark");
-  const drawSpark = () => {
-    const n = score.frames.length;
-    const x = (i) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
-    const [lo, hi] = score.range;
-    // Zoom the chart to the data but keep zero in view; the sound itself never rescales.
-    const vals = score.frames.flatMap((f) => [f.mean, f.nino34Relative]).filter((v) => typeof v === "number");
-    const top = Math.min(hi, Math.max(0.5, ...vals) + 0.3), bot = Math.max(lo, Math.min(-0.5, ...vals) - 0.3);
-    const y = (v) => 40 - ((v - bot) / (top - bot)) * 40;
-    const path = (key) => score.frames.map((f, i) => (typeof f[key] === "number" ? `${i && typeof score.frames[i - 1][key] === "number" ? "L" : "M"}${x(i).toFixed(2)} ${y(f[key]).toFixed(2)}` : "")).join(" ");
-    const mean = path("mean");
-    spark.querySelector(".mean").setAttribute("d", mean);
-    spark.querySelector(".area").setAttribute("d", mean ? `${mean} L100 40 L0 40 Z` : "");
-    spark.querySelector(".nino").setAttribute("d", path("nino34Relative"));
-    const z = spark.querySelector(".zero");
-    z.setAttribute("y1", y(0)); z.setAttribute("y2", y(0));
-  };
-  const drawSparkCursor = (i) => {
-    const n = score.frames.length;
-    const cx = n <= 1 ? 50 : (i / (n - 1)) * 100;
-    const c = spark.querySelector(".cur");
-    c.setAttribute("x1", cx); c.setAttribute("x2", cx);
+  // Carbon dioxide is NASA's own turning-globe video: keep it in step with the sound.
+  const syncVideo = (jump = false) => {
+    if (!usesVideo() || !son) return;
+    const v = $("video"), t = son.mediaTime();
+    if (t === null) return;
+    // Never seek again while a seek is still loading, or the video never gets to play.
+    if (jump || (!v.seeking && Math.abs(v.currentTime - t) > 0.3)) v.currentTime = t;
+    if (playing) { v.playbackRate = son.mediaRate(); if (v.paused) v.play().catch(() => {}); } else v.pause();
   };
 
-  // ---------- Waveform ----------
-  const wave = $("wave");
-  const wctx = wave.getContext("2d");
-  const drawWave = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.round(wave.clientWidth * dpr), h = Math.round(wave.clientHeight * dpr);
-    if (wave.width !== w || wave.height !== h) { wave.width = w; wave.height = h; }
-    wctx.clearRect(0, 0, w, h);
-    const data = playing && son && son.waveform ? son.waveform() : null;
-    const grad = wctx.createLinearGradient(0, 0, w, 0);
-    grad.addColorStop(0, "#5aa9ff"); grad.addColorStop(0.5, "#f4ead8"); grad.addColorStop(1, "#ff7a45");
-    wctx.strokeStyle = grad; wctx.lineWidth = 2 * dpr; wctx.beginPath();
-    if (data && data.length) {
-      for (let i = 0; i < data.length; i++) {
-        const px = (i / (data.length - 1)) * w, py = h / 2 - clamp(data[i] * 2.2, -1, 1) * (h / 2 - 3);
-        i ? wctx.lineTo(px, py) : wctx.moveTo(px, py);
-      }
-    } else { wctx.moveTo(0, h / 2); wctx.lineTo(w, h / 2); }
-    wctx.stroke();
-  };
-  const waveLoop = () => {
-    drawWave();
-    if (playing && !reduced.matches) requestAnimationFrame(waveLoop);
+  // While playing: the progress bar, the flat image's line, and the video.
+  const tick = () => {
+    if (!playing || !son) return;
+    $("stage-fill").style.width = `${son.progress() * 100}%`;
+    syncVideo();
+    requestAnimationFrame(tick);
   };
 
-  // ---------- Playback ----------
-  const setTime = (i) => {
-    $("time").value = i;
-    const text = timeText(i);
-    $("time").setAttribute("aria-valuetext", text);
-    $("time-out").textContent = text;
-  };
-
+  // ---------- Building the sonifier for a track ----------
+  let lastNote = null;
   const onFrame = (f, i) => {
-    setTime(i);
     showFrame(i);
     window.framesSeen = (window.framesSeen || 0) + 1;
-    if ($("announce")?.checked && playing) {
-      const m = f.mean;
-      const how = m === null ? "no data" : Math.abs(m) < 0.05 ? "about normal" : `${Math.abs(m).toFixed(1)} degrees ${m > 0 ? "warmer" : "colder"} than normal`;
-      say(`${niceDate(f.date)}${f.label ? `, ${f.label === son.thenLabel ? "then" : "now"}` : ""}. ${cap(words().subject)} ${how}.${bellOn(f) ? " El Niño bell." : ""}`);
-    }
-    if (bellOn(f)) {
-      if (globe) globe.ringBell();
-      const b = $("bell"); b.classList.remove("ring"); void b.offsetWidth; b.classList.add("ring");
-    }
-    if (comparing) {
-      const second = cmpFrames++ > 0;
-      $("cmp-a-card").classList.toggle("live", !second);
-      $("cmp-b-card").classList.toggle("live", second);
-    }
+    if (playing && $("announce").checked && son?.started) say(`${f.when}.`);
+    if (son) son.started = true;
   };
-  // i is the frame this step belongs to. son.frame() can already be the next frame here:
-  // the engine schedules ahead, so at step 15 it has moved on before this callback runs.
-  const onStep = (s, i, time) => {
-    placeMarker(s);
-    const scan = settings.mapping === "scan";
-    lightBar(scan ? s : -1);
-    if (globe) {
-      if (scan) globe.step(s, 60 / settings.bpm / 4, time); else globe.strip = -1;
-      globe.follow = scan && $("follow").checked;
-    }
-    updateSignal(score.frames[i], s);
+  const onStep = (i, info) => { son.info = info; };
+  const onNote = (note) => {
+    lastNote = note;
+    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
   };
-  const resetCompareUI = () => {
-    comparing = false;
-    $("cmp-a-card").classList.remove("live"); $("cmp-b-card").classList.remove("live");
-    $("cmp-play").textContent = "Play A, then B";
+  const onEnd = () => {
+    playing = false; setPlayButton(); idle();
+    say(`End of track ${pos()}, ${track.title}. Press Space in the player to play it again, or choose another track.`);
   };
-  const onSequenceEnd = () => {
-    son.pause(); son.cancelSequence();
-    playing = false; setPlayButton(); idleVisuals(); resetCompareUI();
-    const a = Number($("cmp-a").value);
-    son.seek(a); setTime(a); showFrame(a);
+  const idle = () => {
+    $("stage-fill").style.width = son ? `${son.progress() * 100}%` : "0";
+    syncVideo();
   };
 
-  const idleVisuals = () => {
-    lightBar(-1);
-    if (globe) globe.strip = -1;
-    $("wave-state").textContent = "Press Play";
-    drawWave();
-    if (son) updateSignal(son.frame(), null);
-  };
-  const setPlayButton = () => {
-    $("play").textContent = playing ? "Pause" : "Play";
-    $("play").dataset.state = playing ? "playing" : "paused";
-    if (playing) { $("wave-state").textContent = "Live"; waveLoop(); }
-  };
-
-  // Build a fresh Sonifier. The old one is disposed first, so notes never double.
-  const rebuild = async (startIndex) => {
+  const loadTrack = async (t, { announce = true } = {}) => {
     const mine = ++gen;
-    if (son) son.dispose();
-    son = new EJ.Sonifier(score, { ...settings, startIndex, onFrame, onStep, onSequenceEnd });
-    window.son = son;
-    setTime(son.index);
-    showFrame(son.index);
-    placeMarker(0);
-    if (playing) {
-      const ok = await son.play();
+    if (son) { son.dispose(); son = null; }
+    playing = false; setPlayButton();
+    $("play").disabled = true;
+    $("alert").hidden = true;
+    track = t;
+    $("np-title").textContent = t.title;
+    let s;
+    try {
+      s = await getScore(t);
+      sweepMod ||= await import("./sweep/sonifier.js");
       if (mine !== gen) return;
-      if (!ok) { playing = false; setPlayButton(); }
+      score = s;
+      son = await sweepMod.createSweep(score, { ...settings, startIndex: 0, onFrame, onStep, onEnd, onNote });
+    } catch (e) {
+      console.error(e);
+      if (mine !== gen) return;
+      showError(`Track ${t.title} could not load. Check your connection, then try again.`, true);
+      say(`Track ${t.title} could not load.`);
+      return;
+    }
+    if (mine !== gen) { son.dispose(); son = null; return; }
+    window.son = son;
+    lastNote = null;
+
+    // The picture: NASA's video for carbon dioxide, the globe for map tracks.
+    const video = usesVideo();
+    $("video-wrap").hidden = !video;
+    $("globe").hidden = video || !globe;
+    $("map-img").hidden = video || !!globe;
+    document.querySelector(".stage-hint").hidden = video || !globe;
+    if (video) {
+      const v = $("video");
+      const data = await (await fetch(score.sweep.src)).json().catch(() => null);
+      if (data?.media) { v.poster = data.media.poster; if (!v.src.endsWith(data.media.src)) v.src = data.media.src; }
+    }
+    if (globe) {
+      globe.headFn = video ? null : () => son?.headLon();
+      globe.full = true;
+      globe.pings = [];
+    }
+
+    // The map slider, and buttons that make no sense for a one-map track.
+    $("map").max = n() - 1;
+    $("map-field").hidden = n() < 2;
+    $("prev").disabled = $("next").disabled = n() < 2;
+    renderSounds();
+    showFrame(0);
+    idle();
+    $("play").disabled = false;
+    window.ready = true;
+    if (announce) {
+      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. `
+        + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
     }
   };
 
-  const loadTrack = async (id) => {
-    const t = index.tracks.find((x) => x.id === id);
-    const s = await getScore(t);
-    if (t !== index.tracks.find((x) => x.id === document.querySelector('input[name="track"]:checked').value)) return;
-    track = t; score = s;
-    if (globe) globe.leftLon = leftLon();
-    $("track-about").textContent = t.description || "";
-    $("time").max = score.frames.length - 1;
-    $("leg-lo").textContent = `${signed(score.range[0])} ${unitShort()}`;
-    $("leg-hi").textContent = `${signed(score.range[1])} ${unitShort()}`;
-    $("bars-scale").textContent = `${signed(score.range[0], 0)} to ${signed(score.range[1], 0)} ${unitShort()}`;
-    // Explainer text uses the track's own lines, never a hardcoded value.
-    const deg = (v) => `${Math.abs(v).toFixed(1)} ${unitShort()}`;
-    if (typeof score.ninoLine === "number") document.querySelectorAll(".v-nino-line").forEach((el) => { el.textContent = deg(score.ninoLine); });
-    if (typeof score.hotLine === "number") document.querySelectorAll(".v-hot-line").forEach((el) => { el.textContent = deg(score.hotLine); });
-    // Wording and El Niño parts follow the track: a map without Niño 3.4 data shows no bell or box.
-    document.querySelectorAll(".v-subject").forEach((el) => { el.textContent = words().subject; });
-    document.querySelectorAll(".needs-nino").forEach((el) => { el.hidden = !hasNino(); });
-    spark.querySelector(".nino").style.display = hasNino() ? "" : "none";
-    if (globe) globe.ninoOn = hasNino();
-    const landBtn = document.querySelector('#learn-list [data-demo="land"]');
-    if (landBtn) {
-      landBtn.hidden = !hasGaps();
-      landBtn.querySelector("b").textContent = words().subject === "ocean" ? "Land" : "No data";
+  // ---------- Actions ----------
+  const play = async () => {
+    if (!son || $("play").disabled) return;
+    if (playing) {
+      son.pause(); playing = false; setPlayButton(); idle();
+      say(`Paused at ${whenOf(son.index)}.`);
+      return;
     }
-    $("ax-w").textContent = lonShort(leftLon());
-    $("ax-m").textContent = lonShort(leftLon() + 180);
-    $("ax-e").textContent = lonShort(leftLon() + 360);
-    const paired = new Set(score.frames.map((f) => f.label).filter(Boolean)).size >= 2;
-    document.querySelectorAll("#learn-list .needs-labels").forEach((b) => { b.hidden = !paired; });
-    renderKey();
-    drawSpark();
-    fillCompare();
-    resetCompareUI();
-    await rebuild(0);
-  };
-
-  list.addEventListener("change", async (e) => {
-    if (e.target.name !== "track") return;
-    await loadTrack(e.target.value);
-    say(`${playing ? "Now playing" : "Selected"} ${track.code} ${track.title}.${playing ? "" : " Press Play to listen."}`);
-  });
-
-  $("play").addEventListener("click", async () => {
-    if (playing) { son.pause(); playing = false; setPlayButton(); idleVisuals(); if (comparing) { son.cancelSequence(); resetCompareUI(); } return; }
-    if (comparing || son.queue) { son.cancelSequence(); resetCompareUI(); }
-    stopTrend(false);
+    if (!son.ready) say("Loading sounds.");
     playing = true; setPlayButton();
-    const mine = son;
+    son.started = false;
+    const me = son;
     const ok = await son.play();
-    if (!ok && mine === son) { playing = false; setPlayButton(); }
+    if (me !== son) return;
+    if (!ok) {
+      playing = false; setPlayButton();
+      showError("Sound could not start in this browser. Try a recent Chrome, Edge, Firefox or Safari, and check the volume.", false);
+      say("Sound could not start.");
+      return;
+    }
+    say(`Playing ${whenOf(son.index)}.`);
+    requestAnimationFrame(tick);
+  };
+
+  const goTo = (i, speak = true) => {
+    if (!son) return;
+    i = clamp(i, 0, n() - 1);
+    son.seek(i);
+    son.started = false;
+    showFrame(i);
+    idle();
+    if (speak) say(`${mapText(i)}.${playing ? "" : " Press Space to play."}`);
+  };
+  const step = (d) => {
+    if (n() < 2) { say("This track has only one map."); return; }
+    const i = son.index + d;
+    if (i < 0) { say(`Already at the first map, ${whenOf(0)}.`); return; }
+    if (i >= n()) { say(`Already at the last map, ${whenOf(n() - 1)}.`); return; }
+    goTo(i);
+  };
+
+  const pauseForSpeech = () => {
+    if (playing) { son.pause(); playing = false; setPlayButton(); idle(); return "Paused. "; }
+    return "";
+  };
+
+  const describe = () => {
+    if (!son) return;
+    const pre = pauseForSpeech();
+    say(`${pre}${son.frame().text} Press Space to play.`);
+  };
+
+  const whereText = () => {
+    if (!son) return "The player is still loading.";
+    const i = son.index;
+    let s = `You are in the player. Track ${pos()} of ${tracks.length}, ${track.title}. ${mapText(i)}. `;
+    if (playing) {
+      const lon = son.headLon();
+      s += `Playing. The scan line is at ${lonWords(lon)}, ${Math.round(son.progress() * 100)} percent of the way across.`;
+      if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest hum.` : " It is crossing a quiet stretch.";
+      if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
+    } else {
+      s += "Paused. Press Space to play.";
+    }
+    return `${s} Press H for keys.`;
+  };
+
+  const HELP = "Player keys. Space: play or pause. Left and Right arrows: previous or next map. Home and End: first or last map. "
+    + "W: where am I. D: describe this map. S: what the sounds mean. 1 to 4: choose a track. M: mono on or off. Escape: stop. "
+    + "Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
+
+  const soundsText = () => {
+    const pre = pauseForSpeech();
+    return `${pre}${sweepMod.keyText(score)}`;
+  };
+
+  const stopAll = () => {
+    if (son) { if (playing) { son.pause(); playing = false; setPlayButton(); idle(); } son.hush(); }
+    clearTimeout(demoTimer);
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    say("Stopped.");
+  };
+
+  $("play").addEventListener("click", play);
+  $("prev").addEventListener("click", () => step(-1));
+  $("next").addEventListener("click", () => step(1));
+  $("map").addEventListener("input", (e) => goTo(Number(e.target.value), false));
+  $("map").addEventListener("change", (e) => say(`${mapText(Number(e.target.value))}.`));
+  $("describe").addEventListener("click", describe);
+  $("where").addEventListener("click", () => say(whereText()));
+  $("help").addEventListener("click", () => say(HELP));
+
+  document.querySelector("#track-list").addEventListener("change", (e) => {
+    if (e.target.name === "track") loadTrack(tracks.find((t) => t.id === e.target.value));
   });
 
-  const stopForSpeech = () => {
-    stopTrend(false);
-    if (playing) { son.pause(); playing = false; setPlayButton(); idleVisuals(); }
-    if (son.queue || comparing) { son.cancelSequence(); resetCompareUI(); }
-  };
-  $("describe").addEventListener("click", () => { stopForSpeech(); say(son.frame().text); });
-  $("key").addEventListener("click", () => { stopForSpeech(); say(EJ.keyText(score)); });
-
-  const goTo = (i) => {
-    const n = score.frames.length;
-    i = ((i % n) + n) % n;
-    son.seek(i); setTime(i); showFrame(i); placeMarker(0);
-  };
-  $("time").addEventListener("input", (e) => goTo(Number(e.target.value)));
-  $("prev").addEventListener("click", () => { goTo(son.index - (playing && son.step > 2 ? 0 : 1)); if (!playing) say(timeText(son.index)); });
-  $("next").addEventListener("click", () => { goTo(son.index + 1); if (!playing) say(timeText(son.index)); });
-
-  document.querySelectorAll('input[name="mapping"]').forEach((r) => r.addEventListener("change", (e) => {
-    settings.mapping = e.target.value;
-    son.mapping = settings.mapping;   // read live on every step: no restart
-    showMarker();
-    if (!playing) idleVisuals();
-  }));
-  $("strict").addEventListener("change", (e) => {
-    settings.strict = e.target.checked;
-    // A running A-then-B would otherwise turn into an endless loop on the new Sonifier.
-    if (comparing) { son.pause(); playing = false; setPlayButton(); idleVisuals(); resetCompareUI(); }
-    rebuild(son.index);             // Strict rewires the synths, so it needs a new Sonifier
+  // ---------- Keys: only inside the player ----------
+  // The keyboard area is role="application", so NVDA and JAWS pass keys straight to it.
+  // Space stays native on buttons; sliders keep their own arrow keys.
+  $("player").addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t.closest("input, select, textarea")) return;
+    const onButton = t.closest("button, a");
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const act = (fn) => { e.preventDefault(); fn(); };
+    switch (k) {
+      case " ": case "Enter": if (!onButton) act(play); break;
+      case "k": act(play); break;
+      case "ArrowLeft": act(() => step(-1)); break;
+      case "ArrowRight": act(() => step(1)); break;
+      case "Home": act(() => goTo(0)); break;
+      case "End": act(() => goTo(n() - 1)); break;
+      case "w": act(() => say(whereText())); break;
+      case "d": act(describe); break;
+      case "h": case "?": act(() => say(HELP)); break;
+      case "s": act(() => say(soundsText())); break;
+      case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
+      default:
+        if (/^[1-9]$/.test(k) && tracks[Number(k) - 1]) {
+          act(() => {
+            const r = $(`track-${tracks[Number(k) - 1].id}`);
+            if (r.checked) { say(`Track ${k}, ${track.title}, is already chosen.`); return; }
+            r.checked = true;
+            loadTrack(tracks[Number(k) - 1]);
+          });
+        }
+    }
   });
+  // Escape stops sound and speech anywhere (it is not a character key, so it cannot clash).
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopAll(); });
+  $("keys").addEventListener("click", () => $("keys").focus());
 
-  // ---------- Listening cursor ----------
-  // Named places are only a way to point at a spot. The sound and value still come from the score.
-  let place = "";
-  const PLACES = {
-    regions: [
-      ["Niño 3.4", -145, 0], ["Gulf Stream", -65, 38], ["Coral Triangle", 125, 0], ["Humboldt Current", -80, -15],
-      ["Indian Ocean", 75, -5], ["Southern Ocean", 0, -60], ["North Atlantic", -30, 50], ["Mediterranean", 15, 35],
-    ],
-    cities: [
-      ["Tokyo", 145, 35], ["Sydney", 155, -35], ["Lagos", 3, 5], ["Mumbai", 68, 18],
-      ["Rio de Janeiro", -35, -23], ["Honolulu", -157, 21], ["Lisbon", -15, 38], ["Cape Town", 15, -37],
-    ],
+  // ---------- What the sounds mean, and examples ----------
+  let demoTimer;
+  const renderSounds = () => {
+    const L = score.legend;
+    $("sounds-summary").textContent = `${L.summary.trim()} ${L.method.trim()}`;
+    $("legend").innerHTML = "";
+    for (const item of L.items) {
+      const li = document.createElement("li");
+      const b = document.createElement("b"); b.textContent = item.sound;
+      const sep = document.createElement("span"); sep.className = "sr-only"; sep.textContent = ": ";
+      li.append(b, sep, item.meaning);
+      $("legend").append(li);
+    }
+    $("caveat").textContent = L.caveat.trim();
+    $("demos").innerHTML = "";
+    for (const d of son.demos()) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn"; b.dataset.demo = d.id;
+      b.innerHTML = '<b></b><span class="sr-only">: </span><span class="hint"></span>';
+      b.querySelector("b").textContent = d.label;
+      b.querySelector(".hint").textContent = d.hint;
+      b.addEventListener("click", async () => {
+        pauseForSpeech();
+        clearTimeout(demoTimer);
+        const secs = await son.demo(d.id);
+        demoTimer = setTimeout(() => say(d.text), secs * 1000);
+      });
+      $("demos").append(b);
+    }
   };
-  const probe = async () => {
-    placeBox();
-    const c = $("lon").value, r = $("lat").value;
-    if (globe) globe.lookAt(lonOf(c), clamp(latOf(r), -50, 50));
-    const value = await son.probe(Number(c), Number(r));
+
+  // ---------- Explore one place ----------
+  const PLACES = [
+    ["Ulaanbaatar", 106.9, 47.9], ["Tokyo", 139.7, 35.7], ["Delhi", 77.2, 28.6], ["Lagos", 3.4, 6.5],
+    ["Kinshasa", 15.3, -4.3], ["Cairo", 31.2, 30.0], ["London", -0.1, 51.5], ["New York", -74.0, 40.7],
+    ["Mexico City", -99.1, 19.4], ["São Paulo", -46.6, -23.5], ["Jakarta", 106.8, -6.2], ["Sydney", 151.2, -33.9],
+  ];
+  $("places").innerHTML = PLACES.map(([name, lon, lat]) =>
+    `<button type="button" class="btn" data-lon="${lon}" data-lat="${lat}">${name}</button>`).join("");
+  $("places").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) pickSpot({ lon: Number(b.dataset.lon), lat: Number(b.dataset.lat) }, b.textContent);
+  });
+  const lonOf = (c) => wrapLon(-180 + (c + 0.5) * 10);
+  const latOf = (r) => 90 - (r + 0.5) * 10;
+  const cellText = (c, r) => `${lonWords(lonOf(c))}, ${latWords(latOf(r))}`;
+  const setSliderText = () => {
+    $("lon").setAttribute("aria-valuetext", lonWords(lonOf(Number($("lon").value))));
+    $("lat").setAttribute("aria-valuetext", latWords(latOf(Number($("lat").value))));
+  };
+  setSliderText();
+  const probe = async (name = "") => {
+    if (!son) return;
+    const c = Number($("lon").value), r = Number($("lat").value);
+    if (globe && !usesVideo()) { globe.cell = [c, r]; globe.lookAt(lonOf(c), clamp(latOf(r), -50, 50)); }
+    pauseForSpeech();
+    const value = await son.probe(c, r);
     window.lastProbe = value;
-    if (value) say(`${place ? `${place}. ` : ""}${lonText(c)}, ${latText(r)}: ${value}`);
+    const near = !name && score.places?.[`${r},${c}`];
+    if (value) say(`${name ? `${name}. ` : near ? `Near ${near}. ` : ""}${whenOf(son.index)}, ${cellText(c, r)}: ${value}`);
   };
   const pickSpot = ({ lon, lat }, name = "") => {
-    place = name;
-    const c = Math.min(35, Math.floor((((lon - leftLon()) % 360) + 360) % 360 / 10));
-    const r = clamp(Math.floor((90 - lat) / 10), 0, 17);
-    $("lon").value = c; $("lat").value = r;
-    $("lon").setAttribute("aria-valuetext", lonText(c));
-    $("lat").setAttribute("aria-valuetext", latText(r));
-    setSpin(false);
-    probe();
+    $("lon").value = clamp(Math.floor((wrapLon(lon) + 180) / 10), 0, 35);
+    $("lat").value = clamp(Math.floor((90 - lat) / 10), 0, 17);
+    setSliderText();
+    probe(name);
   };
-  for (const [group, id] of [["regions", "places-regions"], ["cities", "places-cities"]]) {
-    $(id).innerHTML = PLACES[group].map(([n, lon, lat]) =>
-      `<button type="button" class="place" data-lon="${lon}" data-lat="${lat}">${n}</button>`).join("");
-    $(id).addEventListener("click", (e) => {
-      const b = e.target.closest("button.place");
-      if (b) pickSpot({ lon: Number(b.dataset.lon), lat: Number(b.dataset.lat) }, group === "cities" ? `Sea beside ${b.textContent}` : b.textContent);
-    });
-  }
-  $("lon").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", lonText(e.target.value)); setSpin(false); probe(); });
-  $("lat").addEventListener("input", (e) => { place = ""; e.target.setAttribute("aria-valuetext", latText(e.target.value)); setSpin(false); probe(); });
-
-  // ---------- Click a 2D map to hear one spot ----------
-  // x and y are fractions across the image. The frames start at leftLon and span 360 by 180 degrees.
-  const fracs = (el, e) => {
-    const r = el.getBoundingClientRect();
-    return [clamp((e.clientX - r.left) / r.width, 0, 0.9999), clamp((e.clientY - r.top) / r.height, 0, 0.9999)];
-  };
-  $("flat-frame")?.addEventListener("click", (e) => {
-    const [fx, fy] = fracs(e.currentTarget, e);
-    pickSpot({ lon: leftLon() + fx * 360, lat: 90 - fy * 180 });
-  });
-  document.querySelectorAll(".cmp-frame").forEach((el) => el.addEventListener("click", async (e) => {
-    const [fx, fy] = fracs(el, e);
-    const c = Math.floor(fx * 36), r = Math.floor(fy * 18);
-    const which = el.dataset.cmp;
-    const i = Number($(`cmp-${which}`).value);
-    const b = el.querySelector(".cmp-box");
-    Object.assign(b.style, { left: `${(c / 36) * 100}%`, top: `${(r / 18) * 100}%`, width: `${100 / 36}%`, height: `${100 / 18}%` });
-    b.hidden = false;
-    const value = await son.probe(c, r, i);
-    if (value) say(`Moment ${which.toUpperCase()}, ${niceDate(score.frames[i].date)}. ${lonText(c)}, ${latText(r)}: ${value}`);
-  }));
-
-  // ---------- Learn the sounds ----------
-  // Example values, labelled as examples. They show the mapping; they are not data.
-  let demoTimer;
-  $("learn-list")?.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-demo]");
-    if (!btn) return;
-    stopForSpeech();
-    clearTimeout(demoTimer);
-    const m = Math.max(Math.abs(score.range[0]), Math.abs(score.range[1]));
-    const ex = [0.15, 0.4, 0.75].map((k) => (m * k).toFixed(1));
-    const u = score.units;
-    const t = tune();
-    const text = {
-      normal: `That is normal: the same temperature as usual for that place and time of year. It is the middle note. Every other note is measured from it.`,
-      warmer: `Warmer than normal: normal, then ${ex.join(", ")} ${u} warmer. The warmer it is, the higher, brighter and louder the note.`,
-      colder: `Colder than normal: normal, then ${ex.join(", ")} ${u} colder. The colder it is, the lower the note, and it sounds soft and round.`,
-      sweep: `West to east. Each map plays from the far west in your left ear to the far east in your right ear. Use headphones, or tick Mono in settings for one ear.`,
-      land: words().subject === "ocean" ? `Land. A note, then silence where the scan crosses land, then the sea again.` : `No data. A note, then silence where the scan crosses a place with no measurements, then the map again.`,
-      knock: `A new map. The low knock starts each map, and soft ticks mark each quarter of the way across.`,
-      bell: `The El Niño bell. It rings at the start of a map when the Niño 3.4 box in the Pacific is more than ${signedSpeech(score.ninoLine ?? 0)} ${u} warmer than the tropics.`,
-      chord: `Planet Chord, smooth then rough. In Planet Chord mode the whole ${words().subject} plays as one chord. A smooth chord means a cool ${words().subject} on average, up to ${signedSpeech(t.ladder[0])} ${u}; a rough chord means a hot one, ${signedSpeech(t.ladder[1])} ${u} or more.`,
-      hum: `The zero hum. A low steady tone under the music that stands for normal. It never changes.`,
-      then: `The then cue: a low note at the start of a map from ${son.thenLabel ?? "the earlier year"}.`,
-      now: `The now cue: a high note at the start of a map from the later year.`,
-    }[btn.dataset.demo];
-    const secs = await son.demo(btn.dataset.demo);
-    demoTimer = setTimeout(() => say(text), secs * 1000);
-  });
-
-  // ---------- Hear the change ----------
-  const cmpA = $("cmp-a"), cmpB = $("cmp-b");
-  const fillCompare = () => {
-    const opts = score.frames.map((f, i) => `<option value="${i}">${shortDate(f.date)}${f.label ? ` (${f.label})` : ""}</option>`).join("");
-    cmpA.innerHTML = opts; cmpB.innerHTML = opts;
-    // Default pair from the data: on then-vs-now tracks, the pair whose Niño 3.4 moved most; otherwise first vs last.
-    let a = 0, b = score.frames.length - 1;
-    const labels = [...new Set(score.frames.map((f) => f.label).filter(Boolean))];
-    if (labels.length >= 2) {
-      let best = -1;
-      for (let i = 0; i + 1 < score.frames.length; i++) {
-        const f = score.frames[i], g = score.frames[i + 1];
-        if (f.label === labels[0] && g.label === labels[1] && typeof f.nino34Relative === "number" && typeof g.nino34Relative === "number") {
-          const d = Math.abs(g.nino34Relative - f.nino34Relative);
-          if (d > best) { best = d; a = i; b = i + 1; }
-        }
-      }
-    }
-    cmpA.value = a; cmpB.value = b;
-    explainCompare();
-  };
-  const explainCompare = () => {
-    document.querySelectorAll(".cmp-box").forEach((b) => { b.hidden = true; });
-    const ia = Number(cmpA.value), ib = Number(cmpB.value);
-    const A = score.frames[ia], B = score.frames[ib];
-    const u = unitShort();
-    for (const [k, f] of [["a", A], ["b", B]]) {
-      $(`cmp-${k}-img`).src = f.image;
-      $(`cmp-${k}-img`).alt = `${cap(words().map)}, ${f.date}`;
-      $(`cmp-${k}-v`).textContent = f.mean === null ? "No data" : `Map average ${signed(f.mean)} ${u}`;
-    }
-    const items = [];
-    const t = tune();
-    if (A.mean !== null && B.mean !== null) {
-      const d = B.mean - A.mean;
-      const dir = Math.abs(d) < 0.05 ? "about the same" : d > 0 ? `warmer by ${d.toFixed(2)} ${u}` : `cooler by ${Math.abs(d).toFixed(2)} ${u}`;
-      items.push(`The whole map is ${dir} in B (${signed(A.mean, 2)} to ${signed(B.mean, 2)} ${u}). ${Math.abs(d) < 0.05 ? "The melody sits at about the same height." : d > 0 ? "On average the Scan melody sits higher." : "On average the Scan melody sits lower."}`);
-      const [lo, hi] = t.ladder;
-      const rung = (m) => Math.round(clamp((m - lo) / (hi - lo)) * 5);
-      const ra = rung(A.mean), rb = rung(B.mean);
-      items.push(ra === rb ? `Planet Chord stays on rung ${ra + 1} of 6.` : `Planet Chord moves from rung ${ra + 1} to rung ${rb + 1} of 6: ${rb > ra ? "rougher" : "smoother"}.`);
-    }
-    items.push(`${cap(words().subject)} area above the hot line (${signed(score.hotLine)} ${u}): ${Math.round(A.hot * 100)}% to ${Math.round(B.hot * 100)}%.${(A.hot > t.tenseAt) !== (B.hot > t.tenseAt) ? ` The scale turns ${B.hot > t.tenseAt ? "darker" : "calm"} in B.` : ""}`);
-    if (typeof A.nino34Relative === "number" && typeof B.nino34Relative === "number") {
-      const ba = bellOn(A), bb = bellOn(B);
-      items.push(`Niño 3.4 against the tropics: ${signed(A.nino34Relative)} to ${signed(B.nino34Relative)} ${u}. ${ba === bb ? `The El Niño bell is ${ba ? "on in both" : "silent in both"}.` : `The El Niño bell ${bb ? "rings in B only" : "rings in A only"}.`}`);
-    }
-    const warmest = (f) => { let k = -1, m = -Infinity; f.columns.forEach((v, s) => { if (v !== null && v > m) { m = v; k = s; } }); return k < 0 ? null : { k, m }; };
-    const wa = warmest(A), wb = warmest(B);
-    if (wa && wb) items.push(`Highest note: ${lonShort(stripLon(wa.k))} at ${signed(wa.m)} ${u} in A, ${lonShort(stripLon(wb.k))} at ${signed(wb.m)} ${u} in B.`);
-    const res = $("cmp-result");
-    res.innerHTML = "<ul></ul>";
-    for (const s of items) { const li = document.createElement("li"); li.textContent = s; res.firstChild.append(li); }
-    return items;
-  };
-  cmpA.addEventListener("change", explainCompare);
-  cmpB.addEventListener("change", explainCompare);
-  $("cmp-play").addEventListener("click", async () => {
-    if (comparing) { onSequenceEnd(); return; }
-    if (playing) { son.pause(); playing = false; }
-    stopTrend(false);
-    const a = Number(cmpA.value), b = Number(cmpB.value);
-    comparing = true; cmpFrames = 0;
-    $("cmp-play").textContent = "Stop";
-    playing = true; setPlayButton();
-    const ok = await son.playSequence([a, b]);
-    if (!ok) { playing = false; setPlayButton(); resetCompareUI(); }
-  });
-
-  // ---------- Year by year: global temperature, CO2 and Arctic sea ice as one sound ----------
-  // Data: public/data/climate.json, built by scripts/climate_data.py. Every value it plays is in that file.
-  const YR = {
-    hz: (t) => 350 + 160 * t,              // 0 degrees = 350 Hz, +1.5 = 590 Hz, +3 = 830 Hz
-    alarmAt: 1.5,                          // the Paris Agreement limit, vs 1880-1900
-    bright: (c) => (c == null ? 0 : clamp((c - 280) / (430 - 280))),   // pre-industrial 280 ppm = pure, 430 ppm = brightest
-    secs: 0.25,                            // per year while playing
-    tc: 0.03,                              // setTargetAtTime time constant: glides with no clicks while scrubbing
-  };
-  let climate = null, yrSound = null, yrTimer = null, yrIdle = null;
-  const yrRows = () => climate.years;
-  const yrIce = () => { const v = yrRows().map((r) => r.ice).filter((x) => x != null); return [Math.min(...v), Math.max(...v)]; };
-  // Less ice = more wind, on one fixed scale for the whole record (its own low and high).
-  const yrWind = (ice) => { if (ice == null) return null; const [lo, hi] = yrIce(); return clamp((hi - ice) / (hi - lo)); };
-  const yrText = (r) => `${r.year}: ${signed(r.temp, 2)} degrees C${r.temp >= YR.alarmAt ? ", over the 1.5 degree line" : ""}. ` +
-    (r.co2 != null ? `CO2 ${Math.round(r.co2)} ppm. ` : "No CO2 record yet. ") +
-    (r.ice != null ? `Arctic sea ice ${r.ice.toFixed(2)} million square kilometres.` : "No sea ice record yet.");
-  const yrSummary = () => {
-    const ys = yrRows(), a = ys[0], z = ys[ys.length - 1];
-    const firstAlarm = ys.find((r) => r.temp >= YR.alarmAt);
-    const co2 = ys.filter((r) => r.co2 != null), ice = ys.filter((r) => r.ice != null);
-    const low = ice.reduce((m, r) => (r.ice < m.ice ? r : m));
-    return `${a.year} to ${z.year}. Global temperature went from ${signed(a.temp, 2)} to ${signed(z.temp, 2)} °C compared with 1880 to 1900, so the tone rose from ${Math.round(YR.hz(a.temp))} to ${Math.round(YR.hz(z.temp))} Hz. ` +
-      (firstAlarm ? `The alarm first sounds in ${firstAlarm.year}, the first year at 1.5 °C or more. ` : "No year reached 1.5 °C, so the alarm never sounds. ") +
-      `CO₂ rose from ${Math.round(co2[0].co2)} ppm in ${co2[0].year} to ${Math.round(co2[co2.length - 1].co2)} ppm in ${co2[co2.length - 1].year}, so the tone grows brighter. ` +
-      `September Arctic sea ice went from ${ice[0].ice.toFixed(2)} million km² in ${ice[0].year} to ${ice[ice.length - 1].ice.toFixed(2)} in ${ice[ice.length - 1].year}, lowest ${low.ice.toFixed(2)} in ${low.year}, so the wind grows louder.`;
-  };
-  const yrShow = (i) => {
-    const r = yrRows()[i], n = yrRows().length;
-    $("year").value = i;
-    $("year").setAttribute("aria-valuetext", yrText(r));
-    $("yr-year").textContent = r.year;
-    $("yr-alarm").hidden = r.temp < YR.alarmAt;
-    $("yr-temp").innerHTML = `${signed(r.temp, 2)} °C<small>${Math.round(YR.hz(r.temp))} Hz</small>`;
-    $("yr-co2").innerHTML = r.co2 != null ? `${Math.round(r.co2)} ppm<small>${Math.round(YR.bright(r.co2) * 100)}% bright</small>` : `–<small>Record starts 1959</small>`;
-    $("yr-ice").innerHTML = r.ice != null ? `${r.ice.toFixed(2)} M km²<small>Wind ${Math.round(yrWind(r.ice) * 100)}%</small>` : `–<small>Record starts 1979</small>`;
-    const c = $("yr-chart").querySelector(".cur"), x = n <= 1 ? 50 : (i / (n - 1)) * 100;
-    c.setAttribute("x1", x); c.setAttribute("x2", x);
-  };
-  const yrDrawChart = () => {
-    const ys = yrRows(), n = ys.length, lo = Math.min(-0.2, ...ys.map((r) => r.temp)), hi = Math.max(1.7, ...ys.map((r) => r.temp));
-    const y = (v) => 40 - ((v - lo) / (hi - lo)) * 40, svg = $("yr-chart");
-    svg.querySelector(".mean").setAttribute("d", ys.map((r, i) => `${i ? "L" : "M"}${((i / (n - 1)) * 100).toFixed(2)} ${y(r.temp).toFixed(2)}`).join(" "));
-    for (const [cls, v] of [["zero", 0], ["alarm-line", YR.alarmAt]]) { const l = svg.querySelector("." + cls); l.setAttribute("y1", y(v)); l.setAttribute("y2", y(v)); }
-    $("yr-ax-a").textContent = ys[0].year; $("yr-ax-b").textContent = ys[n - 1].year; $("yr-first").textContent = ys[0].year;
-  };
-  // Glide every voice to year i. setTargetAtTime never jumps, so dragging the slider fast does not click.
-  const yrSet = (i) => {
-    if (!yrSound) return;
-    const r = yrRows()[i], s = yrSound, now = EJ.Tone.now(), go = (param, v) => param.setTargetAtTime(v, now, YR.tc);
-    const wind = yrWind(r.ice);
-    go(s.sine.frequency, YR.hz(r.temp)); go(s.harm.frequency, YR.hz(r.temp));
-    go(s.harmGain.gain, 0.5 * YR.bright(r.co2));
-    go(s.alarmGain.gain, r.temp >= YR.alarmAt ? 0.06 : 0);
-    go(s.noiseGain.gain, wind == null ? 0 : 0.04 + 0.3 * wind);
-    go(s.filter.frequency, wind == null ? 400 : 400 + 2600 * wind);
-  };
-  const yrStart = async () => {
-    if (yrSound) return;
-    await EJ.Tone.start();
-    const T = EJ.Tone;
-    const master = new T.Gain(0).toDestination();
-    const s = {
-      master,
-      sine: new T.Oscillator({ type: "sine", frequency: 350 }),
-      harm: new T.Oscillator({ type: "custom", partials: [0, 0.6, 0.45, 0.35, 0.28, 0.22], frequency: 350 }),   // overtones 2 to 6 only
-      harmGain: new T.Gain(0),
-      alarm: new T.Oscillator({ type: "sawtooth", frequency: 880 }),
-      alarmGain: new T.Gain(0),
-      noise: new T.Noise("white"),
-      filter: new T.Filter(400, "lowpass"),
-      noiseGain: new T.Gain(0),
-    };
-    s.sine.connect(master); s.harm.chain(s.harmGain, master); s.alarm.chain(s.alarmGain, master); s.noise.chain(s.filter, s.noiseGain, master);
-    [s.sine, s.harm, s.alarm, s.noise].forEach((o) => o.start());
-    master.gain.setTargetAtTime(0.3 * (settings.volume / 100), T.now(), YR.tc);
-    yrSound = s;
-  };
-  const yrStop = () => {
-    if (!yrSound) return;
-    const s = yrSound; yrSound = null;
-    s.master.gain.setTargetAtTime(0, EJ.Tone.now(), YR.tc);
-    setTimeout(() => Object.values(s).forEach((n) => n.dispose()), 300);
-  };
-  const stopTrend = (finished) => {
-    clearInterval(yrTimer); yrTimer = null; clearTimeout(yrIdle);
-    yrStop();
-    $("trend-play").textContent = "Play every year";
-    if (finished) say(yrSummary());
-  };
-  $("trend-play").addEventListener("click", async () => {
-    if (!climate) return;
-    if (yrTimer) { stopTrend(false); return; }
-    stopForSpeech();
-    let i = Number($("year").value);
-    if (i >= yrRows().length - 1) i = 0;
-    await yrStart(); yrShow(i); yrSet(i);
-    $("trend-play").textContent = "Stop";
-    yrTimer = setInterval(() => {
-      const next = Number($("year").value) + 1;   // reads the slider, so scrubbing while playing moves the playhead
-      if (next >= yrRows().length) { stopTrend(true); return; }
-      yrShow(next); yrSet(next);
-    }, YR.secs * 1000);
-  });
-  // Scrub: dragging or arrow keys play the year, and the sound fades out shortly after you stop.
-  $("year").addEventListener("input", async () => {
-    if (!climate) return;
-    const i = Number($("year").value);
-    yrShow(i);
-    if (yrTimer) { yrSet(i); return; }
-    if (playing || comparing) stopForSpeech();
-    await yrStart(); yrSet(i);
-    clearTimeout(yrIdle);
-    yrIdle = setTimeout(() => { if (!yrTimer) yrStop(); }, 900);
-  });
-  fetch("data/climate.json").then((r) => r.json()).then((d) => {
-    climate = d;
-    $("year").max = yrRows().length - 1;
-    yrDrawChart(); yrShow(0);
-    $("trend-text").textContent = yrSummary();
-    $("trend-src").innerHTML = "Data: " + d.sources.map((s) => `<a href="${s.url}">${s.title}</a>`).join(", ") + `. Temperatures are compared with ${d.baseline.replace("-", " to ")}.`;
-  }).catch(() => { $("trend-text").textContent = "Could not load the yearly climate data."; $("trend-play").disabled = true; $("year").disabled = true; });
-
-  // ---------- Key, as a list ----------
-  const renderKey = () => {
-    const ul = $("keylist");
-    ul.innerHTML = "";
-    EJ.keyText(score).replace(/^Key\.\s*/, "").split(/(?<=\.)\s+(?=[A-Z])/).forEach((s) => {
-      const li = document.createElement("li"); li.textContent = s; ul.append(li);
-    });
-  };
+  for (const id of ["lon", "lat"]) $(id).addEventListener("input", () => { setSliderText(); probe(); });
 
   // ---------- Settings ----------
-  document.querySelectorAll('input[name="speed"]').forEach((r) => r.addEventListener("change", (e) => {
-    settings.bpm = Number(e.target.value);
-    son.setTempo(settings.bpm);
-  }));
   $("volume").addEventListener("input", (e) => {
     settings.volume = Number(e.target.value);
-    e.target.setAttribute("aria-valuetext", `${settings.volume} percent`);
-    son.setVolume(settings.volume);
-    if (yrSound) yrSound.master.gain.setTargetAtTime(0.3 * (settings.volume / 100), EJ.Tone.now(), YR.tc);
+    e.target.setAttribute("aria-valuetext", volText());
+    store.set("volume", settings.volume);
+    son?.setVolume(settings.volume);
   });
-  // Mixer: one native checkbox per sound. Ticked = you hear it.
-  $("mixer-list").innerHTML = EJ.LAYERS.map((l) =>
-    `<label class="check"><input type="checkbox" data-layer="${l.id}" checked aria-describedby="mix-${l.id}"> ${l.label}</label><span id="mix-${l.id}" class="hint mix-note">${l.note}</span>`).join("");
-  $("mixer-list").addEventListener("change", (e) => {
-    const id = e.target.dataset.layer;
-    if (!id) return;
-    settings.muted = e.target.checked ? settings.muted.filter((m) => m !== id) : [...settings.muted, id];
-    son.setLayerMuted(id, !e.target.checked);
+  document.querySelectorAll('input[name="speed"]').forEach((r) => r.addEventListener("change", (e) => {
+    settings.bpm = Number(e.target.value);
+    store.set("bpm", settings.bpm);
+    son?.setTempo(settings.bpm);
+  }));
+  $("mono").addEventListener("change", (e) => { settings.mono = e.target.checked; store.set("mono", settings.mono); son?.setMono(settings.mono); });
+  $("announce").addEventListener("change", (e) => store.set("announce", e.target.checked));
+  $("speak").addEventListener("change", (e) => {
+    store.set("speak", e.target.checked);
+    if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel();
   });
-  $("mono").addEventListener("change", (e) => {
-    settings.mono = e.target.checked;
-    son.setMono(settings.mono);
-  });
-  $("speak").addEventListener("change", (e) => { if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel(); });
-
   $("save").addEventListener("click", async () => {
+    if (!son) return;
     const btn = $("save");
-    stopForSpeech();
+    pauseForSpeech();
     btn.disabled = true;
-    const seconds = Math.min(180, EJ.passSeconds(score, settings.bpm));
-    const name = `${track.id}-${settings.mapping}.wav`;
-    say(`Rendering ${track.code} ${track.title}, ${Math.round(seconds)} seconds of audio. This takes a few seconds.`);
+    const seconds = Math.min(180, son.passSeconds());
+    const name = `earth-jukebox-${track.id}.wav`;
+    say(`Making the audio file: ${Math.round(seconds)} seconds of sound. This takes a few seconds.`);
     try {
-      const buffer = await EJ.renderOffline(score, { ...settings }, seconds);
-      const url = URL.createObjectURL(EJ.toWav(buffer));
+      const url = URL.createObjectURL(EJ.toWav(await son.renderOffline(seconds)));
       const a = document.createElement("a");
       a.href = url; a.download = name;
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      say(`Saved ${name}.`);
+      say(`Saved ${name} to your downloads.`);
     } catch (err) {
-      say(`Could not save the audio: ${err.message}`);
+      say(`Could not make the audio file: ${err.message}`);
     } finally {
       btn.disabled = false;
     }
   });
 
-  // Start-up state.
-  $("lon").setAttribute("aria-valuetext", lonText($("lon").value));
-  $("lat").setAttribute("aria-valuetext", latText($("lat").value));
-  placeBox();
-  showMarker();
-  await loadTrack(track.id);
-  drawWave();
-  window.addEventListener("resize", () => { if (!playing) drawWave(); });
-  window.ready = true;
+  await loadTrack(tracks[0], { announce: false });
+  say(`Ready. ${tracks.length} tracks. Track 1, ${tracks[0].title}, is chosen. Press Tab to reach the player, then Space to play.`);
 })();

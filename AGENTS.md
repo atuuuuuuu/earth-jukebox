@@ -1,55 +1,48 @@
 # Earth Jukebox: rules for AI coding assistants
 
-NASA Space Apps 2026, "The Earth Information Jukebox". NASA map frames become
-numbers (the backend, finished), and the numbers become music live in the
-browser (the frontend, which you are building).
+NASA Space Apps 2026, "The Earth Information Jukebox". NASA Earth Information Center videos become
+numbers (the backend), and the numbers become sound live in the browser. The tracks are the
+challenge's NASA resources 1 (night lights), 6 (carbon dioxide) and 7 (lightning).
 
 ## Layout
 
-- `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built), `textures/` (NASA Blue Marble), `api/`, `frames/`, `data/climate.json` (yearly climate records, built by `scripts/climate_data.py`)
-- `src/engine.js` the Tone.js sonifier. `npm run build` bundles it into `public/bundle.js` as the global `EJ`
-- `backend/` Python that builds `public/api` and `public/frames`. `backend/API.md` is the contract
-- `test/run.cjs` browser test: keyboard play, audio level, accessibility (axe). `test/responsive.cjs` checks every layout from 320 to 1440 px
+- `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built: Tone.js as `EJ.Tone`, and `EJ.toWav`), `textures/` (NASA Blue Marble), `api/` (scores), `data/` (3 degree grids), `media/` (map images, the CO2 video), `samples/`
+- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js`. Lightning uses the night-lights mapping with the kalimba
+- `backend/eic/` team RUSTMN's pipeline: NASA videos to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`
+- `backend/build_sweep.py` + `backend/sweep.config.json`: grids to `public/api`. `backend/API.md` is the contract, `backend/validate_api.py` enforces it
+- `test/run.cjs` the real page by keyboard, with axe. `test/responsive.cjs` every layout from 320 to 1440 px. `backend/tests/test_sweep.py` the score builder
 
-## The backend contract
+## The data contract
 
-Read `backend/API.md` before writing any code that touches data.
+- Load data only like this: `fetch("api/tracks.json")`, then `fetch(track.score)`. Never hardcode track ids, map counts, dates or ranges.
+- Never edit `public/api/`, `public/data/` or `public/media/` by hand. They are generated: change the config or the builder and rebuild.
+- `text` is the spoken description of a map and starts with its `when` ("2013", "Week from 21 January 2020", "July"). Speak it only when the listener asks (D), or announce `when` alone as a map starts.
+- `range` is one fixed scale per track. Never rescale per map.
+- The globe never shows anything the sound and text do not, and never fakes a value.
 
-- Load data only like this: `fetch("api/tracks.json")`, then `fetch(track.score)` for the chosen track. Never hardcode track ids, frame counts, dates or ranges.
-- NEVER edit `backend/`, `public/api/` or `public/frames/`. They are generated. If the frontend needs a field that does not exist, stop and ask: the backend owner adds it.
-- Use the fields like this:
+## Accessibility rules (the point of the project)
 
-| Field | Use |
-| --- | --- |
-| `columns` (16 values, west to east) | The Scan melody. `null` = land: stay silent |
-| `grid` (18 rows x 36 cells) | The listening cursor |
-| `mean`, `spread`, `clusters`, `hot` | The Planet Chord and the calm/tense scale |
-| `nino34Relative` above `ninoLine` | Ring the El Niño bell. Use `nino34Relative`, NEVER `nino34` |
-| `label` (`"2025"` / `"2026"`) | Then-vs-now pairs on the El Niño track |
-| `text` | The spoken description. Speak it only when the listener asks |
-| `image` | The map frame for that moment |
-| `range` | One fixed scale for the whole track. NEVER rescale per frame |
-| `leftLon` | Longitudes: strip k is at `leftLon + (k + 0.5) * 22.5`, grid cell c at `leftLon + (c + 0.5) * 10` |
-| `sample`, `source` (in `tracks.json`) | Show a "sample data" note when `sample` is true. Always show the source credit and link |
+- A blind person must be able to use the page the first time with no one explaining it. Every step says what to press next, in the live region or in visible text.
+- Native controls only (`button`, `input type="range"`, radios in a `fieldset`). Sliders carry `aria-valuetext`. One polite `role="status"` region (`#live`) for speech, one `role="alert"` (`#alert`) for errors.
+- Single-letter shortcuts work only inside `#player` (WCAG 2.1.4); `#keys` is `role="application"` so NVDA and JAWS pass keys through. Space stays native on buttons; sliders and radios keep their arrow keys. Escape stops everything from anywhere. Every shortcut is also a button.
+- Focus moves only when the listener moves it (the skip link goes to `#keys`). Focus rings stay visible. Touch targets are at least 44 px. Respect `prefers-reduced-motion`.
+- Keep announcements short. No sound before a key press or click (`Tone.start()` inside the gesture).
 
-## Rules
+## Other rules
 
 - Plain HTML, CSS and JavaScript. No frameworks. No new npm packages without asking.
-- Audio starts only from a click or key press (`Tone.start()`), never on page load.
-- One Tone transport. Before building a new `Sonifier` (new track, Strict mode), stop and clear the old one: `Tone.getTransport().stop()`, `Tone.getTransport().cancel()`, dispose its nodes. Otherwise every note plays twice.
-- Accessibility is the point of the project: native controls (`button`, `input type="range"`, `fieldset` + `legend`), everything works with the keyboard alone, sliders carry `aria-valuetext`, one `role="status"` live region that speaks only when asked, visible focus, touch targets at least 44 px, works at 375 px wide.
-- The site must run as static files on GitHub Pages: relative paths only.
-- The globe is never decoration: everything it shows (scan strip, cursor cell, Niño 3.4 box, bell) must come from the score, and the same information must be available without it (flat map, text, sound). Never fake or estimate a value for display.
-- Keep the hooks the browser test uses: ids `play`, `describe`, `live`, `time`, `lon`, `lat`, `globe`, `cmp-play`, `trend-play`, and `window.ready`, `window.framesSeen`, `window.lastProbe`, `window.globeReady`, global `EJ`. If you must change one, update `test/run.cjs` in the same change.
+- One Tone.js only: the sweep engine uses `EJ.Tone`. Dispose the old sonifier before building a new one (`son.dispose()`), or notes double.
+- Static files on GitHub Pages: relative paths only.
+- Keep the hooks the tests use: ids `keys`, `play`, `prev`, `next`, `map`, `where`, `describe`, `help`, `live`, `alert`, `demos`, `places`, `lon`, `lat`, `volume`, `mono`, `save`, and `window.ready`, `window.son`, `window.globe`, `window.lastProbe`, `window.framesSeen`, global `EJ`. If you change one, update `test/run.cjs` in the same change.
 
 ## Check before saying done
 
-- `npm run build` succeeds
-- `npm run validate` prints `API OK`
-- `npm test` shows 0 axe violations and 0 page errors (needs Playwright; ask before installing it)
+- `npm run api` and `npm run validate` (prints `API OK`)
+- `npm test` ends with `all checks passed` (Playwright; ask before installing it)
 - `npm run test:responsive` prints `all widths ok`
-- By hand: Tab to Play, press Space, music plays; Describe speaks the frame's `text`
+- `python3 -m unittest backend/tests/test_sweep.py`
+- By hand with a screen reader: Tab, Enter on the skip link, Space, W, D
 
 ## Stop and ask before
 
-Deleting files, adding dependencies, editing `backend/` or `public/api/`, changing `backend/API.md`, or pushing to GitHub.
+Deleting files, adding dependencies, changing `backend/API.md`, committing, or pushing to GitHub.
