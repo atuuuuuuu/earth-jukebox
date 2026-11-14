@@ -35,8 +35,8 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `id`, `code`, `title`, `subtitle`, `description` | Names; `description` is read by screen readers with the track's radio button |
 | `score` | Path of the score |
 | `frames` | Number of maps |
-| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (lightning months) |
-| `when` | The span, spoken: `"2012 to 2023"`, `"January to December"` |
+| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (lightning parts) |
+| `when` | The span, spoken: `"2012 to 2023"`, `"Part 1 of 14 to Part 14 of 14"` |
 | `units` | What the values mean, like `"share of the brightest light"` |
 | `engine` | `"sweep"` |
 | `source` | `title`, `url`, `credit`: show them on the page |
@@ -49,7 +49,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `weeks`, `months`), `mapping` (`night-lights` or `co2`), `instrument` (`vibraphone`, `kalimba`) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `weeks`, `parts`), `mapping` (`night-lights` or `co2`), `instrument` (`vibraphone`, `kalimba`) |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
 | `frames` | The maps, in playing order |
@@ -58,8 +58,8 @@ Each frame:
 
 | Field | Meaning |
 | --- | --- |
-| `when` | The map's name, spoken: `"2013"`, `"Change from 2012 to 2023"`, `"Week from 21 January 2020"`, `"July"` |
-| `date` | `YYYY-MM-DD`, or `null` when `when` names something with no single date (a month across years) |
+| `when` | The map's name, spoken: `"2013"`, `"Change from 2012 to 2023"`, `"Week from 21 January 2020"`, `"Part 3 of 14"` |
+| `date` | `YYYY-MM-DD`, or `null` when `when` names something with no single date (a part of the lightning video) |
 | `image`, `alt` | The map image and its description |
 | `text` | The spoken description. Starts with `when`. Built from the same numbers |
 | `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, or not crossed by carbon dioxide's line that week) |

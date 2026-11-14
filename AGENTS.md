@@ -16,7 +16,7 @@ challenge's NASA resources 1 (night lights), 6 (carbon dioxide) and 7 (lightning
 
 - Load data only like this: `fetch("api/tracks.json")`, then `fetch(track.score)`. Never hardcode track ids, map counts, dates or ranges.
 - Never edit `public/api/`, `public/data/` or `public/media/` by hand. They are generated: change the config or the builder and rebuild.
-- `text` is the spoken description of a map and starts with its `when` ("2013", "Week from 21 January 2020", "July"). Speak it only when the listener asks (D), or announce `when` alone as a map starts.
+- `text` is the spoken description of a map and starts with its `when` ("2013", "Week from 21 January 2020", "Part 3 of 14"). Speak it only when the listener asks (D), or announce `when` alone as a map starts.
 - `range` is one fixed scale per track. Never rescale per map.
 - The globe never shows anything the sound and text do not, and never fakes a value.
 
