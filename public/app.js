@@ -139,7 +139,6 @@
   try {
     globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
     globe.follow = true;
-    globe.ninoOn = false;
     globe.spin = !reduced.matches;
     const earth = new Image();
     earth.onload = () => globe.setEarth(earth);

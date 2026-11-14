@@ -1,198 +1,83 @@
 # Earth Jukebox backend
 
-The backend turns NASA map images into numbers and publishes them as a small
-API the frontend reads. It has no server and no database. It is a Python
-program you run once on your laptop, and it writes plain JSON files that are
-hosted with the website.
+The backend turns NASA Earth Information Center videos into numbers and publishes them as a small
+API the website reads. It has no server and no database: Python programs you run on a laptop write
+plain JSON files that are hosted with the website.
 
 ```
-NASA video ──ffmpeg──> frames ──build_api.py──> public/api/*.json ──fetch()──> the jukebox
-                                    │
-                    reads each pixel's colour off the colour bar
+NASA video ──backend/eic (OpenCV)──> public/data/*.json ──build_sweep.py──> public/api/*.json ──fetch()──> the page
+              3-degree grid per map     + public/media/*      10-degree scores, statistics, spoken text
 ```
 
-`API.md` is the contract with the frontend: every file and field it can rely on.
+`API.md` is the contract with the page: every file and field it can rely on.
 
 ## The parts
 
 | File | What it does |
 | --- | --- |
-| `analyze.py` | The science: finds the colour bar, turns colours into numbers, works out averages, the Niño 3.4 box and the spoken text |
-| `build_api.py` | The program you run: reads the config, chooses frames, writes the API files and the web images |
-| `tracks.config.json` | Settings for the real NASA data: where the files are, the dates, the tracks |
-| `sample.config.json` | The same settings for the synthetic sample data |
-| `validate_api.py` | Checks every API file against `API.md`. Run it before every deploy |
-| `inspect_frame.py` | Checks one frame by eye (the Gate 1 test) |
-| `nino_check.py` | Compares one month's El Niño numbers with NOAA's monthly discussion |
-| `make_fixture.py` | Makes synthetic maps with known answers, for tests and the sample API |
-| `tests/test_backend.py` | 17 tests: known answers in, the same answers must come out |
+| `eic/` | Team RUSTMN's pipeline: one YAML and one builder per track, video to 3-degree grids and map images (see `eic/README.md`) |
+| `build_sweep.py` + `sweep.config.json` | Grids to scores: 10-degree squares, statistics, and the spoken description of every map, naming nearby cities |
+| `validate_api.py` | Checks every API file against `API.md`. GitHub runs it before every deploy |
+| `tests/` | Known answers in, the same answers out: the score builder, the validator, the lightning correction |
 
 ## Set up once
 
-You need Python 3.10 or newer and ffmpeg. Check them:
+Python 3.10 or newer (on Windows, type `py` where these notes say `python3`):
 
 ```bash
-python3 --version
-ffmpeg -version
+pip install -r backend/eic/pipeline/requirements.txt
+python3 -m unittest discover backend/tests -v      # all should say ok
 ```
 
-On Windows, type `py` where these notes say `python3`. Install the libraries:
+## Rebuild
+
+The processed data is in the repository, so the site runs without any of this. To rebuild a track,
+download its video (each `eic/tracks/*.yaml` names the file and the NASA page), then:
 
 ```bash
-pip install numpy scipy opencv-python-headless
+export EJ_RESOURCES=/path/to/videos                  # default: data/eic in the repository
+cd backend/eic && python3 -m pipeline.run --track 07_lightning && cd ../..
+python3 backend/build_sweep.py backend/sweep.config.json
+python3 backend/validate_api.py public               # "API OK"
 ```
 
-Then run the tests from the project folder. All 17 should say `ok`:
-
-```bash
-python3 -m unittest discover backend/tests -v
-```
-
-## Try it now with sample data
-
-```bash
-python3 backend/make_fixture.py data/sample              # fake NASA-style maps
-python3 backend/build_api.py backend/sample.config.json  # writes public/api
-python3 backend/validate_api.py public                   # "API OK"
-```
-
-This writes into `public/api` too, replacing the real API, so rebuild the real
-one afterwards (step 5 below). `public/api` already holds the API built from
-NASA's real video, so your frontend pair can build against real data now.
-
-## On the day: real NASA data
-
-**1. Download** from [SVS 5176](https://svs.gsfc.nasa.gov/5176) into `data/sst/`:
-the video (`sst_anomaly_30_sec_4096x2048_2x1_30p.mp4`, 338 MB) and the colour
-bar image `sst_mur_anomaly_auto_colorbar_01_print.jpg` (save it as
-`data/sst/colorbar.jpg`). Check the Resources tab first: if NASA lists a
-different visualization, use that one instead (see "A different dataset" below).
-
-**2. Extract every frame.** Nearest-neighbour scaling keeps NASA's exact colours.
-It takes about a minute and about 320 MB:
-
-```bash
-mkdir -p data/sst/daily
-ffmpeg -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -vf scale=1440:720:flags=neighbor -q:v 2 data/sst/daily/%04d.jpg
-```
-
-The video prints its date in a box at the bottom left. `ignoreBoxes` in the
-config already blanks that box out, so its white text is not read as data.
-
-**3. Read the dates.** Save the first and last frames, open them, and read the
-date printed on each:
-
-```bash
-ffmpeg -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -frames:v 1 data/sst/first.png
-ffmpeg -sseof -0.2 -i data/sst/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4 -update 1 data/sst/last.png
-```
-
-Put the two dates in `tracks.config.json` as `firstDate` and `lastDate`. The
-video downloaded on 8 Nov 2026 runs from 18 May 2024 to 4 Nov 2026, and those
-dates are already in the config. NASA updates the video daily, so a newer
-download needs new dates.
-
-**4. Gate 1: check one frame by eye.**
-
-```bash
-python3 backend/inspect_frame.py data/sst/daily/0901.jpg data/sst/colorbar.jpg --range -4 4 --ignore=0,645,212,720
-```
-
-Open `check_colorbar.png`: the green box must sit on the bar. Open
-`check_frame.png`: land should be shaded purple, and each marked number should
-match its spot's colour on the colour bar. "Mapped area" should be about 60–70%
-for an ocean map.
-
-**5. Build and check.**
-
-```bash
-python3 backend/build_api.py backend/tracks.config.json
-python3 backend/validate_api.py public
-```
-
-The build prints how many days lie between frames. If it says "exactly one per
-day: yes", the dates are exact.
-
-**6. Check against NOAA.** NOAA's monthly ENSO discussion reports the *relative*
-Niño 3.4: the box minus the whole tropical ocean. Compare a month with it:
-
-```bash
-python3 backend/nino_check.py backend/tracks.config.json 2026-09
-```
-
-For September 2026 this gives +2.04 °C. NOAA's 8 Oct discussion gives +2.1 °C.
-The plain Niño 3.4 on NASA's map is about 1 °C higher (+3.1), because in 2026
-the whole tropical ocean runs about 1 °C warm.
-
-**7. Hand over.** Commit `public/api` and `public/frames`. The frontend needs
-nothing else.
-
-## If something goes wrong
-
-| Message or sign | Fix |
+| Track | NASA video (SVS page) |
 | --- | --- |
-| `No colour bar found` | Crop to the bar: `"colorbarCrop": [x0, y0, x1, y1]` in the source settings (pixel corners from any image viewer) |
-| `set firstDate and lastDate` | Step 3 above |
-| Mapped area far above 70%, or land shows numbers | Land matches a bar colour. Add its colour as `"landColors": [[B, G, R]]` (note the order: blue, green, red) |
-| Mapped area far below 60% | Video compression moved the colours. Raise `"maxDist"` from 14 to 20 |
-| A burned-in date or logo is read as data | Cut it off with `"frameCrop": [x0, y0, x1, y1]` |
-| Map centred on the Pacific | Set `"leftLon": 0` (or whatever longitude sits at the left edge) |
-
-## Rebuild one track only
-
-```bash
-python3 backend/build_api.py backend/tracks.config.json --only a2-el-nino
-```
-
-Builds just that track. The other tracks keep their files and their entries in
-`tracks.json` exactly as they were, and their NASA videos need not be on your
-computer.
-
-## A different dataset
-
-Any NASA visualization works if it is a flat world map with a colour bar that
-has numbers on it. Add a new entry under `"sources"` with its frames, dates,
-colour bar and `range`, then a track that uses it. Give the source `"words"`
-(`{"subject": "planet", "map": "..."}`) so the page names it right, and set
-`"nino34": false` on its tracks if it is not a sea temperature map. The frontend
-needs no other change: the new track appears in `tracks.json`.
+| `01_night_lights` | `nightlights_flat_series_and_change_wZooms_13_EIC_2160p30_h265.mp4` ([5313](https://svs.gsfc.nasa.gov/5313/)) |
+| `06_air_quality` | `EIC_AirQuality_Preview_3840x1080.mp4` ([5533](https://svs.gsfc.nasa.gov/5533/)) |
+| `07_ocean_currents` | `perpetual_ocean2_CLOSE_093_clean_noDate_1080p30.mp4` ([5425](https://svs.gsfc.nasa.gov/5425/)) |
+| `06_co2_dyamond` | `dyamondPointCloud_12-1-2023b_dyamond_co2_anim_globe_orbit_1080p30_h265.mp4` ([5196](https://svs.gsfc.nasa.gov/5196/)) |
+| `07_lightning` | `iss_lightning_sos_yearly_07312023_2048p60.mp4`, the flat Science On a Sphere version ([5011](https://svs.gsfc.nasa.gov/5011/)); the turning-globe `iss_lightning_sphere_*.mp4` cannot be read this way |
 
 ## Explaining it to the judges
 
-**How does a picture become data?** Every colour on the map stands for a number
-on the colour bar. For each pixel we find the nearest bar colour, measured the
-way eyes see colour (CIE Lab), and read its number. Pixels that match no bar
-colour, like land and labels, become "no data" and stay silent.
+**How does a video become data?** Each track reads NASA's own frames. Night lights: the 8K EIC
+video, calibrated against 10 known cities, with the lights separated from the base map. Carbon
+dioxide: a thin line through the centre of NASA's turning globe, read every 3 hours of model time.
+Air quality: four pollutants in strips that slide over one flat map; each strip is found in every
+frame and its colours rebuilt into a whole world map per pollutant. Ocean: a line through the middle
+of NASA's moving camera view, ten readings per second of video. Lightning: the flat world-map movie, where yellow dots are strikes; we average them over 14 equal
+parts of the record, in order.
 
-**Why weight by latitude?** On a flat world map every pixel is the same size, but
-near the poles a pixel covers much less of the Earth. At 60° it covers half as
-much as at the equator, so each pixel counts by cos(latitude).
+**Why is lightning corrected?** The space station's orbit is tilted 51.6 degrees, so it turns round
+near 50 degrees north and south and passes over those latitudes about four times as often as over
+the equator. NASA's movie shows every strike the sensor saw, so storms there look bigger than they
+are. We divide by how long the sensor looks at each latitude (`iss_view_weight`, tested against the
+orbit formula), for the sound, the words and the picture alike.
 
-**What is the Niño 3.4 bell?** The average of the ocean box from 5°S to 5°N and
-170°W to 120°W, minus the average of the whole tropical ocean. That is how NOAA
-judges El Niño today, so warming of the whole ocean alone cannot ring the bell.
-Above +0.5 °C is NOAA's El Niño line. It is the one sound with a scientific
-threshold rather than a chosen one.
+**Why weight by latitude?** On a flat world map every pixel is the same size, but near the poles a
+pixel covers much less of the Earth, so each one counts by cos(latitude).
 
-**How do you know it is right?** The tests build fake maps where we know every
-true number. The decoder recovers the map average to within 0.01 °C after JPEG
-compression. On NASA's real frames, land and ice are left out (65% of the Earth
-is mapped, right for oceans without sea ice), and the relative Niño 3.4 for
-September 2026 comes out at +2.04 °C, against NOAA's own +2.1 °C.
+**Why no database?** The data does not change while people listen, so a server would add something
+that can break and give listeners nothing. Static files are fast, free to host, and cannot go down
+during judging.
 
-**Why no database?** The data does not change while people listen, so a server
-would add something that can break and give listeners nothing. The API is
-static files: fast, free to host, and it cannot go down during judging.
-
-**What are the limits?** A colour map can only be read as finely as its colours
-differ, and NASA's scale stops at ±4 °C. NOAA reports water above +4 °C in the
-eastern Pacific, and on our map that water reads as +4, so the hottest values
-are a floor, not the full number. Video compression adds small errors. The data covers about 2.5 years: enough to show El Niño, too short
-to show the long-term warming trend.
+**What are the limits?** Values come from the colours of NASA's videos, so they are relative levels,
+not satellite units. The lightning movie has no dates, so its parts are equal stretches of the movie,
+not calendar months.
 
 ## Before you submit
 
-Check the 2026 Project Submission guide (out 13 Nov) on code written before the
-event, and declare AI help on your project page. Say what actually happened,
-for example: "Parts of our code were written with an AI assistant. We
-reviewed, tested and adapted it, and ran every step on NASA's data ourselves."
+Declare AI help on your project page and say what actually happened, for example: "Parts of our
+code were written with an AI assistant. We reviewed, tested and adapted it, and ran every step on
+NASA's data ourselves."

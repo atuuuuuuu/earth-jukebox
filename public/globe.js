@@ -34,8 +34,6 @@ uniform float uLeftLon;
 uniform float uStrip;          // scan strip 0..15, or -1
 uniform float uHead;           // playhead longitude, gliding through the strip being played
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
-uniform float uBell;           // 0..1, the El Niño bell glow
-uniform float uNinoOn;         // 1 when the track has Niño 3.4 data, else the box is not drawn
 uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
@@ -161,19 +159,6 @@ void main() {
     col = mix(col, vec3(1.0, 0.86, 0.3), 0.95 * ring);
   }
 
-  // Niño 3.4 box: 5S to 5N, 170W to 120W. Glows when the bell rings.
-  {
-    float dx = lonDist(lon, -145.0), dy = abs(lat);
-    float edgeX = line(abs(dx - 25.0), 1.5) * step(dy, 5.3);
-    float edgeY = line(abs(dy - 5.0), 1.5) * step(dx, 25.3);
-    float dash = step(0.5, fract((lon + lat) / 3.0));
-    float e = max(edgeX, edgeY);
-    vec3 boxCol = mix(vec3(0.85, 0.95, 1.0), vec3(1.0, 0.95, 0.6), uBell);
-    col = mix(col, boxCol, uNinoOn * e * (0.35 + 0.55 * uBell) * mix(dash, 1.0, uBell));
-    float inBox = step(dx, 25.0) * step(dy, 5.0);
-    col += uNinoOn * inBox * uBell * 0.22 * vec3(1.0, 0.9, 0.5);
-  }
-
   // Soft light from the upper left, never so dark that the data is hard to read.
   vec3 L = normalize(vec3(-0.45, 0.5, 0.75));
   float diff = max(dot(n, L), 0.0);
@@ -236,8 +221,6 @@ void main() {
       this.fps = 24;         // smooth enough, and light on older laptops
       this.nextDraw = 0;
       this.cell = [-1, -1];
-      this.bell = 0;
-      this.ninoOn = true;   // false for tracks without Niño 3.4 data
       this.mix = 1;
       this.dataOn = true;
       this.scale = 0.9;
@@ -285,7 +268,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uNinoOn", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -335,7 +318,6 @@ void main() {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.tex[1]);
     }
 
-    ringBell() { this.bell = 1; }
     // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
     ping(lon, lat, kind = 0) {
       this.pings.push({ lon, lat, kind, born: performance.now() });
@@ -454,7 +436,6 @@ void main() {
         this.tilt += still ? d : d * Math.min(1, dt * 4);
       }
       this.mix = Math.min(1, this.mix + dt * 4);
-      this.bell = Math.max(0, this.bell - dt * 0.9);
       this.draw();
     }
 
@@ -481,8 +462,6 @@ void main() {
       gl.uniform1f(this.u.uStrip, this.strip < 0 ? -1 : Math.floor(this.headPos) % 16);
       gl.uniform1f(this.u.uHead, this.headLon === undefined ? 999 : this.headLon);
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
-      gl.uniform1f(this.u.uBell, this.bell);
-      gl.uniform1f(this.u.uNinoOn, this.ninoOn ? 1 : 0);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.uniform1f(this.u.uFull, this.full ? 1 : 0);

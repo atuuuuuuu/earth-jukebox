@@ -308,7 +308,7 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
     for n, f in enumerate(chapter["frames"], 1):
         mid = (f["startStep"] + f["steps"] / 2) * data["framesPerStep"] / data["media"]["fps"]
         image = f.get("image") or still(t["_public"], data["media"]["src"], mid,
-                                         str(Path(data["media"]["src"]).parent / f"week-{n}.jpg"))
+                                         (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())  # a web path: / even on Windows
         total = [[0.0] * GRID_COLS for _ in range(GRID_ROWS)]
         count = [[0] * GRID_COLS for _ in range(GRID_ROWS)]
         for s_ in range(f["startStep"], f["startStep"] + f["steps"]):
@@ -451,7 +451,6 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "units": t["units"],
         "range": t["range"],
         "hotLine": t["hotLine"],
-        "ninoLine": None,
         "leftLon": data.get("grid", {}).get("lonWest", -180),
         "tuning": {},
         "words": t["words"],
@@ -500,7 +499,8 @@ def main(config_path: Path) -> None:
         index["tracks"].append(entry)
         print(f"{entry['code']} {entry['title']}: {entry['frames']} maps -> {out.relative_to(public)} "
               f"({out.stat().st_size / 1024:.0f} KB)")
-    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # newline="\n": the same bytes on Windows as on Mac and Linux, so a rebuild makes no diff
+    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

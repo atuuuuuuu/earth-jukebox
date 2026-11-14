@@ -12,27 +12,26 @@ not a file. The tester drives; the observer only writes down what happens.
 
 ## What the page should say (2 minutes)
 
-Press Tab from the top of the page. Expected order and what the screen reader says:
+On load the page says: "Ready. 6 tracks. Track 1, Earth at night, is chosen. Press Tab to reach
+the player, then Space to play." Then press Tab from the top. Expected order:
 
-1. "Skip to the player, link". Enter jumps to the Player section.
-2. "Choose a track, grouping. A1 Ocean Fever, radio button, checked, 1 of 2. Sea surface temperature". Arrow keys change track.
-3. "Play, button". After pressing it: "Pause, button".
-   Then "Previous moment, button" and "Next moment, button".
-4. "Time, slider, 2024-05-18, map average +0.6 degrees C. Moment 1 of 31". Arrow keys move one moment.
-5. "Sound, grouping. Scan, radio button, checked". Arrow to "Planet Chord".
-6. "Strict data mode, checkbox, not checked. Strict: plain tones on a continuous pitch, no musical scale or reverb."
-7. "Describe this moment, button". Pauses the music and reads the moment.
-8. "Key, button". Pauses the music and reads what every sound means.
-   Then "Read aloud, checkbox, not checked" (leave it off with a screen reader).
-   Then the globe: "View, grouping. Globe, radio button, checked", "Spin, toggle button, pressed", "Follow the scan, checkbox".
-   Then "Hear the change": "Moment A, combo box", "Moment B, combo box", "Play A, then B, button".
-9. "Listen to one spot, grouping. West to east, slider, 5 degrees east". Each arrow plays one note and says, for example, "15 degrees east, 5 degrees south: -0.3 degrees C".
-10. "North to south, slider, 5 degrees south".
-11. "Settings". Speed (Half, Normal, Double), Volume slider ("100 percent"), Mono checkbox, "Save as WAV, button".
-12. Footer links: data source, Tone.js.
+1. "Skip to the player, link". Enter moves to the player's keyboard area.
+2. "Tracks, grouping. 1. Earth at night. City lights, 2012 to 2023, radio button, checked, 1 of 6",
+   then the track's one-sentence description. Arrow keys change track; the new track is announced.
+3. "Player keys, keyboard area". Space plays or pauses here, Left and Right change the map,
+   W says where you are, D describes the map, S says what the sounds mean, H lists every key.
+4. "Play, button", "Previous map, button", "Next map, button".
+5. "Map, slider, 2012, map 1 of 12". Arrow keys move one map.
+6. "Where am I?, button", "Describe this map, button", "Keys, button".
+7. What the sounds mean: one button per example sound, for example "A bright place".
+8. Explore one place: city buttons (Ulaanbaatar, Tokyo, Delhi...), then "West to east, slider"
+   and "North to south, slider". Each arrow plays one spot and says what is there.
+9. Settings: Volume slider ("80 percent"), Speed (Slow, Normal, Fast), "Say each new map",
+   "Mono", "Read aloud" (leave it off with a screen reader), "Save as audio file, button".
+10. About the data: one link per NASA source.
 
-The page never talks on its own during playback. It speaks only after Describe,
-Key, a track change, a cursor move or Save as WAV.
+While playing, the page says only the year, week or part as each map starts (turn this off with
+"Say each new map"). Everything else is spoken only when the tester asks.
 
 - [ ] Order matched, or note where it did not
 - [ ] Every control had a clear name and value
@@ -40,37 +39,38 @@ Key, a track change, a cursor move or Save as WAV.
 
 ## Controls check (2 minutes)
 
-- [ ] Space on Play starts the music; Space again pauses it
-- [ ] Changing track while playing keeps playing, with no doubled notes
-- [ ] Planet Chord changes the sound within one bar, without stopping
-- [ ] Mono on: sounds stay in the middle. Off: they move left to right again
-- [ ] Double speed is clearly faster; Half clearly slower
-- [ ] Save as WAV says "Rendering", then "Saved ...", and a file downloads
-- [ ] Hear the change plays A, then B, then stops by itself; the list below it reads the difference
-- [ ] Moving the listening cursor turns the globe to that spot; tapping the globe plays that spot
+- [ ] Space in the keyboard area plays; Space again pauses
+- [ ] Left and Right change the map and say which one; at the first map, Left says so
+- [ ] W, D, S and H each speak; D pauses the music first
+- [ ] Keys 1 to 6 choose a track; changing track never doubles the notes
+- [ ] M turns mono on and off: sounds stay in the middle, then move between the ears again
+- [ ] Escape stops all sound and speech, from anywhere on the page
+- [ ] Each example button plays a sound, then says what it means
+- [ ] A city button plays that place and says its value
+- [ ] Save as audio file says "Making the audio file", then "Saved ...", and a file downloads
 - [ ] With "Reduce motion" on in the system settings, the globe does not spin on its own
-- [ ] Focus is always visible (yellow outline) for a low-vision tester
-- [ ] At 200% browser zoom, nothing is cut off and no sideways scrolling
+- [ ] Focus is always visible for a low-vision tester
+- [ ] At 200% browser zoom, nothing is cut off and there is no sideways scrolling
 
 ## The four listener tasks (5 minutes)
 
 Give each task in these words. Do not help. Note time taken and what the tester says.
 
-1. **Start Ocean Fever without help.**
+1. **Start Earth at night without help.**
    Pass: music playing within 60 seconds, starting from the top of the page.
 
-2. **Find the warmest part of the map by ear.**
-   Use Scan, or the listening cursor. Pass: the tester names a region (for example
-   "the eastern Pacific, near South America") and it matches a warm patch on the map.
+2. **Find where the night is brightest in 2023.**
+   Use the music, the city buttons, or Describe. Pass: the tester names a bright region
+   (for example the eastern United States, Europe, India or eastern China).
 
-3. **Hear 2025 and 2026, and say which Pacific is warmer.**
-   Choose A2 El Niño: then vs now and play. Pass: the tester says 2026 is warmer,
-   using the low/high year cue, the bell, or Describe.
+3. **Play Lightning and say when the storms move north.**
+   Pass: the tester notices parts where the drop-like notes sound higher and more in the left
+   ear (north) and parts where they sound lower and on the right (south). W or D can confirm
+   ("mostly north of the equator").
 
-4. **Explain what the drone and the bell mean.**
-   The tester may press Key first. Pass: the drone is the zero line (no change from
-   normal); the bell means El Niño (the Niño 3.4 box is more than 0.5 degrees C warmer
-   than the tropical ocean).
+4. **On Carbon dioxide, explain what the hum and the heartbeat mean.**
+   The tester may press S first. Pass: the hum is the carbon dioxide on the scan line, and it
+   turns tense over dense plumes; the heartbeat is one beat for each day of data.
 
 ## Notes for the team
 

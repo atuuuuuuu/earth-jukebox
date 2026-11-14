@@ -51,5 +51,8 @@ legend:
       meaning: "All the lightning under the scan line. It is quiet over calm ocean and swells over stormy land like Central Africa or the Amazon."
   caveat: >
     Values are read from the colours of NASA's video, not from the satellite measurements, so
-    they are relative. The sensor sees only from about 55 degrees north to 55 degrees south. NASA's
+    they are relative. The sensor sees only from about 55 degrees north to 55 degrees south, and the
+    space station passes over 50 degrees north and south about four times as often as over the
+    equator, so NASA's movie catches more of the storms there. We divide by how often the station
+    looks at each latitude, so a storm sounds the same wherever it is; the map is corrected too. NASA's
     movie has no dates, so the parts are equal stretches of the movie, not calendar months.

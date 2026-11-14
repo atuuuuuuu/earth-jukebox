@@ -4,7 +4,8 @@ NASA's Science On a Sphere movie is equirectangular, so the frame *is* the map. 
 strikes of a 10-day window as yellow dots on a grey base map. The movie has no date label and does not
 run at an even speed (the storms' yearly swing north and south takes 650 to 1260 frames), so we never
 guess dates: we cut the part of the movie that shows lightning into equal parts, in order, and average
-how yellow each place is over each part, on a 3-degree grid.
+how yellow each place is over each part, on a 3-degree grid. Then we divide by how often the space
+station looks at each latitude (iss_view_weight), so storms near 50 N and S are not overcounted.
 """
 from __future__ import annotations
 
@@ -14,6 +15,27 @@ import numpy as np
 from ..config import MEDIA_DIR, source_path
 from ..lib import grid, video
 
+
+
+def iss_view_weight(edges_deg, inclination: float = 51.6, half_fov: float = 2.7) -> np.ndarray:
+    """How long the sensor looks at each latitude band, per unit area, with the equator = 1.
+
+    The ISS orbit is tilted 51.6 degrees, so its track turns round near 50 N and 50 S and the
+    sensor (a 600 km square, about 2.7 degrees each side) passes over those latitudes several times
+    as often as over the equator. A 10-day window of NASA's movie therefore shows more of the storms
+    there. Dividing by this weight makes a storm count the same wherever it is. edges_deg: band edges,
+    north to south. Bands the sensor rarely or never sees get 1, so they are never boosted."""
+    s_i = np.sin(np.radians(inclination))
+
+    def south_of(lat):  # share of each orbit the ground track spends south of lat
+        return np.arcsin(np.clip(np.sin(np.radians(np.clip(lat, -90, 90))) / s_i, -1, 1)) / np.pi + 0.5
+
+    edges = np.asarray(edges_deg, dtype=np.float64)
+    looked = np.mean([south_of(edges - d) for d in np.linspace(-half_fov, half_fov, 61)], axis=0)
+    per_area = np.abs(np.diff(looked)) / np.abs(np.diff(np.sin(np.radians(edges))))
+    mid = (edges[:-1] + edges[1:]) / 2
+    rel = per_area / per_area[np.argmin(np.abs(mid))]
+    return np.maximum(rel, 1.0)
 
 
 def strike_value(bgr: np.ndarray, ex: dict) -> np.ndarray:
@@ -61,10 +83,12 @@ def build(cfg: dict) -> dict:
         if k % 200 == 0:
             print(f"  frame {i}/{n}, part {m + 1}")
 
-    mean = cell / np.maximum(count, 1)[:, None, None]
+    # Storms per look, not per 10 days: the same correction for the sound, the words and the picture.
+    mean = cell / np.maximum(count, 1)[:, None, None] / iss_view_weight(np.linspace(90, -90, rows + 1))[None, :, None]
     scale = float(np.percentile(mean[mean > 0], 99.5))
     norm = np.clip(mean / scale, 0, 1)
     dens /= np.maximum(count, 1)[:, None, None]
+    dens /= iss_view_weight(np.linspace(90, -90, disp[1] + 1)).astype(np.float32)[None, :, None]
     dscale = float(np.percentile(dens[dens > 0], 99.7))
     print(f"  samples per part {count.tolist()}; cell scale {scale:.4f}; image scale {dscale:.4f}")
 

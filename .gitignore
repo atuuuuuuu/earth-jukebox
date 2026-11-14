@@ -1,8 +1,4 @@
 node_modules/
-# Big NASA downloads and their frames stay on your laptop, not in git
-data/sst/
-# Regenerate with: npm run sample
-data/sample/
 __pycache__/
 # NASA EIC videos for backend/eic (set EJ_RESOURCES, or put them here)
 data/eic/

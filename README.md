@@ -78,8 +78,12 @@ npm run api                        # 3-degree grids -> public/api scores (standa
 npm run validate                   # check public/api against backend/API.md: prints "API OK"
 npm test                           # the real page, keyboard only: every key, speech, sound level, axe, no trap
 npm run test:responsive            # 320 to 1440 px: no sideways scroll, touch targets >= 44 px
-python3 -m unittest backend/tests/test_sweep.py   # known-answer tests for the score builder
+npm run test:backend               # known-answer tests: score builder, validator, lightning correction
 ```
+
+`test:backend` needs the pipeline's Python packages (`pip install -r backend/eic/pipeline/requirements.txt`).
+GitHub runs the backend tests and the API check before every deploy (`.github/workflows/pages.yml`), and
+the two browser tests on every push (`.github/workflows/tests.yml`).
 
 To rebuild a track from NASA's video, put the video in `data/eic/` (see each `backend/eic/tracks/*.yaml`
 for the file and URL), then:
@@ -99,8 +103,10 @@ npm run api && npm run validate
    strip is found in every frame and its colours rebuilt into a full world map per pollutant. Ocean:
    a line through the middle of NASA's moving camera view, ten readings per second of video.
    Lightning: NASA's Science On a Sphere movie is already a flat world map; yellow strike pixels are
-   averaged over the frames of each of 14 equal parts, in order. Output: a 3 degree grid per map (or
-   one line per step) in `public/data/` and images or video in `public/media/`.
+   averaged over the frames of each of 14 equal parts, in order, then divided by how often the space
+   station looks at each latitude (its orbit turns round near 50 degrees north and south, so it sees
+   those storms about four times as often as storms at the equator). Output: a 3 degree grid per map
+   (or one line per step) in `public/data/` and images or video in `public/media/`.
 2. **Scores** (`backend/build_sweep.py`, standard library). Pools the grid to 10 degree squares, adds
    statistics and the spoken description of every map (naming the cities in the busiest squares), and
    writes `public/api/` following `backend/API.md`. `backend/validate_api.py` checks it.
@@ -111,6 +117,14 @@ npm run api && npm run validate
    each day; the ocean adds a soft pulse for each month.
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
+### The sound follows NASA's Caldwell 73 sonification
+
+The challenge lists NASA's [Data Sonification: Caldwell 73](https://svs.gsfc.nasa.gov/13786/) as its
+model. There, a radar line sweeps round a star cluster, a star's place on the line sets its pitch, the
+whole image sounds as a choir, and bright stars ring as marimba and glockenspiel notes. Earth Jukebox
+keeps that grammar for Earth maps: a scan line sweeps the world, a place's latitude on the line sets its
+pitch (and its ear), the whole line sounds as a deep hum, and bright places ring as single notes.
+
 ## Data and credits
 
 - Visualizations: NASA's Scientific Visualization Studio, NASA Earth Information Center.
@@ -120,7 +134,10 @@ npm run api && npm run validate
   Shirah, Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL); ECCO2.
 - Values are read from the colours of NASA's videos, so they are relative levels, not satellite units.
   The lightning video has no date label and its speed is uneven, so it is split into 14 equal parts
-  and no part claims a month or date.
+  and no part claims a month or date. Lightning is corrected for how often the space station looks
+  at each latitude (`iss_view_weight` in `backend/eic/pipeline/tracks/lightning.py`, with tests).
+- Sound design model: [Data Sonification: Caldwell 73](https://svs.gsfc.nasa.gov/13786/), NASA Hubble,
+  sonification by SYSTEM Sounds (M. Russo, A. Santaguida).
 - Land on the globe: [NASA Visible Earth, Blue Marble](https://visibleearth.nasa.gov/collection/1484/blue-marble).
 - Sound design and video reading for night lights and carbon dioxide: team RUSTMN (Ulaanbaatar).
 - The ocean web video is a 640 x 360 copy of NASA's; the raw NASA videos are not in the repository.
