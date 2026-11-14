@@ -12,7 +12,7 @@ Stage 2, this script, uses only the Python standard library. For every track in 
 config it writes a score that follows backend/API.md, so every part of the page works
 on it (Describe, Listen to one spot, Hear the change, the globe and the flat map):
 
-    api/scores/<track id>.json   grid (18 x 36), columns (16), mean, text ... per map
+    api/scores/<track id>.json   grid (18 x 36), mean, text ... per map
     api/tracks.json              the sweep tracks added or replaced; other tracks kept
 
 The sweep engine itself plays the full 3-degree grid: the score names it in "sweep".
@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 API_VERSION = 1
-GRID_ROWS, GRID_COLS, STRIPS = 18, 36, 16
+GRID_ROWS, GRID_COLS = 18, 36
 LAT_MIN, LAT_MAX = -60.0, 76.0   # the same rows the sweep engine reads: no ice-sheet texture
 
 # Big cities, most populous first. Only used to name a 10-degree square in the spoken text;
@@ -123,26 +123,6 @@ def pool(values: list[float], g: dict, lat_range: tuple[float, float] = (LAT_MIN
             total[R][C] += w * v
             weight[R][C] += w
     return [[total[R][C] / weight[R][C] if weight[R][C] else None for C in range(GRID_COLS)] for R in range(GRID_ROWS)]
-
-
-def strips(grid: list[list[float | None]]) -> list[float | None]:
-    """16 west-to-east strips of 22.5 degrees, area-weighted, from the 10-degree grid."""
-    out = []
-    for s in range(STRIPS):
-        west, east = -180 + s * 22.5, -180 + (s + 1) * 22.5
-        tot = wsum = 0.0
-        for C in range(GRID_COLS):
-            overlap = max(0.0, min(east, -180 + (C + 1) * 10) - max(west, -180 + C * 10)) / 10
-            if not overlap:
-                continue
-            for R in range(GRID_ROWS):
-                v = grid[R][C]
-                if v is not None:
-                    w = overlap * math.cos(math.radians(cell_lat(R)))
-                    tot += w * v
-                    wsum += w
-        out.append(tot / wsum if wsum else None)
-    return out
 
 
 def percentile(xs: list[float], q: float) -> float:
@@ -247,7 +227,6 @@ def build_years(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": rel,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text,
         })
@@ -281,7 +260,6 @@ def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
             "image": f["image"],
             "alt": f.get("alt", ""),
             **st,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -335,7 +313,6 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": rel,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -369,7 +346,6 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": round(rel, 3),
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -389,7 +365,7 @@ def build_scenes(data: dict, chapter: dict, t: dict) -> list[dict]:
         frames.append({
             "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""),
             **stats(grid, t["hotLine"]), "relativeTotal": rel,
-            "columns": [None] * STRIPS, "grid": grid, "text": text.strip(),
+            "grid": grid, "text": text.strip(),
         })
     return frames
 
@@ -413,7 +389,6 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
         frames.append({
             "date": None, "when": when, "image": f["image"], "alt": f.get("alt", ""), **st,
             "relativeTotal": round((f.get("total") or 0) / max(x.get("total") or 0 for x in chapter["frames"]), 3),
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid), "text": text.strip(),
         })
     return frames
@@ -452,7 +427,6 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "range": t["range"],
         "hotLine": t["hotLine"],
         "leftLon": data.get("grid", {}).get("lonWest", -180),
-        "tuning": {},
         "words": t["words"],
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
                   "instrument": t.get("instrument", "vibraphone")},
