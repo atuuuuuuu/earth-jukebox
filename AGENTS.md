@@ -2,13 +2,13 @@
 
 NASA Space Apps 2026, "The Earth Information Jukebox". NASA Earth Information Center videos become
 numbers (the backend), and the numbers become sound live in the browser. The tracks are the
-challenge's NASA resources 1 (night lights), 6 (carbon dioxide) and 7 (lightning).
+challenge's NASA resources 1 (night lights), 3 (aerosols), 6 (carbon dioxide) and 7 (lightning).
 
 ## Layout
 
 - `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built: Tone.js as `EJ.Tone`, and `EJ.toWav`), `textures/` (NASA Blue Marble), `api/` (scores), `data/` (3 degree grids), `media/` (map images, the CO2 video), `samples/`
-- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/lightning.js`. Lightning has its own mapping: muted harp notes per mark, storm wind, contrabass and strings in E flat, stereo following the scan line west to east, and a compare-with-previous-part pass
-- `backend/eic/` team RUSTMN's pipeline: NASA videos to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`
+- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/lightning.js` / `tracks/aerosols.js`. Lightning has its own mapping: muted harp notes per mark, storm wind, contrabass and strings in E flat, stereo following the scan line west to east, and a compare-with-previous-part pass. Aerosols is one noise wind per layer of the map (`winds.js`; the layers, their names, letters and wind colours come from the data), heard all together or one alone ("Listen to")
+- `backend/eic/` team RUSTMN's pipeline: NASA videos (and the aerosol still) to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`. `python -m pipeline.validate --track <id>` checks known places and writes heat maps to `backend/eic/debug/` (git-ignored)
 - `backend/build_sweep.py` + `backend/sweep.config.json`: grids to `public/api`. `backend/API.md` is the contract, `backend/validate_api.py` enforces it
 - `test/run.cjs` the real page by keyboard, with axe. `test/responsive.cjs` every layout from 320 to 1440 px. `backend/tests/test_sweep.py` the score builder
 
@@ -33,7 +33,7 @@ challenge's NASA resources 1 (night lights), 6 (carbon dioxide) and 7 (lightning
 - Plain HTML, CSS and JavaScript. No frameworks. No new npm packages without asking.
 - One Tone.js only: the sweep engine uses `EJ.Tone`. Dispose the old sonifier before building a new one (`son.dispose()`), or notes double.
 - Static files on GitHub Pages: relative paths only.
-- Keep the hooks the tests use: ids `keys`, `play`, `prev`, `next`, `map`, `where`, `describe`, `help`, `live`, `alert`, `demos`, `places`, `lon`, `lat`, `volume`, `mono`, `save`, `compare`, and `window.ready`, `window.son`, `window.globe`, `window.lastProbe`, `window.framesSeen`, global `EJ`. If you change one, update `test/run.cjs` in the same change.
+- Keep the hooks the tests use: ids `keys`, `play`, `prev`, `next`, `map`, `where`, `describe`, `help`, `live`, `alert`, `demos`, `places`, `lon`, `lat`, `volume`, `mono`, `save`, `compare`, `listen-field` (radios `listen-all` and `listen-<layer id>`, name `listen`), and `window.ready`, `window.son` (with `son.layers`, `son.solo`), `window.globe`, `window.lastProbe`, `window.framesSeen`, global `EJ`. If you change one, update `test/run.cjs` in the same change.
 
 ## Check before saying done
 

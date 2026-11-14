@@ -57,9 +57,9 @@ function audit(touch) {
     await page.goto("http://localhost:8124/");
     await page.waitForFunction("window.ready === true");
     // Every kind of stage must fit: NASA's video (carbon dioxide), lightning (with its compare
-    // control), then the globe (track 1).
+    // control), aerosols (with its Listen to radios), then the globe (track 1).
     let flat = { cut: [], small: [], overflow: 0 };
-    for (const id of ["carbon-dioxide", "lightning"]) {
+    for (const id of ["carbon-dioxide", "lightning", "aerosols"]) {
       const radio = await page.evaluate((v) => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === v)?.id, id);
       if (!radio) continue;
       await page.evaluate((x) => document.getElementById(x).click(), radio);

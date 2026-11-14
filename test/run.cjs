@@ -52,7 +52,9 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://localhost:8123/");
   await page.waitForFunction("window.ready === true", null, { timeout: 15000 });
-  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.textContent("#live")).trim(); };
+  // Read the live region directly: page.textContent waits on animation frames, which a slow
+  // machine with software WebGL (the globe) can starve for many seconds.
+  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.evaluate(() => document.getElementById("live").textContent)).trim(); };
   check("ready message tells the next step", (await live(300)).includes("Press Tab to reach the player, then Space"), await live(0));
   check("no sound before a key press", await page.evaluate("EJ.Tone.getContext().state !== 'running' || !son.playing"));
 
@@ -169,6 +171,43 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       await page.keyboard.press("c");
       check(`${ids[k]}: C turns compare off`, (await live()).startsWith("Compare off") && !(await page.isChecked("#compare")));
     }
+    // Listen to: where the track has layers (aerosols), a radio group of All and each layer, and
+    // a letter for each in the player, never outside it.
+    const lay = await page.evaluate(() => son.layers.map((L) => ({ id: L.id, name: L.name, key: L.key })));
+    check(`${ids[k]}: Listen to shown only where it works`, (await page.isVisible("#listen-field")) === lay.length > 0);
+    if (lay.length) {
+      const radios = await page.evaluate(() => [...document.querySelectorAll("#listen-field input")].map((r) => ({ id: r.id, type: r.type, name: r.name, checked: r.checked })));
+      check(`${ids[k]}: Listen to is one radio group, All first and chosen`,
+        (await page.textContent("#listen-field legend")).trim() === "Listen to" && radios.length === lay.length + 1
+        && radios.every((r) => r.type === "radio" && r.name === "listen") && radios[0].id === "listen-all" && radios[0].checked,
+        radios.map((r) => r.id).join(", "));
+      await page.focus("#listen-all");
+      await page.keyboard.press("ArrowRight");
+      const moved = await live();
+      check(`${ids[k]}: arrow key chooses ${lay[0].name} and says so`, moved.startsWith(`${lay[0].name} only.`)
+        && await page.isChecked(`#listen-${lay[0].id}`) && await page.evaluate(`son.solo === "${lay[0].id}"`), moved);
+      await page.focus("#keys");
+      for (const L of lay) {
+        await page.keyboard.press(L.key.toLowerCase());
+        const said = await live();
+        check(`${ids[k]}: ${L.key} chooses ${L.name}`, said.startsWith(`${L.name} only.`)
+          && await page.isChecked(`#listen-${L.id}`) && await page.evaluate(`son.solo === "${L.id}"`), said);
+      }
+      await page.keyboard.press("w");
+      const where = await live();
+      check(`${ids[k]}: W says what you listen to and what is under the line`,
+        where.includes(`Listening to ${lay[lay.length - 1].name.toLowerCase()} only`) && where.includes("scan line is at"), where.slice(0, 160));
+      await page.keyboard.press("a");
+      const all = await live();
+      check(`${ids[k]}: A goes back to all`, /^All \w+ /.test(all) && await page.isChecked("#listen-all") && await page.evaluate("son.solo === null"), all);
+      await page.keyboard.press("h");
+      const help = await live();
+      check(`${ids[k]}: H lists the letters`, help.includes("A: all") && lay.every((L) => help.includes(`${L.key}: ${L.name.toLowerCase()} only`)));
+      await page.focus("#title");
+      await page.evaluate(() => { document.getElementById("live").textContent = "x"; });
+      await page.keyboard.press(lay[0].key.toLowerCase());
+      check(`${ids[k]}: layer letters are ignored outside the player`, (await live()) === "x" && await page.evaluate("son.solo === null"));
+    }
   }
 
   // ---- Sliders keep their own arrow keys and speak each spot.
@@ -195,7 +234,12 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     if (id === "BODY" || id === "skip") break;
     seen.push(id);
   }
-  const want = ["keys", "play", "prev", "next", "where", "describe", "help", "lon", "lat", "volume", "announce", "mono", "speak", "save"];
+  // Every enabled control (Previous and Next are disabled on a one-map track), and the Listen to
+  // group where it is shown (Tab lands on its chosen radio).
+  const want = await page.evaluate(() => [
+    ...["keys", "play", "prev", "next", "where", "describe", "help", "lon", "lat", "volume", "announce", "mono", "speak", "save"].filter((id) => !document.getElementById(id).disabled),
+    ...(document.getElementById("listen-field").hidden ? [] : [document.querySelector("#listen-field input:checked").id]),
+  ]);
   const missing = want.filter((x) => !seen.includes(x));
   check("Tab walks the whole page without a trap", !missing.length && seen.length < 150, `${seen.length} stops${missing.length ? `, never reached: ${missing}` : ""}`);
   // Every focused control shows a visible focus ring.
