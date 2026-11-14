@@ -77,6 +77,7 @@ const STRING_DEG = (2 * STRING_TOP) / STRING_BANDS;  // 13.5°
 const STRING_REACH = 1;            // columns each side (±3°, about ±0.2 s): steady but still in real time
 const STRING_PERCENTILE = 0.95;    // a band this full of lightning plays its note in full
 const STRING_GATE = 0.06;          // below this share a band is silent
+const STRING_TOTAL = 1.4;          // all bands together at most this (one full band = 1): no loud surges
 const LADDERS = Object.fromEntries(Object.entries(TRIADS).map(([name, pcs]) => [name, scaleRange(51, 96, pcs).slice(0, STRING_BANDS)]));
 /** String band of a latitude: 0 = farthest north … STRING_BANDS - 1 = farthest south. */
 export const stringBandOfLat = (lat) => clamp(Math.floor((STRING_TOP - lat) / STRING_DEG), 0, STRING_BANDS - 1);
@@ -298,7 +299,11 @@ function stringSums(track, frame, c) {
 
 /** The string band levels (0..1) at column c: each band swells with the lightning in its latitudes. */
 export function stringLevels(track, frame, c) {
-  return Array.from(stringSums(track, frame, c), (x) => stringLevel(x / track._stringNorm));
+  const levels = Array.from(stringSums(track, frame, c), (x) => stringLevel(x / track._stringNorm));
+  // Many bands full at once would add up to a loud peak: the bands together never go above
+  // STRING_TOTAL, so which notes sound still tells where the storms are, without the surge.
+  const total = levels.reduce((a, b) => a + b, 0);
+  return total > STRING_TOTAL ? levels.map((x) => (x * STRING_TOTAL) / total) : levels;
 }
 
 /** The lightning near column c, averaged over `reach` columns each side (east and west edges join). */

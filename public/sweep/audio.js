@@ -25,12 +25,12 @@ const CELLO = { notes: ['C2', 'E2', 'Ab2', 'C3', 'E3', 'Ab3', 'C4'], trim: 3 };
 // trim: bass 3 dB and strings 5 dB below where they were first set by ear (6 and 7 dB), to make
 // room for the marks and the storm wind.
 const ORCHESTRA = {
-  bass: { dir: 'contrabass', notes: ['D1', 'Eb1', 'Bb1', 'D2', 'Eb2'], trim: 3, attack: 1.0, release: 1.2 },
+  bass: { dir: 'contrabass', notes: ['D1', 'Eb1', 'Bb1', 'D2', 'Eb2'], trim: 1, attack: 1.0, release: 1.2 },
   // A flat and C as well, so most chord notes need no pitching up (a pitched-up sample is shorter).
   // The strings are a cloud of sustained notes, one per band of latitude (setStrings): each note is
   // re-bowed every `stroke` seconds, and as one stroke fades out over `fade` the next fades in over
   // the same time, so the note never breaks. `enter` is the quicker fade-in of a note that starts.
-  strings: { dir: 'strings', notes: [...EB_FILES.slice(0, 8), 'Ab3', 'C4', 'Ab4', 'C5', 'Ab5'], trim: 6, stroke: 1.2, fade: 1.0, enter: 0.3 },
+  strings: { dir: 'strings', notes: [...EB_FILES.slice(0, 8), 'Ab3', 'C4', 'Ab4', 'C5', 'Ab5'], trim: 7, stroke: 1.2, fade: 1.0, enter: 0.3 },
 };
 // Levels set by offline render: about a third of the energy below 60 Hz, about 70% below 250 Hz,
 // and the same average loudness as the other tracks.
@@ -38,7 +38,7 @@ const SUB_GAIN = 0.035;       // a sine under the contrabass, on the same note: 
 const BASS_REVERB = 0.5;      // the bass sends this share of the hum's reverb: low notes blur a hall
 // Lightning's storm wind: pink noise in two soft bands that drift like gusts. Its level follows the
 // marks near the line through slow glides (seconds to reach about two thirds of a change).
-const WIND = { trim: -2, gain: 0.5, rise: 0.5, fall: 1.0, low: 260, high: 620 };
+const WIND = { trim: -4, gain: 0.5, rise: 0.5, fall: 1.0, low: 260, high: 620 };
 // Lightning's mark notes are "muted": the harp through a gentle low-pass. Compare mode opens it a
 // little, so its rising and falling figures are clear.
 const NOTE_TONE = { marks: 1700, compare: 3200 };
