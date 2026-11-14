@@ -137,7 +137,7 @@
   // ---------- The globe (or a flat image when WebGL is missing) ----------
   let globe = null;
   try {
-    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
+    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit) });
     globe.follow = true;
     globe.spin = !reduced.matches;
     const earth = new Image();

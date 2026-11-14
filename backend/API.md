@@ -63,7 +63,6 @@ Each frame:
 | `image`, `alt` | The map image and its description |
 | `text` | The spoken description. Starts with `when`. Built from the same numbers |
 | `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, not crossed by carbon dioxide's line that week; every cell for ocean scenes, which follow a moving camera and have no map) |
-| `columns` | 16 west-to-east strips of 22.5 degrees |
 | `mean`, `spread`, `hot`, `clusters`, `valid` | Area-weighted average, spread, share of the map read at or above `hotLine`, number of separate high patches, share of the Earth with a reading |
 | `relativeTotal` | Total compared with the first map (night lights) or the busiest map (carbon dioxide, lightning) |
 
@@ -74,7 +73,7 @@ Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 `python3 backend/validate_api.py public` checks before every deploy:
 
 - every file named in `tracks.json` exists, and every map image exists
-- `grid` is always 18 × 36 and `columns` 16, every value a number inside `range` or `null`
+- `grid` is always 18 × 36, every value a number inside `range` or `null`
 - every `text` starts with its map's `when` (or date)
 - dated maps are in date order
 - `sweep.src` exists, its chapter has as many maps with the same images, and its arrays are full size

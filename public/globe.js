@@ -1,6 +1,6 @@
 // globe.js: a 3D globe in plain WebGL. No libraries.
 // The ocean is the NASA data frame itself; land comes from NASA Blue Marble.
-// It shows what the music is doing: the scan strip, the listening cursor and the Niño 3.4 box.
+// It shows what the music is doing: the scan line, the notes just played and the listening cursor.
 (function () {
   "use strict";
 
@@ -31,8 +31,7 @@ uniform sampler2D uData1;
 uniform sampler2D uEarth;
 uniform float uMix;            // crossfade between the previous and current frame
 uniform float uLeftLon;
-uniform float uStrip;          // scan strip 0..15, or -1
-uniform float uHead;           // playhead longitude, gliding through the strip being played
+uniform float uHead;           // scan line longitude, or 999 when nothing is playing
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
 uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
@@ -54,7 +53,7 @@ float line(float d, float px) {
 }
 
 // How much a frame colour is data. Pure grey (land, ice) has almost no saturation: no data.
-// Near-zero ocean is a bright cream, so brightness keeps it.
+// Very bright colours count as data too.
 float dataOf(vec3 c) {
   float hi = max(c.r, max(c.g, c.b));
   float sat = hi - min(c.r, min(c.g, c.b));
@@ -98,9 +97,7 @@ void main() {
     float around = n > 0.5 ? sum / n : 1.0;
     isData = max(isData, ink * smoothstep(0.6, 0.95, around));
   }
-  // The NASA date stamp sits in the bottom-left corner of every frame: never paint it on the globe.
   isData = mix(isData, 1.0, uFull);
-  isData *= 1.0 - (1.0 - uFull) * smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
   isData *= uDataOn;
   vec3 land = earth * 0.82;
   vec3 col = mix(land, data, isData);
@@ -114,20 +111,6 @@ void main() {
   float gLon = line(15.0 - abs(mod(lon + 180.0, 30.0) - 15.0), 1.0) * meridianFade;
   float gLat = line(15.0 - abs(mod(lat + 90.0, 30.0) - 15.0), 1.0);
   col = mix(col, vec3(1.0), 0.10 * max(gLon, gLat));
-
-  // Scan strip: the 22.5 degree slice being played right now.
-  if (uStrip >= 0.0) {
-    float c = uLeftLon + (uStrip + 0.5) * 22.5;
-    float dd = lonDist(lon, c);
-    float inside = 1.0 - smoothstep(10.9, 11.25, dd);
-    float edge = line(abs(dd - 11.25), 1.5) * meridianFade;
-    col = mix(col, col * 1.18 + 0.06, 0.55 * inside);
-    col = mix(col, vec3(1.0), 0.45 * edge);
-    // Playhead: where in this strip the music is right now. Its own warm colour, so it stays
-    // one clear line when it reaches the strip edge.
-    float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
-    col = mix(col, vec3(1.0, 0.9, 0.55), 0.95 * ph);
-  }
 
   // Sweep tracks: one thin scan line moving west to east. The part not yet heard rests dimmer.
   if (uSweep > 0.5 && uHead < 900.0) {
@@ -215,9 +198,7 @@ void main() {
       this.tilt = 12;
       this.targetYaw = null;
       this.spin = true;
-      this.strip = -1;
       this.follow = false;   // turn with the scan
-      this.clock = opts.clock || (() => performance.now() / 1000);   // the audio clock, in seconds
       this.fps = 24;         // smooth enough, and light on older laptops
       this.nextDraw = 0;
       this.cell = [-1, -1];
@@ -268,7 +249,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -322,20 +303,6 @@ void main() {
     ping(lon, lat, kind = 0) {
       this.pings.push({ lon, lat, kind, born: performance.now() });
       if (this.pings.length > 6) this.pings.shift();
-    }
-    // The music reached strip s at audio time `at` (seconds on this.clock); it lasts `seconds`.
-    // The playhead glides through it on the audio clock, so it matches what you hear even if frames bunch up.
-    step(s, seconds, at) {
-      this.strip = s;
-      this.stepDur = seconds;
-      this.stepAt = typeof at === "number" ? at : this.clock();
-    }
-    // Playhead position in strips (0..16), or -1 when nothing is being scanned.
-    head() {
-      if (this.strip < 0) return -1;
-      if (this.reduced.matches || !this.stepDur) return this.strip + 0.5;
-      // Up to two strips ahead: if the page stalls and a step callback is dropped, keep following the audio.
-      return this.strip + clamp((this.clock() - this.stepAt) / this.stepDur, 0, 2);
     }
     lookAt(lon, lat) {
       this.targetYaw = lon;
@@ -407,9 +374,7 @@ void main() {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       const still = this.reduced.matches;
-      const h = this.head();
-      this.headPos = h;
-      this.headLon = h < 0 ? 999 : this.leftLon + h * 22.5;
+      this.headLon = 999;
       if (this.headFn) {
         // Sweep tracks: the line's longitude comes straight from the audio clock.
         const l = this.headFn();
@@ -421,7 +386,7 @@ void main() {
       if (this.follow && this.headLon < 900) {
         // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
         const diff = wrap(this.headLon - this.yaw);
-        const moving = still ? 0 : this.headFn ? this.headSpeed : h < this.strip + 2 ? 22.5 / this.stepDur : 0;
+        const moving = still ? 0 : this.headSpeed;
         this.yaw = still ? wrap(this.headLon) : wrap(this.yaw + moving * dt + diff * Math.min(1, dt * 5));
         this.targetYaw = this.yaw;   // stay here when the music stops
       } else if (this.targetYaw !== null && this.targetYaw !== undefined) {
@@ -458,9 +423,7 @@ void main() {
       gl.uniformMatrix3fv(this.u.uRot, false, new Float32Array(R));
       gl.uniform1f(this.u.uMix, this.mix);
       gl.uniform1f(this.u.uLeftLon, this.leftLon);
-      // The lit strip is the one under the playhead (the same as this.strip unless a step callback was dropped).
-      gl.uniform1f(this.u.uStrip, this.strip < 0 ? -1 : Math.floor(this.headPos) % 16);
-      gl.uniform1f(this.u.uHead, this.headLon === undefined ? 999 : this.headLon);
+      gl.uniform1f(this.u.uHead, this.headLon);
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));

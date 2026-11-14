@@ -65,12 +65,6 @@ class Stats(unittest.TestCase):
         none = [[None] * 36 for _ in range(18)]
         self.assertIsNone(bs.stats(none, 0.5)["mean"])
 
-    def test_strips_cover_the_world_west_to_east(self):
-        g = [[float(c) for c in range(36)] for _ in range(18)]
-        s = bs.strips(g)
-        self.assertEqual(len(s), 16)
-        self.assertLess(s[0], s[-1])
-
 
 class NewBuilders(unittest.TestCase):
     def test_weeks_fill_only_the_cells_the_line_crossed(self):
@@ -123,7 +117,7 @@ class NewBuilders(unittest.TestCase):
         self.assertEqual(f["text"], "Gulf Stream, 1 May 2023 to 2 June 2023. The camera is over the Gulf Stream. "
                                     "Bright moving water in the picture: the busiest scene. It carries warmth to Europe.")
         self.assertTrue(all(c is None for row in f["grid"] for c in row))
-        self.assertEqual((len(f["grid"]), len(f["grid"][0]), len(f["columns"])), (18, 36, 16))
+        self.assertEqual((len(f["grid"]), len(f["grid"][0])), (18, 36))
 
 
 class Build(unittest.TestCase):
