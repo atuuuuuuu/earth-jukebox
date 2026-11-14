@@ -86,16 +86,23 @@ npm run api && npm run validate
 1. **Reading NASA's video** (`backend/eic/`, team RUSTMN's pipeline, numpy and OpenCV). Each track's
    YAML says how. Night lights: the 8K EIC video, calibrated against 10 cities, lights separated from
    the base map. Carbon dioxide: a thin line through the centre of NASA's turning globe, read every 3
-   hours of model time. Lightning: NASA's Science On a Sphere movie is already a flat world map;
-   yellow strike pixels are averaged over every frame in each calendar month. Output: a 3 degree grid
-   per map in `public/data/` and map images in `public/media/`.
+   hours of model time. Lightning: NASA's Science On a Sphere movie is already a flat world map, read
+   at its own 4096 x 2048 pixels in 14 equal parts; each yellow mark is counted once, when it first
+   appears, on a 1 x 3 degree grid, and the share of each 3 degree cell covered by marks is averaged
+   over the part. Output: a 3 degree grid per map in `public/data/` and map images in `public/media/`.
 2. **Scores** (`backend/build_sweep.py`, standard library). Pools the grid to 10 degree squares, adds
    statistics and the spoken description of every map (naming the cities in the busiest squares), and
    writes `public/api/` following `backend/API.md`. `backend/validate_api.py` checks it.
 3. **Sound** (`public/sweep/`, team RUSTMN's engine on Tone.js). The scan advances one 3 degree column
-   at a time; notes ring as it crosses bright places (vibraphone for lights, kalimba for lightning),
-   a hum follows everything under the line, and carbon dioxide adds tension over dense plumes and a
-   heartbeat for each day.
+   at a time; a vibraphone rings as it crosses bright places, a hum follows everything under the
+   line, and carbon dioxide adds tension over dense plumes and a heartbeat for each day. Lightning
+   is a small orchestra in E flat, after NASA's Butterfly Nebula sonification (a sustained texture
+   under distinct notes): a quiet, muted harp note for each lightning mark (crowded marks become a
+   soft flurry), a storm wind that swells with the marks near the line, a deep contrabass for how
+   much lightning is under the line, and bowed strings that sit higher when the storms are farther
+   north. Its sound moves from the left ear to the right as the line crosses from west to east. A
+   compare pass plays the change from the previous part instead: rising notes for more, falling
+   notes for less.
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ## Data and credits

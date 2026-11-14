@@ -78,10 +78,11 @@
       "code": "4",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
-      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. Each stormy place plays a drop-like note; listen to the storms swing north and south with the seasons.",
+      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
       "data": "data/07_lightning.json",
       "chapter": "parts",
-      "instrument": "kalimba",
+      "mapping": "lightning",
+      "instrument": "harp",
       "units": "share of the most lightning",
       "range": [
         0,

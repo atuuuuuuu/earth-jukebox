@@ -49,7 +49,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `weeks`, `months`), `mapping` (`night-lights` or `co2`), `instrument` (`vibraphone`, `kalimba`) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `weeks`, `parts`), `mapping` (`night-lights`, `co2` or `lightning`), `instrument` for the ringing notes (`vibraphone`, `harp`) |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
 | `frames` | The maps, in playing order |

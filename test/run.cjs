@@ -151,6 +151,24 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       return { peakDb: +(20 * Math.log10(pk)).toFixed(1), rmsDb: +(10 * Math.log10(sum / l.length)).toFixed(1) };
     });
     check(`${ids[k]}: audio file render`, wav.peakDb < 0 && wav.rmsDb > -50, JSON.stringify(wav));
+    // Compare with previous part: only where the track has it (lightning), by key C and the checkbox.
+    const canCompare = await page.evaluate("son.canCompare");
+    check(`${ids[k]}: compare control shown only where it works`, (await page.isVisible("#compare")) === canCompare);
+    if (canCompare) {
+      await page.focus("#keys");
+      await page.keyboard.press("Home");
+      await page.keyboard.press("c");
+      const on = await live(300);
+      check(`${ids[k]}: C turns on compare and explains the first part`, on.startsWith("Compare with previous part on") && on.includes("nothing to compare") && await page.isChecked("#compare"), on.slice(0, 90));
+      await page.keyboard.press("ArrowRight");
+      check(`${ids[k]}: compare names both parts`, /^Part 2 of \d+ compared with Part 1\./.test(await live()), await live(0));
+      await page.keyboard.press("d");
+      check(`${ids[k]}: D describes the change`, /compared with Part 1\. Lightning grew in/.test(await live()), (await live(0)).slice(0, 90));
+      const cmp = await page.evaluate(async () => { const b = await son.renderOffline(4); let pk = 0; for (const x of b.getChannelData(0)) pk = Math.max(pk, Math.abs(x)); return +(20 * Math.log10(pk)).toFixed(1); });
+      check(`${ids[k]}: compare pass renders`, cmp < 0 && cmp > -40, `peak ${cmp} dB`);
+      await page.keyboard.press("c");
+      check(`${ids[k]}: C turns compare off`, (await live()).startsWith("Compare off") && !(await page.isChecked("#compare")));
+    }
   }
 
   // ---- Sliders keep their own arrow keys and speak each spot.

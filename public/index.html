@@ -83,6 +83,11 @@
           <input id="map" type="range" min="0" max="0" value="0" step="1">
         </div>
 
+        <div id="compare-field" hidden>
+          <label class="check"><input id="compare" type="checkbox" aria-describedby="compare-hint" aria-keyshortcuts="C"> Compare with previous part</label>
+          <p id="compare-hint" class="muted small">Each sweep plays what changed since the part before, in the same places: short rising notes for more lightning, falling notes for less, quiet where it stayed the same.</p>
+        </div>
+
         <div class="btn-row three">
           <button id="where" class="btn" type="button" aria-keyshortcuts="W">Where am I?</button>
           <button id="describe" class="btn" type="button" aria-keyshortcuts="D">Describe this map</button>

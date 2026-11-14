@@ -304,8 +304,9 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
     frames = []
     for n, f in enumerate(chapter["frames"], 1):
         mid = (f["startStep"] + f["steps"] / 2) * data["framesPerStep"] / data["media"]["fps"]
+        # as_posix: the path goes into the score as a URL, so forward slashes on Windows too
         image = f.get("image") or still(t["_public"], data["media"]["src"], mid,
-                                         str(Path(data["media"]["src"]).parent / f"week-{n}.jpg"))
+                                         (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())
         total = [[0.0] * GRID_COLS for _ in range(GRID_ROWS)]
         count = [[0] * GRID_COLS for _ in range(GRID_ROWS)]
         for s_ in range(f["startStep"], f["startStep"] + f["steps"]):
@@ -356,9 +357,13 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
         share = f.get("north", 0.5)
         side = ("mostly north of the equator" if share > 0.6 else "mostly south of the equator" if share < 0.4
                 else "on both sides of the equator")
+        marks = f.get("markCount")
+        about = f"{round(marks, 2 - len(str(marks))):,}" if marks and marks >= 100 else str(marks)
         text = (f"{when}. Lightning in this part of NASA's record: "
                 + ("the busiest part" if rel == 1 else f"{round(rel * 100)} percent of the busiest part")
-                + f", {side}. " + (f"Most lightning: {listing(busy)}." if busy else ""))
+                + f", {side}. "
+                + (f"About {about} separate lightning marks appear in NASA's movie during this part. " if marks else "")
+                + (f"Most lightning: {listing(busy)}." if busy else ""))
         frames.append({
             "date": None,
             "when": when,

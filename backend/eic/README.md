@@ -21,4 +21,5 @@ colour key, grid, playback timing and the screen-reader sound legend.
 `06_co2_dyamond.yaml` and its builder are kept but not in the jukebox yet: that video is a
 turning globe seen by a camera, not a world map, so it cannot be draped on the 3D globe
 without more work. `pipeline.fetch_samples` downloads the instrument samples into
-`public/samples/` (vibraphone and cello are already there).
+`public/samples/` (vibraphone, cello, kalimba and lightning's contrabass, strings and harp are
+already there). Name instruments to fetch only those: `python -m pipeline.fetch_samples strings`.

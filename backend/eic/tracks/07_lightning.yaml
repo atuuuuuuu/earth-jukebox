@@ -6,7 +6,8 @@ builder: lightning
 
 source:
   # The SOS movie is equirectangular (4096x2048, 180 W at the left edge), so no globe geometry is needed.
-  video: 07_Lightning/iss_lightning_sos_yearly_07312023_2048p60.mp4
+  # Under EJ_RESOURCES. The folder name is the one download_lightning_2d.bat makes.
+  video: 07_Lightning_ISS/iss_lightning_sos_yearly_07312023_2048p60.mp4
   svs_id: 5011
   url: https://svs.gsfc.nasa.gov/5011/
   svs_title: "Lightning Events Detected from the International Space Station (ISS) 2017-2023"
@@ -22,11 +23,19 @@ time:
   sample_every: 6            # well under one 10-day window, so no strike is missed
 
 extraction:
-  work: [1920, 960]          # 16 px per 3-degree cell
+  # Read at the movie's own 4096 x 2048: most marks are 2 to 8 pixels across, and shrinking the
+  # frame first (it used to be read at 1920 x 960) merged or lost about half of them.
   grid: { cols: 120, rows: 60 }
   yellow_lo: 40              # (R+G)/2 - B below this: grey base map, white grid lines
   yellow_hi: 150
   red_min: 110
+  marks:
+    detect: 0.25             # a new mark: strike value above this…
+    shown: 0.1               # …where the sample before showed nothing above this (2 px wider)
+    min_area: 2              # pixels; a single pixel counts only if clearly yellow
+    cols: 360                # 1 degree of longitude: about 1/20 of a second of the sweep
+    rows: 38                 # 3 degrees of latitude…
+    lat_north: 57            # …from 57 N to 57 S, just beyond what the sensor sees
 
 media:
   width: 2048
@@ -34,22 +43,37 @@ media:
   webp_quality: 82
 
 playback:
-  seconds_per_sweep: 11
+  seconds_per_sweep: 20      # slow, so the orchestra can swell: 14 parts = about 4.7 minutes
 
 legend:
   summary: >
     Lightning seen from the International Space Station from March 2017 to July 2023, in 14 equal
     parts, in order. A scan line crosses the world once per part, west to east.
   method: >
-    Everything you hear sits on the scan line. Places in the north sound higher and in your left
-    ear; places in the south sound lower and in your right. Listen to the storms swing north and
-    south and back again as the seasons turn, about seven times.
+    The sound moves with the scan line: from your left ear at the western edge of the map, through
+    the centre, to your right ear at the eastern edge. North sounds higher and south lower. Listen
+    to the storms swing north and south and back again as the seasons turn, about seven times.
+    To hear what changed instead, turn on Compare with previous part (key C): each sweep then plays
+    the difference between this part and the one before it, in the same places.
   items:
-    - sound: "Drop-like notes"
-      meaning: "Places with a lot of lightning, played as the scan line crosses them. Louder = more lightning."
-    - sound: "Deep hum"
-      meaning: "All the lightning under the scan line. It is quiet over calm ocean and swells over stormy land like Central Africa or the Amazon."
+    - sound: "Soft harp notes"
+      meaning: "Lightning marks in NASA's movie, each played as the scan line crosses it. A lone mark is one quiet note; many marks together make a soft, quick flurry. Higher = farther north."
+    - sound: "Storm wind"
+      meaning: "How many lightning marks are close to the scan line. It swells over busy storms and dies away over calm places."
+    - sound: "Deep bass"
+      meaning: "How much of the map under the scan line is lit by lightning. It never stops, and stays in the middle."
+    - sound: "Strings"
+      meaning: "Where the storms are, north or south, moment by moment. Every stretch of latitude has its own string note, higher = farther north, and it swells while lightning there is under the scan line."
+    - sound: "Rising notes (compare only)"
+      meaning: "More lightning here than in the previous part. A bigger increase is louder and climbs further."
+    - sound: "Falling notes (compare only)"
+      meaning: "Less lightning here than in the previous part. Places that stayed the same are quiet."
   caveat: >
     Values are read from the colours of NASA's video, not from the satellite measurements, so
-    they are relative. The sensor sees only from about 55 degrees north to 55 degrees south. NASA's
-    movie has no dates, so the parts are equal stretches of the movie, not calendar months.
+    they are relative. A mark is a yellow dot in the movie, counted once when it first appears; it
+    is not a measured flash, and in the busiest storms dots land on top of each other, so counts
+    there are too low. The sensor sees only from about 55 degrees north to 55 degrees south. NASA's
+    movie has no dates, so the parts are equal stretches of the movie, not calendar months. The
+    movie runs at an uneven speed, so parts hold different spans of time, and the number of marks
+    in a part depends on that too; the last part includes the movie's ending, where no new marks
+    appear. Compare mode uses how much of the map is lit, which does not depend on the speed.

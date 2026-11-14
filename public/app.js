@@ -146,9 +146,10 @@
   const usesVideo = () => !!score?.frames && score.sweep.mapping === "co2";
   const n = () => score.frames.length;
   const pos = () => tracks.indexOf(track) + 1;
-  const whenOf = (i) => score.frames[i].when;
+  // A map's spoken name; in lightning's compare mode, "Part 6 of 14 compared with Part 5".
+  const whenOf = (i) => son?.mapName?.(i) ?? score.frames[i].when;
   // "Part 4 of 14" already counts itself; other names get "map 4 of 14".
-  const mapText = (i) => (/ of \d+$/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, map ${i + 1} of ${n()}`);
+  const mapText = (i) => (/ of \d+\b/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, map ${i + 1} of ${n()}`);
 
   const setPlayButton = () => {
     $("play").dataset.state = playing ? "playing" : "paused";
@@ -159,7 +160,7 @@
     const f = score.frames[i];
     $("map").value = i;
     $("map").setAttribute("aria-valuetext", mapText(i));
-    $("stage-when").textContent = f.when;
+    $("stage-when").textContent = son?.comparing ? (i ? `${f.when} − ${score.frames[i - 1].when.replace(/ of \d+$/, "")}` : `${f.when}: nothing before it`) : f.when;
     const label = `${(f.alt || score.words.map).replace(/\.$/, "")}. ${n() > 1 ? `Map ${i + 1} of ${n()}.` : ""}`.trim();
     if (usesVideo()) $("video-wrap").setAttribute("aria-label", label);
     else $("globe").setAttribute("aria-label", `3D globe: ${label}`);
@@ -195,7 +196,7 @@
   const onFrame = (f, i) => {
     showFrame(i);
     window.framesSeen = (window.framesSeen || 0) + 1;
-    if (playing && $("announce").checked && son?.started) say(`${f.when}.`);
+    if (playing && $("announce").checked && son?.started) say(`${whenOf(i)}.`);
     if (son) son.started = true;
   };
   const onStep = (i, info) => { son.info = info; };
@@ -259,6 +260,9 @@
     $("map").max = n() - 1;
     $("map-field").hidden = n() < 2;
     $("prev").disabled = $("next").disabled = n() < 2;
+    // Compare with previous part: only where the track has it, and always off when a track loads.
+    $("compare").checked = false;
+    $("compare-field").hidden = !son.canCompare;
     renderSounds();
     showFrame(0);
     idle();
@@ -319,8 +323,25 @@
   const describe = () => {
     if (!son) return;
     const pre = pauseForSpeech();
-    say(`${pre}${son.frame().text} Press Space to play.`);
+    say(`${pre}${son.describeText?.() ?? son.frame().text} Press Space to play.`);
   };
+
+  // Lightning: play each part itself, or what changed since the part before.
+  const setCompare = (on) => {
+    if (!son?.canCompare) { say("Compare with previous part is only for the Lightning track."); return; }
+    $("compare").checked = on;
+    son.setCompare(on);
+    const i = son.index;
+    showFrame(i);
+    const next = playing ? "" : " Press Space to play.";
+    if (!on) { say(`Compare off. Each sweep plays the lightning in the part itself. ${mapText(i)}.${next}`); return; }
+    const what = "Compare with previous part on. Each sweep now plays what changed since the part before: "
+      + "short rising notes where there is more lightning, falling notes where there is less, quiet where it stayed the same.";
+    say(i === 0
+      ? `${what} ${score.frames[0].when} is the first part, so there is nothing to compare it with: playing starts with ${whenOf(1)}.${next}`
+      : `${what} ${mapText(i)}.${next}`);
+  };
+  $("compare").addEventListener("change", (e) => setCompare(e.target.checked));
 
   const whereText = () => {
     if (!son) return "The player is still loading.";
@@ -329,7 +350,10 @@
     if (playing) {
       const lon = son.headLon();
       s += `Playing. The scan line is at ${lonWords(lon)}, ${Math.round(son.progress() * 100)} percent of the way across.`;
-      if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest hum.` : " It is crossing a quiet stretch.";
+      if (son.info?.change !== undefined) {
+        const c = son.info.change;
+        s += c > 0.05 ? " Under it: more lightning than in the previous part." : c < -0.05 ? " Under it: less lightning than in the previous part." : " Under it: about the same as the previous part.";
+      } else if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest ${son.bedWord}.` : " It is crossing a quiet stretch.";
       if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
     } else {
       s += "Paused. Press Space to play.";
@@ -338,7 +362,8 @@
   };
 
   const HELP = "Player keys. Space: play or pause. Left and Right arrows: previous or next map. Home and End: first or last map. "
-    + "W: where am I. D: describe this map. S: what the sounds mean. 1 to 4: choose a track. M: mono on or off. Escape: stop. "
+    + "W: where am I. D: describe this map. S: what the sounds mean. 1 to 4: choose a track. M: mono on or off. "
+    + "C: on the Lightning track, compare each part with the previous part, or go back to the part itself. Escape: stop. "
     + "Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
 
   const soundsText = () => {
@@ -388,6 +413,7 @@
       case "h": case "?": act(() => say(HELP)); break;
       case "s": act(() => say(soundsText())); break;
       case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
+      case "c": act(() => setCompare(!$("compare").checked)); break;
       default:
         if (/^[1-9]$/.test(k) && tracks[Number(k) - 1]) {
           act(() => {

@@ -100,6 +100,16 @@ class NewBuilders(unittest.TestCase):
         self.assertIsNone(out[0]["grid"][2][0])      # 60-70 N: beyond what the station sees
         self.assertIsNone(out[0]["date"])
         self.assertEqual(out[0]["when"], "Part 1 of 2")
+        self.assertNotIn("marks", out[0]["text"])    # no count from the pipeline: nothing said
+
+    def test_parts_say_about_how_many_marks(self):
+        g = fine()
+        g[at(0, 20)] = 100
+        frames = [{"label": "Part 1 of 2", "image": "1.webp", "glow": g, "core": g, "total": 1.0, "markCount": 58153},
+                  {"label": "Part 2 of 2", "image": "2.webp", "glow": g, "core": g, "total": 1.0, "markCount": 87}]
+        out = bs.build_parts({"grid": G}, {"frames": frames}, {"hotLine": 0.5, "latRange": [-55, 55]})
+        self.assertIn("About 58,000 separate lightning marks appear in NASA's movie during this part.", out[0]["text"])
+        self.assertIn("About 87 separate lightning marks", out[1]["text"])
 
 
 class Build(unittest.TestCase):
