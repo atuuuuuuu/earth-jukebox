@@ -1,4 +1,4 @@
-"""Build the API for the sweep tracks (Night Lights): 3-degree grids in, scores out.
+"""Build the API for the sweep tracks (night lights, carbon dioxide, lightning, aerosols): 3-degree grids in, scores out.
 
     python3 backend/build_sweep.py backend/sweep.config.json
 
@@ -285,6 +285,7 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
     frames = []
     for n, f in enumerate(chapter["frames"], 1):
         mid = (f["startStep"] + f["steps"] / 2) * data["framesPerStep"] / data["media"]["fps"]
+        # as_posix: the path goes into the score as a URL, so forward slashes on Windows too
         image = f.get("image") or still(t["_public"], data["media"]["src"], mid,
                                          (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())  # a web path: / even on Windows
         total = [[0.0] * GRID_COLS for _ in range(GRID_ROWS)]
@@ -336,9 +337,13 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
         share = f.get("north", 0.5)
         side = ("mostly north of the equator" if share > 0.6 else "mostly south of the equator" if share < 0.4
                 else "on both sides of the equator")
+        marks = f.get("markCount")
+        about = f"{round(marks, 2 - len(str(marks))):,}" if marks and marks >= 100 else str(marks)
         text = (f"{when}. Lightning in this part of NASA's record: "
                 + ("the busiest part" if rel == 1 else f"{round(rel * 100)} percent of the busiest part")
-                + f", {side}. " + (f"Most lightning: {listing(busy)}." if busy else ""))
+                + f", {side}. "
+                + (f"About {about} separate lightning marks appear in NASA's movie during this part. " if marks else "")
+                + (f"Most lightning: {listing(busy)}." if busy else ""))
         frames.append({
             "date": None,
             "when": when,
@@ -347,6 +352,44 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
             **st,
             "relativeTotal": round(rel, 3),
             "grid": r3(grid),
+            "text": text.strip(),
+        })
+    return frames
+
+
+def build_still(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """One still map with layers (aerosols): a 10-degree grid per layer, each on its own fixed
+    scale (1 = that layer's thickest squares on any map), and `grid` = the strongest layer per cell."""
+    g = data["grid"]
+    lat_range = tuple(t.get("latRange", (LAT_MIN, LAT_MAX)))
+    layers = data.get("layers") or []
+    pooled = [{L["id"]: pool([v / 100 for v in f["layers"][L["id"]]], g, lat_range) for L in layers}
+              for f in chapter["frames"]]
+    scales = {L["id"]: percentile([v for p in pooled for row in p[L["id"]] for v in row if v], 0.99) or 1.0
+              for L in layers}
+    frames = []
+    for f, p in zip(chapter["frames"], pooled):
+        grids = {k: [[None if v is None else min(1.0, v / scales[k]) for v in row] for row in gr] for k, gr in p.items()}
+        combined = [[None if all(grids[k][r][c] is None for k in grids) else max(grids[k][r][c] or 0.0 for k in grids)
+                     for c in range(GRID_COLS)] for r in range(GRID_ROWS)]
+        st = stats(combined, t["hotLine"])
+        when = f["label"]
+        most = []
+        for L in layers:
+            top = ranked(grids[L["id"]], 1, 2, 0.05)
+            if top:
+                most.append(f"Most {L['name'].lower()}: {listing(top)}.")
+        kinds = {2: "two", 3: "three", 4: "four", 5: "five"}.get(len(layers), str(len(layers)))
+        text = (f"{when}. One moment of NASA's GEOS model, with {kinds} kinds of aerosol, each measured "
+                f"against its own thickest places. " + " ".join(most))
+        frames.append({
+            "date": f.get("date"),
+            "when": when,
+            "image": f["image"],
+            "alt": f.get("alt", ""),
+            **st,
+            "grid": r3(combined),
+            "layers": {k: r3(gr) for k, gr in grids.items()},
             "text": text.strip(),
         })
     return frames
@@ -396,7 +439,8 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
 
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
-BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants, "scenes": build_scenes}
+BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts,
+            "pollutants": build_pollutants, "scenes": build_scenes, "still": build_still}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 
@@ -431,6 +475,9 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
                   "instrument": t.get("instrument", "vibraphone")},
         "legend": legend,
+        # Layers heard on their own (aerosols): id, spoken name, shortcut key, picture of it alone.
+        **({"layers": [{k: L[k] for k in ("id", "name", "key", "image") if k in L} for L in data["layers"]]}
+           if data.get("layers") else {}),
         # Names for 10-degree cells that hold a listed city, "row,col": name. Only for speech.
         "places": {f"{r},{c}": n for r in range(GRID_ROWS) for c in range(GRID_COLS) if (n := place_in(r, c))},
         "frames": frames,

@@ -123,13 +123,17 @@ export class Player {
     for (const ev of plan.events) {
       const t = time + ev.offset;
       const key = `${ev.voice}:${ev.midi}`;
-      if (t - (this._lastNote.get(key) ?? -1) < NOTE_COOLDOWN) continue;
-      this._lastNote.set(key, t);
+      // ev.free: the mapping already spaced these notes (lightning's flurries); never drop one.
+      if (!ev.free) {
+        if (t - (this._lastNote.get(key) ?? -1) < NOTE_COOLDOWN) continue;
+        this._lastNote.set(key, t);
+      }
       // ev.pos: where the note sits along the scan line (-1 = top = left ear … +1 = bottom = right ear)
       this.audio.play(ev, t, ev.pos);
       this.audio.draw(() => this.onVoice?.(ev, seg), t);
     }
     this.audio.setHum(plan.hum.level, plan.hum.pan, time, seg.stepDur, plan.hum.tension ?? 0);
+    if (plan.layers) this.audio.setLayers?.(plan.layers, time, seg.stepDur);
     this.audio.draw(() => this.onPad?.(plan.hum.level), time);
     this.audio.draw(() => this.onStep?.(seg, step, plan), time);
     if (plan.beat) {

@@ -32,6 +32,7 @@ That decided the interface before any sound was designed:
 | Ocean currents | 7, Perpetual Ocean 2: Western Boundary Currents (SVS 5425) | Bright moving water along a line through the picture |
 | Carbon dioxide | 8, DYAMOND Global Carbon Dioxide (SVS 5196) | Carbon dioxide along a line on a turning globe |
 | Lightning | 9, Lightning from the ISS 2017 to 2023 (SVS 5011) | Lightning strikes per place |
+| Aerosols | GEOS Aerosols (2025) (SVS 5669) | Black carbon, dust, sea salt and sulfate per place, at one moment |
 
 ## Reading NASA's pictures (backend/eic, Python with OpenCV)
 
@@ -64,8 +65,8 @@ pure-white core of the Gulf Stream. Dates come from NASA's matching date overlay
 22 December 2023, evenly. The eight scenes (the globe, Kuroshio, Indian Ocean, Agulhas, South
 Atlantic, Gulf Stream, Gulf of Mexico, the globe again) were timed from a contact sheet.
 
-**Night lights, carbon dioxide and lightning** are explained in each track's YAML file in
-`backend/eic/tracks/`.
+**Night lights, carbon dioxide, lightning and aerosols** are explained in each track's YAML file in
+`backend/eic/tracks/` (and aerosols also in `backend/README.md`).
 
 ## Turning numbers into sound (public/sweep, Tone.js)
 
@@ -100,6 +101,12 @@ meaning choose its mood:
   went out falls, on a cello.
 - **Carbon dioxide never goes silent.** Its drone only gets quieter, and it turns tense over the
   densest plumes.
+- **Lightning is dark but calm.** Storms are not bad news, so it is a small orchestra in E flat with no
+  clashing notes: a muted harp note for each lightning mark, a storm wind, a deep contrabass for how
+  much lightning is under the line, and strings that sit higher when the storms are farther north.
+- **Aerosols are four winds.** After the wind in NASA's NGC 1300 sonification: smoke is low, dark and a
+  little rough, with soft crackles where it is thickest; dust is grainy; sea salt is low and airy;
+  sulfate is thin and high. Listen to all four, or to one alone.
 
 ## Checking the work
 

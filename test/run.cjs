@@ -52,7 +52,15 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://localhost:8123/");
   await page.waitForFunction("window.ready === true", null, { timeout: 15000 });
-  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.textContent("#live")).trim(); };
+  // Read the live region directly: page.textContent waits on animation frames, which a slow
+  // machine with software WebGL (the globe) can starve for many seconds.
+  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.evaluate(() => document.getElementById("live").textContent)).trim(); };
+  // After an action that also swaps the globe's picture (Listen to), a slow machine may take a while
+  // to speak: wait for the answer to appear (the live region is cleared first, then filled).
+  const spoken = async () => {
+    await page.waitForFunction(() => document.getElementById("live").textContent.trim().length > 0, null, { timeout: 5000, polling: 50 }).catch(() => {});
+    return live(0);
+  };
   check("ready message tells the next step", (await live(300)).includes("Press Tab to reach the player, then Space"), await live(0));
   check("no sound before a key press", await page.evaluate("EJ.Tone.getContext().state !== 'running' || !son.playing"));
 
@@ -123,7 +131,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     if (k > 0) {
       await page.keyboard.press(String(k + 1));
       await page.waitForFunction(`window.son && son.score.id === "${ids[k]}" && !document.getElementById('play').disabled`, null, { timeout: 15000 });
-      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 5000, polling: 50 }).catch(() => {});
+      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 15000, polling: 50 }).catch(() => {});
       check(`key ${k + 1}: track ${ids[k]} chosen and announced`, (await live(0)).startsWith(`Track ${k + 1} of ${ids.length}`), await live(0));
     }
     await page.keyboard.press("Space");
@@ -160,6 +168,61 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       return { peakDb: +(20 * Math.log10(pk)).toFixed(1), rmsDb: +(10 * Math.log10(sum / l.length)).toFixed(1) };
     });
     check(`${ids[k]}: audio file render`, wav.peakDb < 0 && wav.rmsDb > -50, JSON.stringify(wav));
+    // Compare with previous part: only where the track has it (lightning), by key C and the checkbox.
+    const canCompare = await page.evaluate("son.canCompare");
+    check(`${ids[k]}: compare control shown only where it works`, (await page.isVisible("#compare")) === canCompare);
+    if (canCompare) {
+      await page.focus("#keys");
+      await page.keyboard.press("Home");
+      await page.keyboard.press("c");
+      const on = await live(300);
+      check(`${ids[k]}: C turns on compare and explains the first part`, on.startsWith("Compare with previous part on") && on.includes("nothing to compare") && await page.isChecked("#compare"), on.slice(0, 90));
+      await page.keyboard.press("ArrowRight");
+      check(`${ids[k]}: compare names both parts (after the key's own name)`, /^Next map\. Part 2 of \d+ compared with Part 1\./.test(await live()), await live(0));
+      await page.keyboard.press("d");
+      check(`${ids[k]}: D describes the change`, /compared with Part 1\. Lightning grew in/.test(await live()), (await live(0)).slice(0, 90));
+      const cmp = await page.evaluate(async () => { const b = await son.renderOffline(4); let pk = 0; for (const x of b.getChannelData(0)) pk = Math.max(pk, Math.abs(x)); return +(20 * Math.log10(pk)).toFixed(1); });
+      check(`${ids[k]}: compare pass renders`, cmp < 0 && cmp > -40, `peak ${cmp} dB`);
+      await page.keyboard.press("c");
+      check(`${ids[k]}: C turns compare off`, (await live()).startsWith("Compare off") && !(await page.isChecked("#compare")));
+    }
+    // Listen to: where the track has layers (aerosols), a radio group of All and each layer, and
+    // a letter for each in the player, never outside it.
+    const lay = await page.evaluate(() => son.layers.map((L) => ({ id: L.id, name: L.name, key: L.key })));
+    check(`${ids[k]}: Listen to shown only where it works`, (await page.isVisible("#listen-field")) === lay.length > 0);
+    if (lay.length) {
+      const radios = await page.evaluate(() => [...document.querySelectorAll("#listen-field input")].map((r) => ({ id: r.id, type: r.type, name: r.name, checked: r.checked })));
+      check(`${ids[k]}: Listen to is one radio group, All first and chosen`,
+        (await page.textContent("#listen-field legend")).trim() === "Listen to" && radios.length === lay.length + 1
+        && radios.every((r) => r.type === "radio" && r.name === "listen") && radios[0].id === "listen-all" && radios[0].checked,
+        radios.map((r) => r.id).join(", "));
+      await page.focus("#listen-all");
+      await page.keyboard.press("ArrowRight");
+      const moved = await spoken();
+      check(`${ids[k]}: arrow key chooses ${lay[0].name} and says so`, moved.startsWith(`${lay[0].name} only.`)
+        && await page.isChecked(`#listen-${lay[0].id}`) && await page.evaluate(`son.solo === "${lay[0].id}"`), moved);
+      await page.focus("#keys");
+      for (const L of lay) {
+        await page.keyboard.press(L.key.toLowerCase());
+        const said = await spoken();
+        check(`${ids[k]}: ${L.key} chooses ${L.name}`, said.startsWith(`${L.name} only.`)
+          && await page.isChecked(`#listen-${L.id}`) && await page.evaluate(`son.solo === "${L.id}"`), said);
+      }
+      await page.keyboard.press("w");
+      const where = await live();
+      check(`${ids[k]}: W says what you listen to and what is under the line`,
+        where.includes(`Listening to ${lay[lay.length - 1].name.toLowerCase()} only`) && where.includes("scan line is at"), where.slice(0, 160));
+      await page.keyboard.press("a");
+      const all = await spoken();
+      check(`${ids[k]}: A goes back to all`, /^All \w+ /.test(all) && await page.isChecked("#listen-all") && await page.evaluate("son.solo === null"), all);
+      await page.keyboard.press("h");
+      const help = await live();
+      check(`${ids[k]}: H lists the letters`, help.includes("A: all") && lay.every((L) => help.includes(`${L.key}: ${L.name.toLowerCase()} only`)));
+      await page.focus("#title");
+      await page.evaluate(() => { document.getElementById("live").textContent = "x"; });
+      await page.keyboard.press(lay[0].key.toLowerCase());
+      check(`${ids[k]}: layer letters are ignored outside the player`, (await live()) === "x" && await page.evaluate("son.solo === null"));
+    }
   }
 
   // ---- Sliders keep their own arrow keys and speak each spot.
@@ -186,7 +249,12 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     if (id === "BODY" || id === "skip") break;
     seen.push(id);
   }
-  const want = ["keys", "play", "prev", "next", "where", "describe", "help", "lon", "lat", "volume", "announce", "mono", "speak", "save"];
+  // Every enabled control (Previous and Next are disabled on a one-map track), and the Listen to
+  // group where it is shown (Tab lands on its chosen radio).
+  const want = await page.evaluate(() => [
+    ...["keys", "play", "prev", "next", "where", "describe", "help", "lon", "lat", "volume", "announce", "mono", "speak", "save"].filter((id) => !document.getElementById(id).disabled),
+    ...(document.getElementById("listen-field").hidden ? [] : [document.querySelector("#listen-field input:checked").id]),
+  ]);
   const missing = want.filter((x) => !seen.includes(x));
   check("Tab walks the whole page without a trap", !missing.length && seen.length < 150, `${seen.length} stops${missing.length ? `, never reached: ${missing}` : ""}`);
   // Every focused control shows a visible focus ring.

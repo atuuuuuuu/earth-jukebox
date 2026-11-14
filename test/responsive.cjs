@@ -56,18 +56,22 @@ function audit(touch) {
     page.on("pageerror", (e) => errors.push(String(e)));
     await page.goto("http://localhost:8124/");
     await page.waitForFunction("window.ready === true");
-    // Both kinds of stage must fit: NASA's video (carbon dioxide), then the globe (track 1).
-    const video = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === "carbon-dioxide")?.id);
-    let flat = { cut: [], overflow: 0 };
-    if (video) {
-      await page.evaluate((id) => document.getElementById(id).click(), video);
-      await page.waitForFunction("window.son && window.son.score.id === 'carbon-dioxide'");
-      flat = await page.evaluate(audit, touch);
-      await page.evaluate(() => document.querySelector('input[name="track"]').click());
-      await page.waitForFunction("window.son && window.son.score.id !== 'carbon-dioxide'");
+    // Every kind of stage must fit: NASA's video (carbon dioxide), lightning (with its compare
+    // control), aerosols (with its Listen to radios), then the globe (track 1).
+    let flat = { cut: [], small: [], overflow: 0 };
+    for (const id of ["carbon-dioxide", "lightning", "aerosols"]) {
+      const radio = await page.evaluate((v) => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === v)?.id, id);
+      if (!radio) continue;
+      await page.evaluate((x) => document.getElementById(x).click(), radio);
+      await page.waitForFunction(`window.son && window.son.score.id === '${id}'`);
+      const a = await page.evaluate(audit, touch);
+      flat = { cut: [...flat.cut, ...a.cut], small: [...flat.small, ...a.small], overflow: Math.max(flat.overflow, a.overflow) };
     }
+    await page.evaluate(() => document.querySelector('input[name="track"]').click());
+    await page.waitForFunction("window.son && window.son.score.id === document.querySelector('input[name=\"track\"]').value");
     const r = await page.evaluate(audit, touch);
     r.cut = [...new Set([...r.cut, ...flat.cut])];
+    r.small = [...new Set([...r.small, ...flat.small])];
     r.overflow = Math.max(r.overflow, flat.overflow);
     const bad = r.overflow > 0 || r.cut.length || r.small.length || errors.length;
     if (bad) failed++;

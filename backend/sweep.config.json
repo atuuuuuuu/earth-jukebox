@@ -127,10 +127,11 @@
       "code": "6",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
-      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. Each stormy place plays a drop-like note; listen to the storms swing north and south with the seasons.",
+      "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
       "data": "data/07_lightning.json",
       "chapter": "parts",
-      "instrument": "kalimba",
+      "mapping": "lightning",
+      "instrument": "harp",
       "units": "share of the most lightning",
       "range": [
         0,
@@ -148,6 +149,34 @@
       "latRange": [
         -55,
         55
+      ]
+    },
+    {
+      "id": "aerosols",
+      "code": "7",
+      "title": "Aerosols",
+      "subtitle": "Four winds, 19 August 2025",
+      "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
+      "data": "data/03_aerosols.json",
+      "chapter": "still",
+      "mapping": "aerosols",
+      "units": "share of the thickest places of each aerosol",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "aerosol map",
+        "dates": "moment",
+        "what": "aerosol",
+        "top": "thickest",
+        "missing": "not read."
+      },
+      "latRange": [
+        -90,
+        90
       ]
     }
   ]

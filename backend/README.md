@@ -18,7 +18,7 @@ NASA video ──backend/eic (OpenCV)──> public/data/*.json ──build_swee
 | `eic/` | Team RUSTMN's pipeline: one YAML and one builder per track, video to 3-degree grids and map images (see `eic/README.md`) |
 | `build_sweep.py` + `sweep.config.json` | Grids to scores: 10-degree squares, statistics, and the spoken description of every map, naming nearby cities |
 | `validate_api.py` | Checks every API file against `API.md`. GitHub runs it before every deploy |
-| `tests/` | Known answers in, the same answers out: the score builder, the validator, the lightning correction |
+| `tests/` | Known answers in, the same answers out: the score builders and the validator |
 
 ## Set up once
 
@@ -48,6 +48,7 @@ python3 backend/validate_api.py public               # "API OK"
 | `07_ocean_currents` | `perpetual_ocean2_CLOSE_093_clean_noDate_1080p30.mp4` ([5425](https://svs.gsfc.nasa.gov/5425/)) |
 | `06_co2_dyamond` | `dyamondPointCloud_12-1-2023b_dyamond_co2_anim_globe_orbit_1080p30_h265.mp4` ([5196](https://svs.gsfc.nasa.gov/5196/)) |
 | `07_lightning` | `iss_lightning_sos_yearly_07312023_2048p60.mp4`, the flat Science On a Sphere version ([5011](https://svs.gsfc.nasa.gov/5011/)); the turning-globe `iss_lightning_sphere_*.mp4` cannot be read this way |
+| `03_aerosols` | one still, `Aerosols_2025-08-19T20_00_00_7680x4320.png`, and its key `Aerosols_cbar.png` ([5669](https://svs.gsfc.nasa.gov/5669/)) |
 
 ## Explaining it to the judges
 
@@ -56,14 +57,18 @@ video, calibrated against 10 known cities, with the lights separated from the ba
 dioxide: a thin line through the centre of NASA's turning globe, read every 3 hours of model time.
 Air quality: four pollutants in strips that slide over one flat map; each strip is found in every
 frame and its colours rebuilt into a whole world map per pollutant. Ocean: a line through the middle
-of NASA's moving camera view, ten readings per second of video. Lightning: the flat world-map movie, where yellow dots are strikes; we average them over 14 equal
-parts of the record, in order.
+of NASA's moving camera view, ten readings per second of video. Lightning: the flat world-map
+movie at its own 4096 x 2048 pixels, where yellow dots are strikes; over 14 equal parts of the
+record, in order, each dot is counted once, when it first appears, and the share of each place
+covered by dots is averaged. Aerosols: one 8K still of NASA's GEOS model.
 
-**Why is lightning corrected?** The space station's orbit is tilted 51.6 degrees, so it turns round
-near 50 degrees north and south and passes over those latitudes about four times as often as over
-the equator. NASA's movie shows every strike the sensor saw, so storms there look bigger than they
-are. We divide by how long the sensor looks at each latitude (`iss_view_weight`, tested against the
-orbit formula), for the sound, the words and the picture alike.
+**How are four aerosols told apart?** NASA draws black carbon, dust, sea salt and sulfate as
+half-see-through colours that overlap. After painting over city lights and fire dots, we take the
+bare map away (dark ocean; grey land and ice, placed from the Blue Marble) and split each pixel into
+the colours of NASA's own key, in linear light, using the fewest aerosols that explain the colour.
+Sea salt is read only over the sea and near coasts, because inland, dust over sulfate mixes to the
+same grey-teal. `python3 -m pipeline.validate --track 03` checks known places (Saharan dust, African
+smoke, Southern Ocean sea salt, Asian sulfate) and writes heat maps to `eic/debug/`.
 
 **Why weight by latitude?** On a flat world map every pixel is the same size, but near the poles a
 pixel covers much less of the Earth, so each one counts by cos(latitude).
@@ -74,7 +79,8 @@ during judging.
 
 **What are the limits?** Values come from the colours of NASA's videos, so they are relative levels,
 not satellite units. The lightning movie has no dates, so its parts are equal stretches of the movie,
-not calendar months.
+not calendar months. The aerosol key has no numbers, so each aerosol is measured against its own
+thickest places: a loud dust wind and a loud sulfate wind are not the same amount.
 
 ## Before you submit
 

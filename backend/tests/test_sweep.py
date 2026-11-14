@@ -94,6 +94,92 @@ class NewBuilders(unittest.TestCase):
         self.assertIsNone(out[0]["grid"][2][0])      # 60-70 N: beyond what the station sees
         self.assertIsNone(out[0]["date"])
         self.assertEqual(out[0]["when"], "Part 1 of 2")
+        self.assertNotIn("marks", out[0]["text"])    # no count from the pipeline: nothing said
+
+    def test_parts_say_about_how_many_marks(self):
+        g = fine()
+        g[at(0, 20)] = 100
+        frames = [{"label": "Part 1 of 2", "image": "1.webp", "glow": g, "core": g, "total": 1.0, "markCount": 58153},
+                  {"label": "Part 2 of 2", "image": "2.webp", "glow": g, "core": g, "total": 1.0, "markCount": 87}]
+        out = bs.build_parts({"grid": G}, {"frames": frames}, {"hotLine": 0.5, "latRange": [-55, 55]})
+        self.assertIn("About 58,000 separate lightning marks appear in NASA's movie during this part.", out[0]["text"])
+        self.assertIn("About 87 separate lightning marks", out[1]["text"])
+
+
+class Still(unittest.TestCase):
+    """One still map with layers (aerosols)."""
+    LAYERS = [{"id": "smoke", "name": "Black carbon", "key": "B", "wind": "smoke", "image": "media/smoke.webp"},
+              {"id": "dust", "name": "Dust", "key": "U", "wind": "sand", "image": "media/dust.webp"}]
+
+    def data(self):
+        smoke, dust = fine(), fine()
+        smoke[at(-4.5, 16.5)] = 100        # by Kinshasa
+        dust[at(25.5, 10.5)] = 60          # central Sahara
+        frame = {"label": "19 August 2025, 20:00 UTC", "date": "2025-08-19", "image": "media/a.webp",
+                 "core": fine(), "glow": fine(), "layers": {"smoke": smoke, "dust": dust}}
+        return {"grid": G, "layers": self.LAYERS}, {"id": "still", "secondsPerSweep": 35, "frames": [frame]}
+
+    def test_each_layer_has_its_own_scale_and_grid_is_the_strongest(self):
+        data, chapter = self.data()
+        f = bs.build_still(data, chapter, {"hotLine": 0.5, "latRange": [-90, 90]})[0]
+        kin = (int((90 + 4.5) // 10), int((16.5 + 180) // 10))
+        sah = (int((90 - 25.5) // 10), int((10.5 + 180) // 10))
+        self.assertEqual(set(f["layers"]), {"smoke", "dust"})
+        self.assertEqual(f["layers"]["smoke"][kin[0]][kin[1]], 1.0)
+        self.assertEqual(f["layers"]["dust"][kin[0]][kin[1]], 0.0)
+        self.assertEqual(f["layers"]["dust"][sah[0]][sah[1]], 1.0)   # its own scale: 60 is dust's thickest
+        self.assertEqual(f["grid"][kin[0]][kin[1]], 1.0)
+        self.assertEqual(f["grid"][sah[0]][sah[1]], 1.0)
+        self.assertEqual(f["date"], "2025-08-19")
+        self.assertTrue(f["text"].startswith("19 August 2025, 20:00 UTC. "))
+        self.assertIn("two kinds of aerosol", f["text"])
+        self.assertIn("Most black carbon: around Kinshasa.", f["text"])
+
+    def make_public(self, tmp):
+        public = Path(tmp)
+        (public / "data").mkdir()
+        (public / "media").mkdir()
+        for img in ("a", "smoke", "dust"):
+            (public / f"media/{img}.webp").write_bytes(b"x")
+        data, chapter = self.data()
+        data.update({
+            "source": {"svs_title": "GEOS Aerosols (2025)", "url": "https://svs.gsfc.nasa.gov/5669/",
+                       "credit": "NASA SVS", "visualizer": "", "dataset": "GEOS"},
+            "legend": {"summary": "S.", "method": "M.", "caveat": "C.", "items": [{"sound": "Wind", "meaning": "air"}]},
+            "chapters": [chapter],
+        })
+        (public / "data/aer.json").write_text(json.dumps(data))
+        cfg = {"out": str(public), "tracks": [
+            {"id": "aer", "code": "5", "title": "Aerosols", "data": "data/aer.json", "chapter": "still",
+             "mapping": "aerosols", "units": "share", "range": [0, 1], "hotLine": 0.5, "words": WORDS,
+             "latRange": [-90, 90]}]}
+        cfg_path = public / "sweep.config.json"
+        cfg_path.write_text(json.dumps(cfg))
+        return public, cfg_path
+
+    def test_still_track_follows_the_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.make_public(tmp)
+            bs.main(cfg)
+            self.assertEqual(validate_api.check(public), [])
+            s = json.loads((public / "api/scores/aer.json").read_text())
+            self.assertEqual(s["layers"], [{k: L[k] for k in ("id", "name", "key", "image")} for L in self.LAYERS])
+            self.assertEqual(s["sweep"]["chapter"], "still")
+            entry = json.loads((public / "api/tracks.json").read_text())["tracks"][0]
+            self.assertEqual((entry["firstDate"], entry["when"]), ("2025-08-19", "19 August 2025, 20:00 UTC"))
+
+    def test_validator_catches_a_missing_layer_and_a_taken_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.make_public(tmp)
+            bs.main(cfg)
+            p = public / "api/scores/aer.json"
+            s = json.loads(p.read_text())
+            del s["frames"][0]["layers"]["dust"]
+            s["layers"][0]["key"] = "W"            # the player's "where am I"
+            p.write_text(json.dumps(s))
+            problems = validate_api.check(public)
+            self.assertTrue(any("layer 'dust'" in m for m in problems))
+            self.assertTrue(any("layer keys" in m for m in problems))
 
     def test_pollutants_skip_unread_cells_and_name_the_thickest(self):
         v = fine(10)
