@@ -9,7 +9,8 @@ const T = window.EJ.Tone;
 export async function renderBuffer({ track, mapping, settings, from = 0, seconds = 20, sampleRate = 44100, mute = [] }) {
   const tail = 4;
   const buffer = await T.Offline(async () => {
-    const audio = new AudioEngine({ offline: true, humNotes: mapping.HUM_NOTES, settings });
+    const audio = new AudioEngine({ offline: true, humNotes: mapping.HUM_NOTES, settings, synths: mapping.SYNTHS });
+    audio.muted = new Set(mute);   // synth voices: the file sounds like the mixer
     await audio.init();
     // solo/mute for analysis: 'notes' | 'cello' | 'hum'
     if (mute.includes('hum')) audio.humBus.level.disconnect();

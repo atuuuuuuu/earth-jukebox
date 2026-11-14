@@ -141,7 +141,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       && (ids[k] !== "ocean-currents" || /The camera is over .+\d{4}|\d{4}\. The camera is over/.test(wk)), wk.slice(0, 140));
     await page.keyboard.press("Space");   // pause
     const axe = await page.evaluate(AXE);
-    check(`${ids[k]}: axe`, axe.violations.length === 0, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", ") || `${axe.passes.length} rules passed`);
+    check(`${ids[k]}: axe`, axe.violations.length === 0, axe.violations.map((v) => `${v.id} (${v.nodes.length}) ${v.nodes.map((n) => n.html.slice(0, 90) + " " + n.any.map((a) => a.message).join()).join(" | ")}`).join(", ") || `${axe.passes.length} rules passed`);
     // Hear an example, then its meaning is spoken.
     const demo = await page.evaluate(() => { const b = document.querySelector("#demos button"); b.click(); return b.querySelector("b").textContent; });
     await page.waitForFunction("document.getElementById('live').textContent.length > 20 && !document.getElementById('live').textContent.startsWith('Paused')", null, { timeout: 8000, polling: 100 });

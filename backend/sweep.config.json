@@ -149,6 +149,31 @@
         -55,
         55
       ]
+    },
+    {
+      "id": "aerosols",
+      "code": "7",
+      "title": "The air we share",
+      "subtitle": "Smoke, dust, sea salt and sulfate, 19 August 2025",
+      "description": "NASA's model of the particles in the air at one moment: four instruments play together as Earth turns under the needle, then NASA's six stories, from Hurricane Erin to Mount Etna. Mute or solo any instrument in the mixer.",
+      "data": "data/05_aerosols.json",
+      "chapter": "sides",
+      "mapping": "aerosols",
+      "instrument": "none",
+      "units": "how strongly a place shows the loudest particle's colour",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "aerosol map",
+        "dates": "story",
+        "what": "particles",
+        "top": "thickest",
+        "missing": "not read."
+      }
     }
   ]
 }

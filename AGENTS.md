@@ -2,14 +2,15 @@
 
 NASA Space Apps 2026, "The Earth Information Jukebox". NASA Earth Information Center videos become
 numbers (the backend), and the numbers become sound live in the browser. The tracks are the
-challenge's NASA resources (numbered as on its Resources tab) 1 and 3 (night lights), 6 (air quality),
+challenge's NASA resources (numbered as on its Resources tab) 1 and 3 (night lights), 5 (GEOS aerosols), 6 (air quality),
 7 (Perpetual Ocean 2), 8 (carbon dioxide) and 9 (lightning). 1, 6 and 7 come first.
 
 ## Layout
 
 - `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built: Tone.js as `EJ.Tone`, and `EJ.toWav`), `textures/` (NASA Blue Marble), `api/` (scores), `data/` (3 degree grids), `media/` (map images, the CO2 and ocean videos), `samples/`
-- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/ocean.js`. Lightning and air quality use the night-lights mapping (kalimba; vibraphone with a sour drone for the `pollutants` chapter)
+- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/ocean.js` / `tracks/aerosols.js`. Aerosols (resource 5, from team BoboMimi's TerraJuke) play on four synth voices, each on its own bus, so the mixer (`#mixer` in app.js) can mute or solo one live. Lightning and air quality use the night-lights mapping (kalimba; vibraphone with a sour drone for the `pollutants` chapter)
 - `backend/eic/` team RUSTMN's pipeline: NASA videos to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`
+- `backend/build_aerosols.py`: NASA's GEOS aerosol still (pinned in `backend/aerosols/`) to `public/data/05_aerosols.json`, standard library only (`npm run aerosols`)
 - `backend/build_sweep.py` + `backend/sweep.config.json`: grids to `public/api`. `backend/API.md` is the contract, `backend/validate_api.py` enforces it
 - `test/run.cjs` the real page by keyboard, with axe. `test/responsive.cjs` every layout from 320 to 1440 px. `backend/tests/` the score builder, the validator and the lightning correction (`npm run test:backend`)
 

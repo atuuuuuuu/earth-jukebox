@@ -49,7 +49,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`), `mapping` (`night-lights`, `co2` or `ocean`), `instrument` (`vibraphone`, `harp`, `kalimba`) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`, `sides`), `mapping` (`night-lights`, `co2`, `ocean` or `aerosols`), `instrument` (`vibraphone`, `harp`, `kalimba`, or `none` for a track played on synth voices) |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
 | `frames` | The maps, in playing order |
@@ -77,4 +77,6 @@ Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 - every `text` starts with its map's `when` (or date)
 - dated maps are in date order
 - `sweep.src` exists, its chapter has as many maps with the same images, and its arrays are full size
+  (for `aerosols`: every slice has one `[amount, lat]` per voice; `data/05_aerosols.json` is written by
+  `backend/build_aerosols.py`, which also holds `voices`, `rules` and the 18 x 36 `cells` for one place)
 - each score stays under 2 MB

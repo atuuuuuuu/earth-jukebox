@@ -39,6 +39,13 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
     chapter = next((c for c in data.get("chapters", []) if c.get("id") == sw.get("chapter")), None)
     if chapter is None:
         return [f"{where}: sweep chapter '{sw.get('chapter')}' not in {src.name}"]
+    if sw.get("mapping") == "aerosols":   # one still, cut into slices (backend/build_aerosols.py)
+        for n, fine in enumerate(chapter["frames"], 1):
+            if not fine.get("steps") or any(len(st.get("mix") or []) != len(data.get("voices") or [1]) for st in fine["steps"]):
+                out.append(f"{where} frame {n}: every slice needs one [amount, lat] per voice")
+        if len(chapter["frames"]) != len(s.get("frames") or []):
+            out.append(f"{where}: {len(s.get('frames') or [])} frames but sweep chapter has {len(chapter['frames'])}")
+        return out
     if not g and len(data.get("line") or []) != data.get("steps", -1) * data.get("rows", -1):
         out.append(f"{where}: spin sweep data must hold steps x rows values in 'line'")
     if len(chapter["frames"]) != len(s.get("frames") or []):

@@ -26,6 +26,7 @@ Resource numbers are the order on the challenge's Resources tab.
 | 4 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
 | 5 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
+| 7 | **The air we share**, smoke, dust, sea salt and sulfate on 19 August 2025: four instruments around the world, then NASA's six stories, with a mixer | 5: [GEOS Aerosols](https://svs.gsfc.nasa.gov/5669/) |
 
 ## Using it without sight
 
@@ -94,6 +95,9 @@ npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_dyamond, 07_ocea
 npm run api && npm run validate
 ```
 
+The air we share is read from NASA's still image instead (pinned with SHA-256 hashes in
+`backend/aerosols/svs5669.provenance.json`), with the standard library only: `npm run aerosols && npm run api`.
+
 ## How it works
 
 1. **Reading NASA's video** (`backend/eic/`, team RUSTMN's pipeline, numpy and OpenCV). Each track's
@@ -107,6 +111,12 @@ npm run api && npm run validate
    station looks at each latitude (its orbit turns round near 50 degrees north and south, so it sees
    those storms about four times as often as storms at the equator). Output: a 3 degree grid per map
    (or one line per step) in `public/data/` and images or video in `public/media/`.
+   The air we share (`backend/build_aerosols.py`, adapted from team BoboMimi's TerraJuke): every other
+   pixel of NASA's GEOS aerosol still is placed on NASA's own colour bar; the nearest colour decides
+   smoke, dust, sea salt or sulfate, and how strongly the pixel shows it decides how much. The world is
+   cut into 64 slices of longitude, and each of NASA's six stories into 8. Each aerosol plays its own
+   synth voice (smoky brass, desert strings, ocean bed, glass bells): louder for more, higher further
+   north, on one D minor pentatonic scale. The mixer's Mute and Solo change what you hear, never a note.
 2. **Scores** (`backend/build_sweep.py`, standard library). Pools the grid to 10 degree squares, adds
    statistics and the spoken description of every map (naming the cities in the busiest squares), and
    writes `public/api/` following `backend/API.md`. `backend/validate_api.py` checks it.
@@ -132,6 +142,10 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
   AJ Christensen, Greg Shirah, Helen-Nicole Kostis, Mark SubbaRao; DYAMOND, GEOS-MITgcm. Lightning:
   Lightning Imaging Sensor on the ISS, NASA GHRC DAAC. Air quality: NASA GEOS-CF. Ocean: Greg
   Shirah, Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL); ECCO2.
+  Aerosols: NASA GMAO and SVS, Joseph V. Ardizzone, Helen-Nicole Kostis; scientist Lesley Ott; GEOS-FP
+  2 km replay (a model). Aerosol reading and sound design: TerraJuke, team BoboMimi (Chia Yuen Kai,
+  Jacy Chiong Yet Suu). NASA's colour bar has no numbers, so loudness follows colour strength, never
+  aerosol optical depth or concentration.
 - Values are read from the colours of NASA's videos, so they are relative levels, not satellite units.
   The lightning video has no date label and its speed is uneven, so it is split into 14 equal parts
   and no part claims a month or date. Lightning is corrected for how often the space station looks

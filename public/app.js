@@ -186,6 +186,13 @@
       loadImg(score.frames[(i + 1) % n()].image);   // the next map, ready before it is needed
     }
     syncVideo(true);
+    // The air we share: a story's window lights up on the globe, and the globe turns to it.
+    if (globe) {
+      const fine = son?.kind === "aerosols" ? son.track.chapters[0].frames[i] : null;
+      globe.box = fine?.box ? { lon0: fine.box[0], lat0: fine.box[1], lon1: fine.box[2], lat1: fine.box[3], color: rgbOf(mixer.colour[fine.aerosol]) } : null;
+      if (fine?.box) globe.lookAt((fine.box[0] + fine.box[2]) / 2, (fine.box[1] + fine.box[3]) / 2);
+      else if (fine) globe.targetTilt = 12;
+    }
   };
 
   // Carbon dioxide is NASA's own turning-globe video: keep it in step with the sound.
@@ -204,6 +211,12 @@
     $("stage-fill").style.width = `${son.progress() * 100}%`;
     const here = son.placeNow();
     if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
+    const slice = son.sliceNow();
+    if (slice) {
+      const l = Math.round(wrapLon(slice.lon));
+      $("stage-when").textContent = `${son.frame().when} · ${Math.abs(l)}°${l < 0 ? "W" : l > 0 ? "E" : ""}`;
+      $("stage-caption").textContent = slice.words;
+    }
     syncVideo();
     requestAnimationFrame(tick);
   };
@@ -220,7 +233,9 @@
   const onNote = (note) => {
     lastNote = note;
     buzz(Math.round(12 + 30 * (note.velocity ?? 0.5)));
-    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
+    const colour = mixer.colour[note.kind];
+    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, colour ? rgbOf(colour) : note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
+    if (colour) mixer.meter(note);
   };
   const onEnd = () => {
     playing = false; setPlayButton(); idle();
@@ -279,6 +294,10 @@
     $("map-field").hidden = n() < 2;
     $("prev").disabled = $("next").disabled = n() < 2;
     renderSounds();
+    mixer.build();
+    $("stage").classList.toggle("is-air", son.kind === "aerosols");
+    $("stage-caption").hidden = son.kind !== "aerosols";
+    $("stage-caption").textContent = "";
     showFrame(0);
     idle();
     $("play").disabled = false;
@@ -354,6 +373,11 @@
           const p = lastNote.pos;
           s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
         }
+      } else if (son.sliceNow()) {
+        const sl = son.sliceNow();
+        s += `Playing. The needle is at ${lonWords(sl.lon)}, ${Math.round(son.progress() * 100)} percent of the way through this map. Heard here: ${sl.words}.`;
+        const off = mixer.voices.filter((v) => !mixer.audible(v.id)).map((v) => v.name.toLowerCase());
+        if (off.length) s += ` Silenced in the mixer: ${off.join(", ")}.`;
       } else {
         s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across.`;
         if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest hum.` : " It is crossing a quiet stretch.";
@@ -444,6 +468,78 @@
   // Escape stops sound and speech anywhere (it is not a character key, so it cannot clash).
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopAll(); });
   $("keys").addEventListener("click", () => $("keys").focus());
+
+  // ---------- The mixer (The air we share): Mute and Solo per instrument, live meters ----------
+  // Ported from TerraJuke's AirMixer. Mute and Solo change what you hear, never a note; the choice
+  // stays while you move between maps, and the saved audio file sounds the same.
+  const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+  const mixer = {
+    voices: [], colour: {}, muted: new Set(), solo: new Set(),
+    audible(id) { return this.solo.size ? this.solo.has(id) : !this.muted.has(id); },
+    build() {
+      this.voices = son.voices();
+      this.colour = Object.fromEntries(this.voices.map((v) => [v.id, v.colour]));
+      $("mixer").hidden = !this.voices.length;
+      const box = $("mixer-strips");
+      box.innerHTML = "";
+      this.voices.forEach((v, i) => {
+        const row = document.createElement("div");
+        row.className = "strip"; row.dataset.voice = v.id;
+        row.style.setProperty("--track", v.colour); row.style.setProperty("--i", i);
+        row.innerHTML = '<span class="strip-sw" aria-hidden="true"></span><span class="strip-name"><b></b><small></small></span>'
+          + '<span class="strip-note" aria-hidden="true">·</span><span class="strip-meter" aria-hidden="true"><span></span></span>'
+          + '<span class="strip-btns"><button type="button" class="btn" data-act="mute" aria-pressed="false">M</button><button type="button" class="btn" data-act="solo" aria-pressed="false">S</button></span>';
+        row.querySelector("b").textContent = v.name;
+        row.querySelector("small").textContent = `${v.instrument} · ${(v.share * 100).toFixed(1)}% of the map`;
+        row.querySelector('[data-act="mute"]').setAttribute("aria-label", `Mute ${v.name}`);
+        row.querySelector('[data-act="solo"]').setAttribute("aria-label", `Solo ${v.name}`);
+        box.append(row);
+      });
+      this.apply();
+    },
+    apply() {
+      for (const row of $("mixer-strips").children) {
+        const id = row.dataset.voice;
+        row.querySelector('[data-act="mute"]').setAttribute("aria-pressed", this.muted.has(id));
+        row.querySelector('[data-act="solo"]').setAttribute("aria-pressed", this.solo.has(id));
+        row.classList.toggle("is-silent", !this.audible(id));
+      }
+      son?.setMuted(this.voices.filter((v) => !this.audible(v.id)).map((v) => v.id));
+    },
+    toggle(act, id) {
+      const set = act === "mute" ? this.muted : this.solo;
+      set.has(id) ? set.delete(id) : set.add(id);
+      this.apply();
+      const v = this.voices.find((x) => x.id === id);
+      const heard = this.voices.filter((x) => this.audible(x.id)).map((x) => x.instrument.toLowerCase());
+      const what = act === "mute" ? (set.has(id) ? "muted" : "unmuted") : (set.has(id) ? "solo on" : "solo off");
+      say(`${v.name} ${what}. ${heard.length ? `You hear: ${heard.join(", ")}.` : "Every instrument is silent."}`);
+    },
+    // A meter jumps to the note's loudness and falls back over about two slices; reduced motion just shows the level.
+    meter(note) {
+      const row = $("mixer-strips").querySelector(`[data-voice="${note.kind}"]`);
+      if (!row) return;
+      const bar = row.querySelector(".strip-meter span"), level = Math.max(0.02, note.velocity ?? 0);
+      row.querySelector(".strip-note").textContent = `${NOTE_NAMES[note.midi % 12]}${Math.floor(note.midi / 12) - 1}`;
+      row.classList.add("is-sounding");
+      clearTimeout(row._t);
+      const fall = Math.max(220, son.settings.sliceSeconds * 1800);
+      row._t = setTimeout(() => { row.classList.remove("is-sounding"); row.querySelector(".strip-note").textContent = "·"; }, fall);
+      bar.style.transition = "none";
+      bar.style.transform = `scaleX(${level})`;
+      if (reduced.matches) return;
+      void bar.offsetWidth;   // start the fall from the new level
+      bar.style.transition = `transform ${fall}ms cubic-bezier(.2, .8, .2, 1)`;
+      bar.style.transform = "scaleX(0.02)";
+    },
+  };
+  $("mixer-strips").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (!b) return;
+    if ($("clicks").checked) son?.earcon("ok");
+    mixer.toggle(b.dataset.act, b.closest(".strip").dataset.voice);
+  });
 
   // ---------- What the sounds mean, and examples ----------
   let demoTimer;

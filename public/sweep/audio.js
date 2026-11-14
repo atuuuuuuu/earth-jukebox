@@ -58,14 +58,15 @@ function fallbackVoice(kind) {
 
 export class AudioEngine {
   /** @param {{offline?: boolean, humNotes: number[], settings: object}} opts */
-  constructor({ offline = false, humNotes = [], settings }) {
+  constructor({ offline = false, humNotes = [], settings, synths = null }) {
     this.offline = offline;
+    this.synthSpec = synths;  // tracks played on synth voices (aerosols): { id: {kind, options, trim, lowpass} }
     this.humNotes = humNotes;
     this.settings = settings;
     this.ready = false;
     this.usingFallback = [];
     this.userDb = 0;
-    this.muted = new Set();   // mixer: 'notes' | 'cello' | 'hum'
+    this.muted = new Set();   // mixer: 'notes' | 'cello' | 'hum', or a synth voice id
     this.nodes = [];
   }
 
@@ -126,10 +127,24 @@ export class AudioEngine {
       envelope: { attack: 0.004, decay: 0.32, sustain: 0, release: 0.1 },
     })).connect(this.beatGain);
 
-    await Promise.all([
-      this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'),
-      this.setInstrument(this.settings.instrument),
-    ]);
+    // Synth voices, one bus each, so the mixer can mute or solo a voice live without changing a note.
+    this.synths = {};
+    for (const [id, v] of Object.entries(this.synthSpec || {})) {
+      const b = bus();
+      const panner = k(new T.Panner(0)).connect(b.level);
+      const into = v.lowpass ? k(new T.Filter({ type: 'lowpass', frequency: v.lowpass, Q: 0.8 })).connect(panner) : panner;
+      const synth = k(new T.PolySynth(T[v.kind], v.options)).connect(into);
+      synth.maxPolyphony = 12;
+      this.synths[id] = { ...b, panner, synth, trim: v.trim };
+    }
+
+    // A track on synth voices needs no samples (instrument "none"): nothing to download.
+    if (this.settings.instrument !== 'none') {
+      await Promise.all([
+        this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'),
+        this.setInstrument(this.settings.instrument),
+      ]);
+    }
     this.apply();
     await this.reverb.ready;
     this.ready = true;
@@ -179,6 +194,10 @@ export class AudioEngine {
       voice.panners.forEach((p, i) => { p.pan.value = ((i / (PAN_SLOTS - 1)) * 2 - 1) * s.width; });
     }
     for (const smp of this.notes.samplers) if (smp && 'release' in smp) smp.release = Math.max(0.3, s.ring * 0.6);
+    for (const [id, v] of Object.entries(this.synths || {})) {
+      v.level.gain.rampTo(on(id) * dbToGain(v.trim + s.notes), 0.03);
+      v.send.gain.value = s.notesReverb;
+    }
   }
 
   async unlock() {
@@ -189,6 +208,13 @@ export class AudioEngine {
 
   /** @param pos position along the scan line: -1 = top (north) … +1 = bottom (south) */
   play(ev, time, pos) {
+    const syn = this.synths?.[ev.voice];
+    if (syn) {
+      // shortcut: one panner per voice, so a note still ringing moves with the next one; fine for one note per slice.
+      syn.panner.pan.setValueAtTime(clamp(pos, -1, 1) * this.settings.width, time);
+      syn.synth.triggerAttackRelease(T.Frequency(ev.midi, 'midi').toFrequency(), ev.duration, time, ev.velocity);
+      return;
+    }
     const voice = ev.voice === 'cello' ? this.cello : this.notes;
     const slot = Math.round(((clamp(pos, -1, 1) + 1) / 2) * (PAN_SLOTS - 1));
     const smp = voice.samplers[slot] ?? voice.samplers[(PAN_SLOTS - 1) / 2];
@@ -221,6 +247,7 @@ export class AudioEngine {
     this.humGain.gain.setValueAtTime(this.humGain.gain.value, t);
     this.humGain.gain.linearRampToValueAtTime(0, t + 0.25);
     for (const voice of [this.notes, this.cello]) for (const s of voice.samplers) s?.releaseAll(t);
+    for (const v of Object.values(this.synths || {})) v.synth.releaseAll(t);
     if (!this.offline) T.getDraw().cancel(0);
   }
 
