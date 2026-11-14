@@ -16,6 +16,8 @@ COLS, GRID_COLS, GRID_ROWS = 16, 36, 18
 TRACK_KEYS = ("id", "code", "title", "score", "frames", "firstDate", "lastDate", "units", "source")
 SCORE_KEYS = ("api", "id", "units", "range", "hotLine", "ninoLine", "leftLon", "tuning", "frames")
 FRAME_KEYS = ("date", "image", "mean", "spread", "hot", "clusters", "valid", "columns", "grid", "text")
+# Letters the player already uses (public/app.js): play (K), W, D, H, S, M, C, and A for "all layers".
+PLAYER_KEYS = set("kwdhsmca")
 
 
 def is_date(s) -> bool:
@@ -51,6 +53,9 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
         arrays = [k for k in ("core", "glow", "gain", "loss") if k in fine]
         if not arrays or any(len(fine[k]) != cells for k in arrays):
             out.append(f"{where} frame {n}: sweep arrays must each hold {cells} cells")
+        for L in s.get("layers") or []:
+            if len((fine.get("layers") or {}).get(L.get("id"), [])) != cells:
+                out.append(f"{where} frame {n}: sweep data needs {cells} cells for layer '{L.get('id')}'")
     if not (s.get("legend") or {}).get("items"):
         out.append(f"{where}: a sweep score needs a legend with items (the Key reads it)")
     return out
@@ -95,6 +100,25 @@ def check(public: Path) -> list[str]:
         if len(frames) != t.get("frames"):
             bad(f"{where}: tracks.json says {t.get('frames')} frames, score has {len(frames)}")
         in_range = lambda x: x is None or (isinstance(x, (int, float)) and lo - 1e-6 <= x <= hi + 1e-6)
+        is_grid = lambda g: (isinstance(g, list) and len(g) == GRID_ROWS
+                             and all(isinstance(r, list) and len(r) == GRID_COLS and all(in_range(x) for x in r) for r in g))
+
+        layers = s.get("layers")
+        if layers is not None:
+            ids, keys = [L.get("id") for L in layers], [str(L.get("key", "")).lower() for L in layers]
+            if not layers or len(set(ids)) != len(ids) or not all(ids):
+                bad(f"{where}: layers need unique ids")
+            if len(set(keys)) != len(keys) or any(len(k) != 1 or not k.isalpha() or k in PLAYER_KEYS for k in keys):
+                bad(f"{where}: layer keys must be different single letters the player does not use ({''.join(sorted(PLAYER_KEYS))})")
+            for L in layers:
+                if not L.get("name"):
+                    bad(f"{where}: layer '{L.get('id')}' has no name")
+                if L.get("image") and not (public / L["image"]).is_file():
+                    bad(f"{where}: layer image not found: {L['image']}")
+            for n, f in enumerate(frames, 1):
+                for i in ids:
+                    if not is_grid((f.get("layers") or {}).get(i)):
+                        bad(f"{where} frame {n}: layer '{i}' must be {GRID_ROWS} rows of {GRID_COLS} numbers or nulls inside the range")
 
         for n, f in enumerate(frames, 1):
             at = f"{where} frame {n}"

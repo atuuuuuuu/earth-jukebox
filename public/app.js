@@ -150,6 +150,14 @@
   const whenOf = (i) => son?.mapName?.(i) ?? score.frames[i].when;
   // "Part 4 of 14" already counts itself; other names get "map 4 of 14".
   const mapText = (i) => (/ of \d+\b/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, map ${i + 1} of ${n()}`);
+  // Layers of one map, heard all together or one alone (aerosols): from the score, never hardcoded.
+  const layers = () => son?.layers ?? [];
+  const layerName = (id) => layers().find((L) => L.id === id)?.name ?? "";
+  const countWord = (k) => ["no", "one", "two", "three", "four", "five", "six"][k] ?? String(k);
+  const allText = () => `all ${countWord(layers().length)} ${score.words.what}s`;
+  const listenText = (id = son?.solo) => (id ? `${layerName(id)} only` : `${allText()[0].toUpperCase()}${allText().slice(1)}`);
+  // The picture of the map, or of the one layer heard alone.
+  const imageOf = (i) => (son?.solo && layers().find((L) => L.id === son.solo)?.image) || score.frames[i].image;
 
   const setPlayButton = () => {
     $("play").dataset.state = playing ? "playing" : "paused";
@@ -166,8 +174,9 @@
     else $("globe").setAttribute("aria-label", `3D globe: ${label}`);
     $("map-img").alt = label;
     if (!usesVideo()) {
-      if (globe) loadImg(f.image).then((im) => { if (im && score.frames[i] === f) globe.setFrame(im); });
-      else { $("map-img").src = f.image; }
+      const src = imageOf(i);
+      if (globe) loadImg(src).then((im) => { if (im && score.frames[i] === f && imageOf(i) === src) globe.setFrame(im); });
+      else { $("map-img").src = src; }
       loadImg(score.frames[(i + 1) % n()].image);   // the next map, ready before it is needed
     }
     syncVideo(true);
@@ -263,16 +272,54 @@
     // Compare with previous part: only where the track has it, and always off when a track loads.
     $("compare").checked = false;
     $("compare-field").hidden = !son.canCompare;
+    renderListen();
     renderSounds();
     showFrame(0);
     idle();
     $("play").disabled = false;
     window.ready = true;
     if (announce) {
-      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. `
+      // A track with layers says how to hear one alone: "Press B, U, T or L for black carbon, dust, …"
+      const L = layers();
+      const choose = L.length
+        ? `${listenText(null)} play together. Press ${orList(L.map((x) => x.key.toUpperCase()))} for ${orList(L.map((x) => x.name.toLowerCase()))} alone. `
+        : "";
+      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}`
         + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
     }
   };
+  const orList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`);
+
+  // ---------- Listen to: all layers, or one alone (aerosols) ----------
+  // Native radios in a fieldset, built from the score's layers; each also has a letter in the player.
+  const renderListen = () => {
+    const L = layers();
+    $("listen-field").hidden = !L.length;
+    $("listen-options").innerHTML = "";
+    for (const o of L.length ? [{ id: "", name: "All", key: "A" }, ...L] : []) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = "listen"; input.value = o.id;
+      input.id = `listen-${o.id || "all"}`;
+      input.checked = (son.solo ?? "") === o.id;
+      input.setAttribute("aria-keyshortcuts", o.key.toUpperCase());
+      const key = document.createElement("span");
+      key.className = "key-hint"; key.setAttribute("aria-hidden", "true"); key.textContent = o.key.toUpperCase();
+      label.append(input, o.name, key);
+      $("listen-options").append(label);
+    }
+  };
+  const setListen = (id) => {
+    if (!son || !layers().length) return;
+    son.setSolo(id || null);
+    const r = $(`listen-${son.solo || "all"}`);
+    if (r) r.checked = true;
+    showFrame(son.index);                 // the globe shows the layer heard alone
+    say(`${listenText()}.${playing ? "" : " Press Space to play."}`);
+  };
+  $("listen-options").addEventListener("change", (e) => { if (e.target.name === "listen") setListen(e.target.value); });
+  // Letter -> layer id ("" for all), for the track playing now.
+  const listenKeys = () => new Map(layers().length ? [["a", ""], ...layers().map((L) => [L.key.toLowerCase(), L.id])] : []);
 
   // ---------- Actions ----------
   const play = async () => {
@@ -343,10 +390,23 @@
   };
   $("compare").addEventListener("change", (e) => setCompare(e.target.checked));
 
+  // What is under the scan line now, for a track with layers: "dust, strong, around 20 degrees north; …"
+  const strength = (rel) => (rel >= 0.6 ? "strong" : rel >= 0.25 ? "moderate" : "faint");
+  const underText = () => {
+    const winds = (son.windsNow() ?? []).filter((w) => w.level > 0 && (!son.solo || w.id === son.solo)).sort((a, b) => b.open - a.open);
+    if (!winds.length) return son.solo ? ` No ${layerName(son.solo).toLowerCase()} under it.` : ` No ${score.words.what} under it.`;
+    return ` Under it: ${winds.map((w) => `${layerName(w.id).toLowerCase()}, ${strength(w.open)}, mostly ${Math.abs(w.lat) < 0.5 ? "at the equator" : `around ${latWords(w.lat)}`}`).join("; ")}.`;
+  };
+
   const whereText = () => {
     if (!son) return "The player is still loading.";
     const i = son.index;
     let s = `You are in the player. Track ${pos()} of ${tracks.length}, ${track.title}. ${mapText(i)}. `;
+    if (layers().length) {
+      s += `Listening to ${son.solo ? `${layerName(son.solo).toLowerCase()} only` : allText()}. `;
+      const at = `The scan line is at ${lonWords(son.headLon(true))}, ${Math.round(son.progress() * 100)} percent of the way across.`;
+      return `${s}${playing ? `Playing. ${at}` : `Paused. ${at}`}${underText()}${playing ? "" : " Press Space to play."} Press H for keys.`;
+    }
     if (playing) {
       const lon = son.headLon();
       s += `Playing. The scan line is at ${lonWords(lon)}, ${Math.round(son.progress() * 100)} percent of the way across.`;
@@ -361,10 +421,12 @@
     return `${s} Press H for keys.`;
   };
 
-  const HELP = "Player keys. Space: play or pause. Left and Right arrows: previous or next map. Home and End: first or last map. "
-    + "W: where am I. D: describe this map. S: what the sounds mean. 1 to 4: choose a track. M: mono on or off. "
-    + "C: on the Lightning track, compare each part with the previous part, or go back to the part itself. Escape: stop. "
-    + "Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
+  // The keys; on a track with layers, also the letter of each layer.
+  const helpText = () => "Player keys. Space: play or pause. Left and Right arrows: previous or next map. Home and End: first or last map. "
+    + `W: where am I. D: describe this map. S: what the sounds mean. 1 to ${tracks.length}: choose a track. M: mono on or off. `
+    + "C: on the Lightning track, compare each part with the previous part, or go back to the part itself. "
+    + (layers().length ? `A: ${allText()}. ${layers().map((L) => `${L.key.toUpperCase()}: ${L.name.toLowerCase()} only.`).join(" ")} ` : "")
+    + "Escape: stop. Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
 
   const soundsText = () => {
     const pre = pauseForSpeech();
@@ -385,7 +447,7 @@
   $("map").addEventListener("change", (e) => say(`${mapText(Number(e.target.value))}.`));
   $("describe").addEventListener("click", describe);
   $("where").addEventListener("click", () => say(whereText()));
-  $("help").addEventListener("click", () => say(HELP));
+  $("help").addEventListener("click", () => say(helpText()));
 
   document.querySelector("#track-list").addEventListener("change", (e) => {
     if (e.target.name === "track") loadTrack(tracks.find((t) => t.id === e.target.value));
@@ -397,10 +459,14 @@
   $("player").addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target;
-    if (t.closest("input, select, textarea")) return;
-    const onButton = t.closest("button, a");
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    // Form controls keep their own keys. On a radio or checkbox (they take no letters), the
+    // layer letters still work, so "Listen to" can be changed by letter from inside the group.
+    const field = t.closest("input, select, textarea");
+    if (field && !((field.type === "radio" || field.type === "checkbox") && listenKeys().has(k))) return;
+    const onButton = t.closest("button, a");
     const act = (fn) => { e.preventDefault(); fn(); };
+    if (listenKeys().has(k)) { act(() => setListen(listenKeys().get(k))); return; }
     switch (k) {
       case " ": case "Enter": if (!onButton) act(play); break;
       case "k": act(play); break;
@@ -410,7 +476,7 @@
       case "End": act(() => goTo(n() - 1)); break;
       case "w": act(() => say(whereText())); break;
       case "d": act(describe); break;
-      case "h": case "?": act(() => say(HELP)); break;
+      case "h": case "?": act(() => say(helpText())); break;
       case "s": act(() => say(soundsText())); break;
       case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
       case "c": act(() => setCompare(!$("compare").checked)); break;

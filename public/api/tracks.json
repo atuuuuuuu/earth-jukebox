@@ -78,6 +78,25 @@
         "url": "https://svs.gsfc.nasa.gov/5011/",
         "credit": "NASA's Scientific Visualization Studio. Data: Lightning Imaging Sensor (LIS) on the ISS, quality-controlled science data (NASA GHRC DAAC)"
       }
+    },
+    {
+      "id": "aerosols",
+      "code": "5",
+      "title": "Aerosols",
+      "subtitle": "Four winds, 19 August 2025",
+      "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
+      "score": "api/scores/aerosols.json",
+      "frames": 1,
+      "firstDate": "2025-08-19",
+      "lastDate": "2025-08-19",
+      "when": "19 August 2025, 20:00 UTC",
+      "units": "share of the thickest places of each aerosol",
+      "engine": "sweep",
+      "source": {
+        "title": "GEOS Aerosols (2025)",
+        "url": "https://svs.gsfc.nasa.gov/5669/",
+        "credit": "NASA's Scientific Visualization Studio. Data: NASA's GEOS model (Goddard Earth Observing System)"
+      }
     }
   ]
 }

@@ -101,6 +101,34 @@
         -55,
         55
       ]
+    },
+    {
+      "id": "aerosols",
+      "code": "5",
+      "title": "Aerosols",
+      "subtitle": "Four winds, 19 August 2025",
+      "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
+      "data": "data/03_aerosols.json",
+      "chapter": "still",
+      "mapping": "aerosols",
+      "units": "share of the thickest places of each aerosol",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "aerosol map",
+        "dates": "moment",
+        "what": "aerosol",
+        "top": "thickest",
+        "missing": "not read."
+      },
+      "latRange": [
+        -90,
+        90
+      ]
     }
   ]
 }

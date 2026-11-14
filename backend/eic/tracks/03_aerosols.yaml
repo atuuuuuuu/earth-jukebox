@@ -1,0 +1,88 @@
+# Track 03 — GEOS aerosols: one still world map, four aerosols separated by their colours
+id: 03_aerosols
+title: "Aerosols: Four Winds"
+short: "Aerosols"
+builder: aerosols
+
+source:
+  # Under EJ_RESOURCES. The 8K still is a full world map (equirectangular, 180 W at the left edge,
+  # 90 N at the top) stretched to 16:9: its coastlines match the Blue Marble below with no shift.
+  image: 03_GEOS_Aerosols/Aerosols_2025-08-19T20_00_00_7680x4320.png
+  key: 03_GEOS_Aerosols/Aerosols_cbar.png
+  # Under public/: where land and ice are, so their grey can be told from sea salt.
+  land: textures/blue-marble.jpg
+  svs_id: 5669
+  url: https://svs.gsfc.nasa.gov/5669/
+  svs_title: "GEOS Aerosols (2025)"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: ""
+  dataset: "NASA's GEOS model (Goddard Earth Observing System)"
+
+# The four aerosols, in the order of NASA's key (its swatches are read left to right).
+# key: the one-letter shortcut in the player. A (all) and the player's own keys are taken.
+# wind: the colour of its wind in public/sweep/winds.js (smoke, sand, ocean or breath).
+layers:
+  - { id: black-carbon, name: "Black carbon", key: B, wind: smoke }
+  - { id: dust, name: "Dust", key: U, wind: sand }
+  - { id: sea-salt, name: "Sea salt", key: T, wind: ocean }
+  - { id: sulfate, name: "Sulfate", key: L, wind: breath }
+
+extraction:
+  grid: { cols: 120, rows: 60 }
+  # NASA's renderer lights the day side, and there sea salt comes out bluer than its key swatch;
+  # with the key colour alone that blue would be read as dust. So sea salt also gets a second,
+  # lit colour, measured where the map shows nothing but sea salt (the sunlit South Pacific).
+  lit:
+    sea-salt: { lat: [-60, -40], lon: [-130, -100] }
+  # Sea salt is sea spray: it is read only over the sea and up to this many degrees inland. Deep
+  # inland, lavender dust over green sulfate mixes to the same grey-teal, and that is not sea salt.
+  sea_only:
+    sea-salt: 2
+  # City lights and fire dots: small white or yellow-white spots much brighter than their
+  # surroundings (in their darkest channel, so green sulfate edges and coastlines do not count),
+  # on or near land, never on ice.
+  spots:
+    radius: 6            # px at 8K: a spot is smaller than a disc this wide (about 0.6 degrees)
+    above: 40            # how much whiter than its surroundings (0..255, darkest channel)
+    max_area: 400        # px; bigger bright shapes are aerosol, not a dot
+    coast: 12            # px: lights on the coast count as land
+  # Unmixing: a type is added only when it explains enough of the colour.
+  per_type: 0.03         # share of the colour's own size that one more type must explain
+  floor: 0.00002         # colours closer than this to the bare map are left as no aerosol
+  # 1 = the thickest few 3-degree squares of each type (each type has its own scale).
+  top_percentile: 99.5
+
+media:
+  width: 2048
+  height: 1024
+  webp_quality: 82
+
+playback:
+  seconds_per_sweep: 35
+
+legend:
+  summary: >
+    NASA's GEOS model of the aerosols in the air on 19 August 2025 at 20:00 UTC: smoke, desert
+    dust, sea salt and sulfate. A scan line crosses the world once, west to east, in about 35 seconds.
+  method: >
+    Each aerosol is its own wind. More of it under the scan line makes its wind louder and brighter;
+    where there is none, it falls silent. North sounds higher and in your left ear, south lower and in
+    your right ear. Listen to all four winds together, or to one at a time.
+  items:
+    - sound: "Black carbon: dark, rough wind"
+      meaning: "Smoke from fires. A low, dark, slightly rough wind, with soft crackles where the smoke is thickest, as over central Africa."
+    - sound: "Dust: sandy wind"
+      meaning: "Desert dust. A grainy wind in the middle, as over the Sahara and the dust blowing from it across the Atlantic."
+    - sound: "Sea salt: low ocean wind"
+      meaning: "Salt spray from the sea. A low, smooth, airy wind, strongest over the stormy southern oceans."
+    - sound: "Sulfate: thin, high wind"
+      meaning: "Sulfate from industry, ships and volcanoes. A thin, high, breathy wind, very soft, as over South and East Asia and the North Pacific."
+    - sound: "Higher or lower, left or right"
+      meaning: "Where that aerosol is under the scan line: north is higher and in your left ear, south is lower and in your right ear."
+  caveat: >
+    Values are read from the colours of NASA's picture, not from the model's numbers. NASA's key has
+    colours but no numbers, so each aerosol is measured against its own thickest places: a loud dust
+    wind and a loud sulfate wind are not the same amount. Where layers overlap they were separated by
+    colour, so a thin layer under a thick one can be missed, and sea salt is read only over the sea
+    and near coasts. City lights and fire dots drawn on the map are not aerosol and were removed
+    first. This is one moment, 19 August 2025 at 20:00 UTC, not an average.

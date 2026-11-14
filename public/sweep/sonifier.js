@@ -11,9 +11,10 @@ import { clamp } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
 import * as lightning from './tracks/lightning.js';
+import * as aerosols from './tracks/aerosols.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, lightning };
+const MAPPINGS = { 'night-lights': nightLights, co2, lightning, aerosols };
 const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
@@ -78,6 +79,13 @@ DEMOS.lightning = [
   ['rising', 'More than before', 'Short rising notes', 'More than before, heard with Compare with previous part. A short rising figure means more lightning here than in the previous part. A bigger increase is louder and climbs further.'],
   ['falling', 'Less than before', 'Short falling notes', 'Less than before, heard with Compare with previous part. A short falling figure means less lightning here than in the previous part. Places that stayed the same are quiet.'],
 ];
+// Aerosols: the hint on each wind's example button, by the colour of its wind (winds.js).
+const WIND_HINTS = {
+  smoke: 'Low, dark and rough, with soft crackles',
+  sand: 'Grainy, in the middle',
+  ocean: 'Low, smooth and airy',
+  breath: 'Thin, high and soft',
+};
 const shortWhen = (when) => when.replace(/ of \d+$/, '');   // "Part 5 of 14" -> "Part 5"
 // "About 58,000": two significant figures from 100 up, as the backend says it in the score's text.
 const about = (n) => {
@@ -92,7 +100,7 @@ class SweepSonifier {
     onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, bpm, volume });
-    this.kind = mapping === co2 ? 'co2' : mapping === lightning ? 'lightning'
+    this.kind = mapping === co2 ? 'co2' : mapping === lightning ? 'lightning' : mapping === aerosols ? 'aerosols'
       : score.sweep.chapter === 'change' ? 'change' : 'light';
     this.bedWord = this.kind === 'lightning' ? 'bass' : 'hum';   // what "Where am I" calls the low layer
     this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
@@ -131,9 +139,10 @@ class SweepSonifier {
     this.lastLevel = plan.hum.level;
     // `under` is the column itself where the sound is a smoothed level (lightning's bed);
     // `change` is the net change under the line in lightning's compare mode.
+    // `winds`: each layer's wind right now (aerosols), for "Where am I?".
     this.onStep(i, {
       lon: this.lonAt(seg, step), light: plan.hum.under ?? plan.hum.level, change: plan.hum.change,
-      notes: plan.events.filter((e) => !e.bed).length,
+      notes: plan.events.filter((e) => !e.bed).length, winds: plan.layers?.winds,
     });
   }
 
@@ -206,6 +215,28 @@ class SweepSonifier {
   setTempo(bpm) { this.bpm = bpm; this.applyTempo(); this.player.retime(); }
   setVolume(volume) { this.volume = volume; this.audio.setVolume(dbFor(volume)); }
   setMono(mono) { this.settings.width = mono ? 0 : SOUND.width; if (this.audio.ready) this.audio.apply(); }
+
+  // ---- layers heard alone (aerosols) ----
+
+  /** The layers of this track ({id, name, key, ...}) from its score, or an empty list. */
+  get layers() { return this.score.layers ?? []; }
+  /** The layer heard alone (its id), or null when all are heard. */
+  get solo() { return this.settings.solo ?? null; }
+
+  /** Hear one layer alone (its id), or all of them (null). The sweep keeps going. */
+  setSolo(id) {
+    this.settings.solo = this.layers.some((L) => L.id === id) ? id : null;
+    this.mapping.configure(this.settings);
+    if (this.audio.ready) this.audio.apply();
+  }
+
+  /** Each layer's wind under the scan line where it is now, playing or not: [{id, level, open, lat}]. */
+  windsNow() {
+    if (!this.layers.length) return null;
+    const seg = this.player.segmentAt(this.player.currentPosition);
+    const c = clamp(Math.floor(this.progress() * seg.steps), 0, seg.steps - 1);
+    return this.mapping.planStep(this.track, seg, c).layers?.winds ?? null;
+  }
 
   // ---- compare with the previous part (lightning) ----
 
@@ -336,6 +367,7 @@ class SweepSonifier {
     }
     const how = v >= 0.5 ? 'high' : v >= 0.05 ? 'some' : 'almost none';
     if (this.kind === 'lightning') return this.probeLightning(c, r, i, v, { lat, midi, t, how, pct });
+    if (this.kind === 'aerosols') return this.probeLayers(c, r, i, { lat, t });
     a.play({ voice: 'notes', midi, velocity: v < 0.05 ? 0.1 : 0.22 + 0.62 * Math.pow(v, 0.8), duration: 2 }, t, pos);
     a.setHum(Math.max(0.1, Math.sqrt(v)), pos, t, 0.3);
     a.setHum(0, pos, t + 1.2, 0.8);
@@ -384,13 +416,85 @@ class SweepSonifier {
       + (marks ? `About ${about(marks)} lightning ${marks === 1 ? 'mark appears' : 'marks appear'} here during this part.` : 'No lightning marks appear here during this part.');
   }
 
+  /**
+   * One 10-degree square of a map with layers (aerosols), heard the way the sweep plays it: the wind
+   * of each layer heard (all, or the one alone) swells to that square's amount at its latitude, then
+   * fades. Says how much of each is there, each against its own thickest places.
+   */
+  probeLayers(c, r, i, { lat, t }) {
+    const w = this.audio.winds, F = this.score.frames[i];
+    const vals = this.layers.map((L) => ({ L, v: F.layers?.[L.id]?.[r]?.[c] ?? 0 }));
+    const heard = vals.filter((x) => !this.solo || x.L.id === this.solo);
+    const winds = heard.map(({ L, v }) => ({ id: L.id, level: aerosols.windLevel(v), open: v, lat, thick: v }));
+    w?.set(winds, t);
+    w?.set(winds.map((x) => ({ ...x, level: 0 })), t + 1.6);
+    // Thick smoke crackles here too, as in the sweep (the wind colour is in the data's layers).
+    const smoke = heard.find((x) => this.track.layers?.find((y) => y.id === x.L.id)?.wind === 'smoke');
+    if (smoke && smoke.v >= 0.6) w?.crackle({ layer: smoke.L.id, velocity: 0.3, pos: this.posForLat(lat), duration: 0.03 }, t + 0.7);
+    const pct = (v) => `${Math.round(v * 100)} percent of its thickest`;
+    const name = (L) => L.name.toLowerCase();
+    if (this.solo) {
+      const me = vals.find((x) => x.L.id === this.solo);
+      const others = vals.filter((x) => x !== me && x.v >= 0.05).map((x) => name(x.L));
+      return (me.v >= 0.05 ? `${name(me.L)}, ${pct(me.v)}.` : `almost no ${name(me.L)}.`)
+        + (others.length ? ` Also here: ${others.join(', ')}.` : '');
+    }
+    const here = vals.filter((x) => x.v >= 0.05).sort((a, b) => b.v - a.v);
+    return here.length ? `${here.map((x) => `${name(x.L)}, ${pct(x.v)}`).join('; ')}.` : `almost no ${this.score.words.what}.`;
+  }
+
   /** The example sounds for this track: [{id, label, hint, text}]. */
-  demos() { return DEMOS[this.kind].map(([id, label, hint, text]) => ({ id, label, hint, text })); }
+  demos() {
+    if (this.kind === 'aerosols') return this.layerDemos();
+    return (DEMOS[this.kind] ?? []).map(([id, label, hint, text]) => ({ id, label, hint, text }));
+  }
+
+  /**
+   * Aerosols: one example per layer, its wind alone, in the order of the legend, with the legend's
+   * own words; then north and south. Built from the data, so no layer is named here.
+   */
+  layerDemos() {
+    const items = this.score.legend.items, L = this.track.layers ?? [];
+    const out = L.map((x) => {
+      const item = items.find((it) => it.sound.startsWith(x.name));
+      return { id: `wind:${x.id}`, label: x.name, hint: WIND_HINTS[x.wind] ?? 'Its wind alone', text: item ? `${item.sound}. ${item.meaning}` : `${x.name}.` };
+    });
+    const where = items.find((it) => !L.some((x) => it.sound.startsWith(x.name)));
+    const mover = L.find((x) => x.wind === 'sand') ?? L[0];
+    if (mover) {
+      out.push({
+        id: 'north', label: 'North and south', hint: 'Low and right, rising to high and left',
+        text: `North and south. ${where ? where.meaning : ''} In this example the ${mover.name.toLowerCase()} wind moves from the far south to the far north.`.replace(/\s+/g, ' '),
+      });
+    }
+    return out;
+  }
+
+  /** Play one aerosol example on the winds. Returns how long it takes, in seconds. */
+  layerDemo(id, t) {
+    const w = this.audio.winds, L = this.track.layers ?? [];
+    if (!w) return 0;
+    const at = (x, level, time, lat = 0, thick = level) => w.set([{ id: x.id, level, open: level, lat, thick }], time);
+    if (id === 'north') {
+      const x = L.find((y) => y.wind === 'sand') ?? L[0];
+      w.hear(x.id, t, 7);
+      for (let k = 0; k <= 20; k++) at(x, 0.8, t + k * 0.25, -50 + 5 * k);
+      at(x, 0, t + 5.4, 50);
+      return 7;
+    }
+    const x = L.find((y) => `wind:${y.id}` === id);
+    if (!x) return 0;
+    w.hear(x.id, t, 6.5);
+    at(x, 0.25, t); at(x, 1, t + 1.2); at(x, 0.25, t + 3.4); at(x, 0, t + 4.6);
+    if (x.wind === 'smoke') for (const [dt, vel] of [[1.9, 0.3], [2.6, 0.4], [3.1, 0.25]]) w.crackle({ layer: x.id, velocity: vel, pos: 0, duration: 0.03 }, t + dt);
+    return 6;
+  }
 
   /** Play one example. Returns how long it takes, in seconds. */
   async demo(id) {
     try { await this.ensureAudio(); } catch { return 0; }
     const a = this.audio, t = T.now() + 0.05, N = nightLights.BAND_NOTES, mid = N[10];
+    if (this.kind === 'aerosols') return this.layerDemo(id, t);
     const note = (midi, at, pos, vel = 0.6, voice = 'notes', dur = 2) => a.play({ voice, midi, velocity: vel, duration: dur }, t + at, pos);
     // Lightning: one bass bow stroke; one mark note; and the sweep panner set to `x` (-1 west … +1 east).
     const bow = (at, rel) => a.play(lightning.bedEvents(rel, 'Eb', `demo${at}`, 0)[0], t + at);

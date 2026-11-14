@@ -2,9 +2,11 @@
 // stereo along the scan line (top = left ear, bottom = right), per-voice reverb sends.
 // Lightning (settings.bed 'orchestra', settings.sweepPan) instead has a bowed bed, a storm wind,
 // and one panner that travels with the scan line: west = left ear, east = right ear.
+// Aerosols (settings.bed 'winds') is only winds, one per layer (winds.js): no notes, no hum.
 // Tone.js comes from the page's own bundle (global EJ), so both engines share one audio context.
 
 import { midiToNote, clamp } from './music.js';
+import { Winds } from './winds.js';
 
 const T = window.EJ.Tone;
 
@@ -149,7 +151,7 @@ export class AudioEngine {
     });
     // "Bad news gets less calm": clashing notes that fade into the hum as the data turns harmful.
     this.tenseGain = k(new T.Gain(0)).connect(this.humFilter);
-    for (const midi of this.settings.bed === 'orchestra' ? [] : TENSE_NOTES) {
+    for (const midi of this.settings.bed ? [] : TENSE_NOTES) {
       const osc = k(new T.FatOscillator({
         frequency: T.Frequency(midi, 'midi').toFrequency(), type: 'sawtooth', count: 3, spread: 16,
       })).connect(this.tenseGain);
@@ -185,6 +187,8 @@ export class AudioEngine {
       });
       o.windNoise.start();
     }
+    // The aerosol winds: no samples to load.
+    if (this.settings.bed === 'winds') this.winds = new Winds({ keep: k, master: this.master, reverb: this.reverb, settings: this.settings });
     // Heartbeat: a soft low double thump, dry and centred.
     this.beatGain = k(new T.Gain(1)).connect(this.master);
     this.beatSynth = k(new T.MembraneSynth({
@@ -193,8 +197,7 @@ export class AudioEngine {
     })).connect(this.beatGain);
 
     await Promise.all([
-      this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'),
-      this.setInstrument(this.settings.instrument),
+      ...(this.winds ? [] : [this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'), this.setInstrument(this.settings.instrument)]),
       ...(this.orch ? [this._loadBowed('bass', this.orch.bassFilter), this._loadStrings(this.orch.stringsGain)] : []),
     ]);
     this.apply();
@@ -295,6 +298,7 @@ export class AudioEngine {
       o.windBus.level.gain.value = on('hum') * dbToGain(WIND.trim + s.hum);
       o.windBus.send.gain.value = s.humReverb;
     }
+    this.winds?.apply(s);
     if (this.noteTone) this.noteTone.frequency.value = s.compare ? NOTE_TONE.compare : NOTE_TONE.marks;
     // With the sweep panner the slots stay centred: the panner alone places every note.
     const slotWidth = this.sweepPan ? 0 : s.width;
@@ -316,6 +320,7 @@ export class AudioEngine {
    */
   play(ev, time, pos) {
     if (ev.bed) { this._bow(ev, time); return; }
+    if (ev.voice === 'crackle') { this.winds?.crackle(ev, time); return; }
     const voice = ev.voice === 'cello' ? this.cello : this.notes;
     const slot = this.sweepPan ? (PAN_SLOTS - 1) / 2 : Math.round(((clamp(pos, -1, 1) + 1) / 2) * (PAN_SLOTS - 1));
     const smp = voice.samplers[slot] ?? voice.samplers[(PAN_SLOTS - 1) / 2];
@@ -379,6 +384,7 @@ export class AudioEngine {
    * layers.to after `ramp`, -1 = western edge … +1 = eastern edge) and the storm wind (0..1).
    */
   setLayers(layers, time, ramp) {
+    if (layers.winds) this.winds?.set(layers.winds, time);
     if (!this.sweepPan) return;
     const jump = this._panFresh || Math.abs(layers.from - (this._panTo ?? layers.from)) > 0.05;
     this.setPan(layers.to, time + ramp, jump ? { from: layers.from, at: time } : null);
@@ -470,6 +476,7 @@ export class AudioEngine {
         this._wind = 0;
       }
     }
+    this.winds?.silence(t);
     if (this.sweepPan) {             // the next sound starts wherever its scan line is
       const p = this.sweepPan.pan;
       p.cancelScheduledValues(t);

@@ -129,7 +129,69 @@ def validate_co2(data: dict) -> bool:
     return ok
 
 
-VALIDATORS = {"night_lights": validate_night_lights, "co2_dyamond": validate_co2}
+def validate_aerosols(data: dict) -> bool:
+    """Each aerosol where NASA's still clearly shows it, and not where it clearly is not."""
+    g = data["grid"]
+    frame = data["chapters"][0]["frames"][0]
+    layers = {L["id"]: np.array(frame["layers"][L["id"]], np.float32).reshape(g["rows"], g["cols"]) / 100
+              for L in data["layers"]}
+    lat = 90 - (np.arange(g["rows"]) + 0.5) * g["cellDeg"]
+    lon = -180 + (np.arange(g["cols"]) + 0.5) * g["cellDeg"]
+    area = np.cos(np.radians(lat))[:, None] * np.ones(g["cols"])
+
+    def mean(layer, lat0, lat1, lon0, lon1):
+        rows = (lat >= lat0) & (lat <= lat1)
+        cols = (lon >= lon0) & (lon <= lon1) if lon0 <= lon1 else (lon >= lon0) | (lon <= lon1)
+        w = area[np.ix_(rows, cols)]
+        return float((layers[layer][np.ix_(rows, cols)] * w).sum() / w.sum())
+
+    world = {k: mean(k, -90, 90, -180, 180) for k in layers}
+    print("  world averages: " + ", ".join(f"{k} {v:.3f}" for k, v in world.items()))
+    # (name, layer, box lat0, lat1, lon0, lon1): high = the aerosol leads there, at least twice any
+    # other, and is at least 1.5 times its own world average (sea salt and sulfate are widespread:
+    # sea salt is also high over the tropical oceans, so its world average is high already).
+    high = [
+        ("Sahara and the dust plume over the Atlantic", "dust", 10, 25, -50, 30),
+        ("Central and southern Africa", "black-carbon", -20, 0, 10, 35),
+        ("Southern Ocean", "sea-salt", -65, -40, -180, 180),
+        ("East Asia", "sulfate", 20, 45, 100, 145),
+        ("North Pacific", "sulfate", 30, 60, 145, -140),
+    ]
+    low = [
+        ("dust over the Southern Ocean", "dust", -65, -40, -180, 180),
+        ("sea salt over the inland Sahara and Sahel", "sea-salt", 8, 28, 0, 30),
+        ("black carbon over the South Pacific", "black-carbon", -50, -10, -150, -90),
+        ("sulfate over Antarctica", "sulfate", -90, -70, -180, 180),
+    ]
+    ok = True
+    for name, k, *box in high:
+        v = mean(k, *box)
+        others = {o: mean(o, *box) for o in layers if o != k}
+        top = max(others, key=others.get)
+        passed = v >= 1.5 * world[k] and v >= 2 * others[top]
+        ok &= passed
+        print(f"  [{'PASS' if passed else 'FAIL'}] {name:<44} {k} {v:.3f} = {v / max(world[k], 1e-6):.1f}x its world average"
+              f" (next: {top} {others[top]:.3f})")
+    for name, k, *box in low:
+        v = mean(k, *box)
+        passed = v <= max(0.02, 0.5 * world[k])
+        ok &= passed
+        print(f"  [{'PASS' if passed else 'FAIL'}] no {name:<41} {k} {v:.3f}")
+    # Sea salt is strongest over the stormy Southern Ocean: its busiest 10-degree band of latitude.
+    band = max(range(-90, 90, 10), key=lambda b: mean("sea-salt", b, b + 10, -180, 180))
+    passed = -65 <= band <= -40
+    ok &= passed
+    print(f"  [{'PASS' if passed else 'FAIL'}] sea salt is strongest from {-band - 10} to {-band} degrees south"
+          if band < 0 else f"  [FAIL] sea salt is strongest from {band} to {band + 10} degrees north")
+    out_dir = DEBUG_DIR / data["id"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for k, arr in layers.items():
+        _heatmap(arr, out_dir / f"check_{k}.png", cv2.COLORMAP_MAGMA)
+    print(f"  debug images: {out_dir}")
+    return ok
+
+
+VALIDATORS = {"night_lights": validate_night_lights, "co2_dyamond": validate_co2, "aerosols": validate_aerosols}
 
 
 def main() -> None:
