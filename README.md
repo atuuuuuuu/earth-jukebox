@@ -1,24 +1,31 @@
 # Earth Jukebox
 
 **Hear NASA's views of Earth.** Earth Jukebox turns visualizations from NASA's Earth Information
-Center into sound: city lights at night, carbon dioxide, and lightning. A scan line crosses the world
-from west to east, and whatever it crosses plays. North sounds higher and in your left ear, south
-lower and in your right.
+Center into sound: city lights at night, the air we breathe, the ocean's great currents, carbon
+dioxide and lightning. A line crosses the picture, and whatever it crosses plays. North (or the top of
+the picture) sounds higher and in your left ear, south lower and in your right.
 
 It is made for blind and low-vision listeners first. A first-time screen reader user can open it and
-use it alone: the page says what to press next, every action is a button, and the player answers
-"Where am I?" at any moment. A 3D globe shows what is playing, but you never need it.
+use it alone: the page says what to press next, every key names itself as you press it, every
+action is a button, and the player answers "Where am I?" at any moment. On phones that can vibrate,
+the notes buzz. A 3D globe (or NASA's own video) shows what is playing, but you never need it.
+
+Why it sounds the way it does, and how the NASA videos are read: [docs/PROCESS.md](docs/PROCESS.md).
 
 Built for **NASA Space Apps 2026: The Earth Information Jukebox**.
 
 ## Tracks
 
+Resource numbers are the order on the challenge's Resources tab.
+
 | # | Track | NASA resource |
 | --- | --- | --- |
-| 1 | **Earth at night**, one scan per year, 2012 to 2023 | Resource 1: [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
-| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map | Resource 1 |
-| 3 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | Resource 6: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
-| 4 | **Lightning**, March 2017 to July 2023 in 14 equal parts | Resource 7: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
+| 1 | **Earth at night**, one scan per year, 2012 to 2023 | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
+| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map | 1 and 3 |
+| 3 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
+| 4 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
+| 5 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
+| 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
 
 ## Using it without sight
 
@@ -31,22 +38,24 @@ In the keyboard area (and on any player button):
 | Key | Does |
 | --- | --- |
 | Space | Play or pause |
-| Left, Right | Previous or next map (year, week or part) |
+| Left, Right | Previous or next map (year, pollutant, scene, week or part) |
 | Home, End | First or last map |
 | W | Where am I: track, map, where the scan line is, the last note and which ear |
 | D | Describe this map (pauses first) |
 | S | What the sounds mean |
 | H | Every key |
-| 1 to 4 | Choose a track |
+| 1 to 6 | Choose a track |
 | M | Mono on or off |
 | Escape | Stop all sound and speech, from anywhere |
 
-The single-letter keys work only inside the player, so they never clash with screen reader keys
+Each key says its name before its answer ("Next map. 2014, map 3 of 12"), with a soft click; a key
+with no job says so. The single-letter keys work only inside the player, so they never clash with screen reader keys
 (WCAG 2.1.4). The keyboard area is `role="application"`, so NVDA and JAWS switch to focus mode there
 by themselves. Every key is also a button. Below the player: **What the sounds mean** (each sound with
 an example button), **Explore one place** (city buttons and two sliders: hear one 10 degree square),
-and **Settings** (volume, speed, mono, say each new map, read aloud, save as audio file). Settings
-are remembered on the device.
+and **Settings** (volume, speed, mono, say each new map, name each key, click on each key, vibrate,
+read aloud, save as audio file). Settings are remembered on the device. The ocean track follows a
+moving camera, so it has no map of places to explore.
 
 ## Run it
 
@@ -77,7 +86,7 @@ for the file and URL), then:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
-npm run eic -- 07_lightning        # or 01_night_lights, 06_co2_dyamond
+npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_dyamond, 07_ocean_currents, 07_lightning
 npm run api && npm run validate
 ```
 
@@ -86,16 +95,20 @@ npm run api && npm run validate
 1. **Reading NASA's video** (`backend/eic/`, team RUSTMN's pipeline, numpy and OpenCV). Each track's
    YAML says how. Night lights: the 8K EIC video, calibrated against 10 cities, lights separated from
    the base map. Carbon dioxide: a thin line through the centre of NASA's turning globe, read every 3
-   hours of model time. Lightning: NASA's Science On a Sphere movie is already a flat world map;
-   yellow strike pixels are averaged over the frames of each of 14 equal parts, in order. Output: a 3 degree grid
-   per map in `public/data/` and map images in `public/media/`.
+   hours of model time. Air quality: four pollutants in strips that slide over one flat map; each
+   strip is found in every frame and its colours rebuilt into a full world map per pollutant. Ocean:
+   a line through the middle of NASA's moving camera view, ten readings per second of video.
+   Lightning: NASA's Science On a Sphere movie is already a flat world map; yellow strike pixels are
+   averaged over the frames of each of 14 equal parts, in order. Output: a 3 degree grid per map (or
+   one line per step) in `public/data/` and images or video in `public/media/`.
 2. **Scores** (`backend/build_sweep.py`, standard library). Pools the grid to 10 degree squares, adds
    statistics and the spoken description of every map (naming the cities in the busiest squares), and
    writes `public/api/` following `backend/API.md`. `backend/validate_api.py` checks it.
 3. **Sound** (`public/sweep/`, team RUSTMN's engine on Tone.js). The scan advances one 3 degree column
-   at a time; notes ring as it crosses bright places (vibraphone for lights, kalimba for lightning),
-   a hum follows everything under the line, and carbon dioxide adds tension over dense plumes and a
-   heartbeat for each day.
+   at a time; notes ring as it crosses bright places (vibraphone for lights and air, harp for the
+   ocean, kalimba for lightning), a drone follows everything under the line. The worst air turns the
+   drone sour and the notes minor; carbon dioxide adds tension over dense plumes and a heartbeat for
+   each day; the ocean adds a soft pulse for each month.
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ## Data and credits
@@ -103,12 +116,14 @@ npm run api && npm run validate
 - Visualizations: NASA's Scientific Visualization Studio, NASA Earth Information Center.
   Night lights: Kel Elkins (USRA); Black Marble: Next Generation (Suomi NPP VIIRS). Carbon dioxide:
   AJ Christensen, Greg Shirah, Helen-Nicole Kostis, Mark SubbaRao; DYAMOND, GEOS-MITgcm. Lightning:
-  Lightning Imaging Sensor on the ISS, NASA GHRC DAAC.
+  Lightning Imaging Sensor on the ISS, NASA GHRC DAAC. Air quality: NASA GEOS-CF. Ocean: Greg
+  Shirah, Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL); ECCO2.
 - Values are read from the colours of NASA's videos, so they are relative levels, not satellite units.
   The lightning video has no date label and its speed is uneven, so it is split into 14 equal parts
   and no part claims a month or date.
 - Land on the globe: [NASA Visible Earth, Blue Marble](https://visibleearth.nasa.gov/collection/1484/blue-marble).
 - Sound design and video reading for night lights and carbon dioxide: team RUSTMN (Ulaanbaatar).
+- The ocean web video is a 640 x 360 copy of NASA's; the raw NASA videos are not in the repository.
 - Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via
   [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts). Sound: [Tone.js](https://tonejs.github.io/).
 

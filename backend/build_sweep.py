@@ -115,9 +115,12 @@ def pool(values: list[float], g: dict, lat_range: tuple[float, float] = (LAT_MIN
         w = math.cos(math.radians(lat))
         R = min(GRID_ROWS - 1, int((90 - lat) // 10))
         for c in range(cols):
+            v = values[r * cols + c]
+            if v is None:                       # no reading in this fine cell
+                continue
             lon = g["lonWest"] + (c + 0.5) * step
             C = min(GRID_COLS - 1, int(((lon + 180) % 360) // 10))
-            total[R][C] += w * values[r * cols + c]
+            total[R][C] += w * v
             weight[R][C] += w
     return [[total[R][C] / weight[R][C] if weight[R][C] else None for C in range(GRID_COLS)] for R in range(GRID_ROWS)]
 
@@ -373,9 +376,52 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+def build_scenes(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """Ocean tour: a moving camera, so there is no map of places: every grid cell is None, and the
+    spoken text names where the camera is, the dates, and the scene's story."""
+    frames = []
+    for f in chapter["frames"]:
+        rel = f.get("relative") or 0
+        grid = [[None] * GRID_COLS for _ in range(GRID_ROWS)]
+        busiest = "the busiest scene" if rel == 1 else f"{round(rel * 100)} percent of the busiest scene"
+        text = (f"{f['label']}, {f['from']} to {f['to']}. The camera is over {f['place']}. "
+                f"Bright moving water in the picture: {busiest}. {f.get('story', '')}")
+        frames.append({
+            "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""),
+            **stats(grid, t["hotLine"]), "relativeTotal": rel,
+            "columns": [None] * STRIPS, "grid": grid, "text": text.strip(),
+        })
+    return frames
+
+
+def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """Air quality: one map per pollutant, each on its own colour scale (0 clean .. 1 dirty)."""
+    g = data["grid"]
+    frames = []
+    for f in chapter["frames"]:
+        gone = set(f.get("missing", []))
+        grid = pool([None if j in gone else v / 100 for j, v in enumerate(f["glow"])], g,
+                    tuple(t.get("latRange", (LAT_MIN, LAT_MAX))))
+        st = stats(grid, t["hotLine"])
+        worst = ranked(grid, 1, 4, t["hotLine"] * 0.8)
+        cleanest = ranked([[None if v is None else 1 - v for v in row] for row in grid], 1, 2, 0.0)
+        when = f["label"]
+        text = (f"{when}, {f.get('span', '')}. "
+                + (f"Thickest: {listing(worst)}. " if worst else "Nowhere very thick on this map. ")
+                + f"{round(st['hot'] * 100)} percent of the map with a reading is in the dirty half of the scale. "
+                + (f"Cleanest: {listing(cleanest)}." if cleanest else ""))
+        frames.append({
+            "date": None, "when": when, "image": f["image"], "alt": f.get("alt", ""), **st,
+            "relativeTotal": round((f.get("total") or 0) / max(x.get("total") or 0 for x in chapter["frames"]), 3),
+            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
+            "grid": r3(grid), "text": text.strip(),
+        })
+    return frames
+
+
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
-BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts}
+BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants, "scenes": build_scenes}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 

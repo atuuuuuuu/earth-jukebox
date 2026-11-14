@@ -101,6 +101,30 @@ class NewBuilders(unittest.TestCase):
         self.assertIsNone(out[0]["date"])
         self.assertEqual(out[0]["when"], "Part 1 of 2")
 
+    def test_pollutants_skip_unread_cells_and_name_the_thickest(self):
+        v = fine(10)
+        for j in [at(lat, lon) for lat in (32, 35, 38) for lon in (111, 114, 117)]:
+            v[j] = 100                               # Beijing's 10-degree square
+        east = [at(lat, lon) for lat in range(-88, 90, 3) for lon in range(142, 180, 3)]
+        for j in east:
+            v[j] = 100                               # would be thickest, but NASA's map has no reading there
+        out = bs.build_pollutants({"grid": G}, {"frames": [
+            {"label": "Ozone", "span": "July and August 2024", "image": "o3.webp", "glow": v, "core": v,
+             "total": 1.0, "missing": east}]}, {"hotLine": 0.5})
+        self.assertTrue(out[0]["text"].startswith("Ozone, July and August 2024. Thickest: around Beijing"), out[0]["text"])
+        self.assertIsNone(out[0]["grid"][5][33])     # 40-50 N, 150-160 E: not read
+        self.assertIsNone(out[0]["date"])
+
+    def test_scenes_have_no_map_and_tell_the_story(self):
+        out = bs.build_scenes({}, {"frames": [
+            {"label": "Gulf Stream", "from": "1 May 2023", "to": "2 June 2023", "place": "the Gulf Stream",
+             "image": "s.webp", "alt": "", "relative": 1, "story": "It carries warmth to Europe."}]}, {"hotLine": 0.5})
+        f = out[0]
+        self.assertEqual(f["text"], "Gulf Stream, 1 May 2023 to 2 June 2023. The camera is over the Gulf Stream. "
+                                    "Bright moving water in the picture: the busiest scene. It carries warmth to Europe.")
+        self.assertTrue(all(c is None for row in f["grid"] for c in row))
+        self.assertEqual((len(f["grid"]), len(f["grid"][0]), len(f["columns"])), (18, 36, 16))
+
 
 class Build(unittest.TestCase):
     def make_public(self, tmp):

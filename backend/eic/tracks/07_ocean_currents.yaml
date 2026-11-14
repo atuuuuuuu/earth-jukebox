@@ -1,0 +1,127 @@
+# Track 07 — Perpetual Ocean 2: Western Boundary Currents (camera tour, 15 Jan 2021 - 22 Dec 2023)
+id: 07_ocean_currents
+title: "Perpetual Ocean: the Great Currents"
+short: "Ocean currents"
+builder: ocean_currents
+
+source:
+  video: 07_Perpetual_Ocean/perpetual_ocean2_CLOSE_093_clean_noDate_1080p30.mp4
+  svs_id: 5425
+  url: https://svs.gsfc.nasa.gov/5425/
+  svs_title: "Perpetual Ocean 2: Western Boundary Currents"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: "Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL)"
+  dataset: "ECCO2 high-resolution ocean and sea ice model (NASA/JPL); Blue Marble: Next Generation"
+
+time:
+  # NASA's dates-only overlay of the same movie: 15 Jan 2021 at the first frame, 22 Dec 2023 at
+  # the last, evenly (7 Jun 2022 at 150 s fits within a day).
+  start: "2021-01-15"
+  days: 1071
+  frames_per_step: 3         # one step = 0.1 s of video, about 8 hours of ocean
+
+extraction:
+  rows: 54                   # 20 px each, top of the picture to the bottom
+  half_width: 10             # the line reads a strip 21 px wide through the middle
+  white_lo: 110              # flow lines are bright and nearly colourless; the sea is blue
+  white_hi: 200
+  sea_lo: 40                 # "clearly blue": B - R above this
+  sea_blur: 61               # flow lines count within 30 px of blue water
+
+scenes:                      # seconds of NASA's movie, read from a contact sheet every 6 s
+  - title: "The whole ocean"
+    place: "the whole Earth as it turns"
+    from: 0
+    to: 93
+    alt: "The Earth turning slowly, its oceans covered in fine white streaks of moving water; the brightest bands run along the equator and the coasts of continents."
+    story: >
+      The whole planet turns beneath you. Every white streak is water on the move. Listen for the
+      bright bands hugging the east coasts of continents: those are the great western boundary
+      currents, and the tour is about to visit three of them.
+  - title: "Kuroshio Current, off Japan"
+    place: "the Kuroshio, south and east of Japan"
+    from: 93
+    to: 123
+    alt: "Close view south of Japan: a bright white river of current hugs the coast, then breaks into loops and swirls as it heads east into the Pacific."
+    story: >
+      The Kuroshio, the "Black Current", carries warm tropical water north past Japan. Where it
+      leaves the coast it starts to meander and throw off eddies, swirls hundreds of kilometres
+      across. Busy, ringing notes mean a strong, tangled current.
+  - title: "Across Asia and the Indian Ocean"
+    place: "Southeast Asia and the Indian Ocean"
+    from: 123
+    to: 144
+    alt: "The camera pulls back and the globe turns past Southeast Asia and Australia to the Indian Ocean."
+    story: >
+      The camera pulls back and travels west over Southeast Asia and the Indian Ocean. Quieter
+      stretches here are calmer open water.
+  - title: "Agulhas Current, off South Africa"
+    place: "the Agulhas, off the southern tip of Africa"
+    from: 144
+    to: 178
+    alt: "Close view of southern Africa: a strong current runs down the east coast, turns back at the tip of the continent, and sheds bright round rings that drift west into the Atlantic."
+    story: >
+      The Agulhas runs down Africa's east coast and, at the tip of the continent, turns back on
+      itself. As it turns it pinches off rings of warm, salty Indian Ocean water that drift into the
+      Atlantic. Each ring that crosses the line rings a note: you are hearing two oceans connect.
+  - title: "Across the South Atlantic"
+    place: "the South Atlantic, towards South America"
+    from: 178
+    to: 207
+    alt: "The camera crosses the open South Atlantic towards Brazil; scattered rings and soft streaks over dark blue water."
+    story: >
+      The camera crosses the South Atlantic, following the path of those rings towards South
+      America and then north. Open ocean is mostly a quiet, low drone.
+  - title: "Gulf Stream, off the United States"
+    place: "the Gulf Stream, off the east coast of the United States"
+    from: 207
+    to: 262
+    alt: "Close view of the east coast of the United States: a thick white current leaves Florida, runs north along the coast, then swings out into the Atlantic in huge meanders and eddies."
+    story: >
+      The Gulf Stream leaves Florida, runs up the coast and swings out into the Atlantic in giant
+      meanders. It carries warmth towards Europe. Scientists watch this circulation closely, because
+      a warming climate may be slowing the Atlantic's overturning circulation it is part of. This is
+      the loudest, busiest part of the tour.
+  - title: "Gulf of Mexico and the Loop Current"
+    place: "the Gulf of Mexico and the Caribbean"
+    from: 262
+    to: 287
+    alt: "Close view of the Gulf of Mexico: a current loops up from the Caribbean, curls around and sheds large eddies before leaving past Florida."
+    story: >
+      In the Gulf of Mexico the Loop Current pushes up from the Caribbean, curls around and sheds
+      large eddies, then leaves past Florida to feed the Gulf Stream. Warm eddies like these can
+      strengthen hurricanes that pass over them.
+  - title: "The whole ocean again"
+    place: "the whole Earth as it turns"
+    from: 287
+    alt: "The camera pulls back to the whole Earth over the Americas, oceans streaked with white currents."
+    story: >
+      The camera pulls back. Every current you heard is one connected system, moving heat around
+      the planet. The tour ends almost three years after it began.
+
+media:
+  width: 640
+  height: 360
+  crf: 34                    # 23 MB for 5 minutes; looks the same as 31 at this size
+
+legend:
+  summary: >
+    NASA's tour of the ocean's currents, January 2021 to December 2023: the whole globe, then the
+    Kuroshio, the Agulhas and the Gulf Stream. A line runs top to bottom through the middle of the
+    picture, and you hear the moving water that crosses it.
+  method: >
+    The top of the picture sounds higher and in your left ear; the bottom lower and in your right.
+    Calm, open water is a soft, low swell. Where strong currents and eddies cross the line, a harp
+    rings and the swell grows. A soft low pulse marks the start of each month.
+  items:
+    - sound: "Harp notes"
+      meaning: "A strong current or an eddy crossing the line. Louder = brighter, faster water."
+    - sound: "Swell"
+      meaning: "All the moving water on the line. It is soft over calm ocean and grows over strong currents."
+    - sound: "Monthly pulse"
+      meaning: "A soft low pulse at the start of each month, so you can hear time passing."
+  caveat: >
+    Values are read from the brightness of NASA's white flow lines, which show currents in the top
+    600 metres (deeper flows, drawn in blue, are not read). They are relative, not speeds in metres
+    per second. The camera moves, so the line crosses different places as the tour goes on;
+    the scenes name where it is.
