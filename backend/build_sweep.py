@@ -394,48 +394,9 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
-def strength_word(amount: float) -> str:
-    """Fixed words on the same fixed scale the aerosol sound uses (public/sweep/tracks/aerosols.js)."""
-    return "none" if amount < 0.004 else "faint" if amount < 0.02 else "light" if amount < 0.06 else "moderate" if amount < 0.15 else "strong"
-
-
-def mix_words(mix: list, voices: list[dict]) -> str:
-    """'strong dust near 18 degrees north; faint sea salt near 30 degrees south', loudest first."""
-    heard = sorted((i for i, (a, _) in enumerate(mix) if a >= 0.004), key=lambda i: -mix[i][0])
-    if not heard:
-        return "clear air, silence"
-    lat = lambda l: "the equator" if not round(l) else f"{abs(round(l))} degrees {'north' if l > 0 else 'south'}"
-    return "; ".join(f"{strength_word(mix[i][0])} {voices[i]['name'].lower()} near {lat(mix[i][1])}" for i in heard)
-
-
-def build_sides(data: dict, chapter: dict, t: dict) -> list[dict]:
-    """Aerosols: one still, played around the world and then as NASA's six stories (backend/build_aerosols.py).
-
-    The grid is the same for every map, because it is the same picture: the loudest aerosol in each
-    10-degree square, on the fixed scale (1 = full loudness, a mean colour strength of 0.3).
-    """
-    full, voices = data["rules"]["fullAmount"], data["voices"]
-    grid = [[round(min(1.0, max(a for a, _ in mix) / full), 3) for mix in row] for row in data["cells"]]
-    st = stats(grid, t["hotLine"])
-    shares = ", ".join(f"{v['name'].lower()} {v['share'] * 100:.1f} percent" for v in sorted(voices, key=lambda v: -v["share"]))
-    frames = []
-    for f in chapter["frames"]:
-        when = f["label"]
-        if f["box"] is None:
-            loud = max(f["steps"], key=lambda s: sum(a for a, _ in s["mix"]))
-            lon = lambda s: (lambda l: f"{abs(round(l))} degrees {'east' if l > 0 else 'west'}" if round(l) else "0 degrees")((s["lon0"] + s["lon1"]) / 2)
-            text = (f"{when}. {f['caption']} Of the map's pixels: {shares}. "
-                    f"Busiest slice: {lon(loud)}, with {mix_words(loud['mix'], voices)}.")
-        else:
-            text = f"{when}, over {f['place']}. {f['caption']} Heard here: {mix_words(f['mix'], voices)}."
-        frames.append({"date": None, "when": when, "image": f["image"], "alt": f["alt"], **st,
-                       "relativeTotal": 1.0, "grid": grid, "text": text})
-    return frames
-
-
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
-BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants, "scenes": build_scenes, "sides": build_sides}
+BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants, "scenes": build_scenes}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 

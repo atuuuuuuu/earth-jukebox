@@ -37,10 +37,7 @@ uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
 uniform float uSweep;          // 1 when the scan line moves freely at uHead (sweep tracks)
-uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), unused
-uniform vec3 uPingCol[6];      // each note's colour
-uniform vec4 uBox;             // a story's window: lon0, lat0, lon1, lat1 (lon0 > lon1 = no box)
-uniform vec3 uBoxCol;
+uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 new light, 2 dimmed)
 
 float lonDist(float a, float b) { return abs(mod(a - b + 540.0, 360.0) - 180.0); }
 float band(float d, float w) { return 1.0 - smoothstep(0.0, w, d); }
@@ -131,16 +128,8 @@ void main() {
     float fade = 1.0 - p.z;
     float ring = (1.0 - smoothstep(0.0, 1.2, abs(d - (1.5 + 6.0 * p.z)))) * fade;
     float core = (1.0 - smoothstep(0.0, 1.8, d)) * fade;
-    vec3 pc = uPingCol[k];
+    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : vec3(1.0, 0.66, 0.41);
     col = mix(col, pc, clamp(0.8 * ring + core, 0.0, 1.0));
-  }
-
-  // A story's window: everything outside rests dimmer, with a thin frame in the story's colour.
-  if (uBox.x < uBox.z) {
-    float hw = 0.5 * (uBox.z - uBox.x), hh = 0.5 * (uBox.w - uBox.y);
-    float edge = max(lonDist(lon, uBox.x + hw) - hw, abs(lat - (uBox.y + hh)) - hh);
-    col *= mix(1.0, 0.55, step(0.0, edge));
-    col = mix(col, uBoxCol, 0.9 * line(abs(edge), 2.0));
   }
 
   // Listening cursor: one 10 degree cell.
@@ -220,7 +209,6 @@ void main() {
       this.headFn = null;     // sweep tracks: () => scan line longitude, or null when silent
       this.headSpeed = 0;
       this.pings = [];
-      this.box = null;        // { lon0, lat0, lon1, lat1, color: [r, g, b] } or null
       this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
       const gl = canvas.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
       if (!gl) throw new Error("WebGL is not available");
@@ -261,7 +249,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing", "uPingCol", "uBox", "uBoxCol"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -311,10 +299,9 @@ void main() {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.tex[1]);
     }
 
-    // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed; or a colour [r, g, b] (0..1).
+    // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
     ping(lon, lat, kind = 0) {
-      const color = Array.isArray(kind) ? kind : [[1, 0.84, 0.59], [0.77, 0.65, 1], [1, 0.66, 0.41]][kind] || [1, 0.84, 0.59];
-      this.pings.push({ lon, lat, color, born: performance.now() });
+      this.pings.push({ lon, lat, kind, born: performance.now() });
       if (this.pings.length > 6) this.pings.shift();
     }
     lookAt(lon, lat) {
@@ -442,19 +429,14 @@ void main() {
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.uniform1f(this.u.uFull, this.full ? 1 : 0);
       gl.uniform1f(this.u.uSweep, this.headFn ? 1 : 0);
-      const now = performance.now(), pings = new Float32Array(24), cols = new Float32Array(18);
+      const now = performance.now(), pings = new Float32Array(24);
       for (let k = 0; k < 6; k++) {
         const p = this.pings[k];
         let age = p ? (now - p.born) / 1700 : 1;
         if (this.reduced.matches) age = age < 0.7 ? 0 : 1;   // no growing rings: a steady dot, then gone
-        pings.set(p ? [p.lon, p.lat, Math.min(1, age), 0] : [0, 0, 1, 0], k * 4);
-        if (p) cols.set(p.color, k * 3);
+        pings.set(p ? [p.lon, p.lat, Math.min(1, age), p.kind] : [0, 0, 1, 0], k * 4);
       }
       gl.uniform4fv(this.u.uPing, pings);
-      gl.uniform3fv(this.u.uPingCol, cols);
-      const b = this.box;
-      gl.uniform4f(this.u.uBox, b ? b.lon0 : 1, b ? b.lat0 : 0, b ? b.lon1 : 0, b ? b.lat1 : 0);
-      gl.uniform3fv(this.u.uBoxCol, b ? b.color : [1, 1, 1]);
       gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
     }
 

@@ -116,25 +116,6 @@
         "url": "https://svs.gsfc.nasa.gov/5011/",
         "credit": "NASA's Scientific Visualization Studio. Data: Lightning Imaging Sensor (LIS) on the ISS, quality-controlled science data (NASA GHRC DAAC)"
       }
-    },
-    {
-      "id": "aerosols",
-      "code": "7",
-      "title": "The air we share",
-      "subtitle": "Smoke, dust, sea salt and sulfate, 19 August 2025",
-      "description": "NASA's model of the particles in the air at one moment: four instruments play together as Earth turns under the needle, then NASA's six stories, from Hurricane Erin to Mount Etna. Mute or solo any instrument in the mixer.",
-      "score": "api/scores/aerosols.json",
-      "frames": 7,
-      "firstDate": null,
-      "lastDate": null,
-      "when": "Around the world to Kilauea's sulfate stream",
-      "units": "how strongly a place shows the loudest particle's colour",
-      "engine": "sweep",
-      "source": {
-        "title": "GEOS Aerosols (2025)",
-        "url": "https://svs.gsfc.nasa.gov/5669/",
-        "credit": "NASA's Global Modeling and Assimilation Office and Scientific Visualization Studio, visualizer Joseph V. Ardizzone, Helen-Nicole Kostis; scientist Lesley Ott. Data: GEOS-FP 2 km replay (model), 19 August 2025 20:00 UTC. Sound design adapted from team BoboMimi's TerraJuke"
-      }
     }
   ]
 }

@@ -11,11 +11,10 @@ import { clamp } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
 import * as ocean from './tracks/ocean.js';
-import * as aerosols from './tracks/aerosols.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, ocean, aerosols };
-const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds', 'sliceSeconds', 'storySeconds'];   // seconds the speed setting scales
+const MAPPINGS = { 'night-lights': nightLights, co2, ocean };
+const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
 const SOUND = {
@@ -80,14 +79,6 @@ DEMOS.ocean = [
   ['beat', 'A new month', 'A soft low pulse', 'A new month. One soft low pulse at the start of each month of the tour.'],
   ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Water near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
 ];
-// The air we share: meet each instrument alone (south, equator, north), then all four at once.
-DEMOS.aerosols = [
-  ['meet-blackCarbon', 'Smoke: smoky brass', 'Low, middle, high', 'Smoke from fires, black carbon, is the smoky brass. It climbed from the far south, low, to the far north, high.'],
-  ['meet-dust', 'Dust: desert strings', 'Low, middle, high', 'Dust is the desert strings. Low in the south, high in the north.'],
-  ['meet-seaSalt', 'Sea salt: ocean bed', 'Low, middle, high', 'Sea salt, lifted by ocean winds, is the soft ocean bed. Low in the south, high in the north.'],
-  ['meet-sulfate', 'Sulfate: glass bells', 'Low, middle, high', 'Sulfate, from pollution and volcanoes, is the glass bells. Low in the south, high in the north.'],
-  ['together', 'All four at once', 'One chord', 'All four at once, as over Africa on this day: smoke, dust, sea salt and sulfate together.'],
-];
 DEMOS.lightning = [
   ['city', 'Storms', 'One drop-like note', 'Storms. Each place with a lot of lightning plays one drop-like note as the line crosses it. More lightning rings louder.'],
   DEMOS.light[1],
@@ -101,7 +92,6 @@ class SweepSonifier {
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
     this.kind = score.sweep.mapping === 'co2' ? 'co2' : score.sweep.mapping === 'ocean' ? 'ocean'
-      : score.sweep.mapping === 'aerosols' ? 'aerosols'
       : score.sweep.chapter === 'change' ? 'change' : score.sweep.chapter === 'pollutants' ? 'air'
         : score.sweep.instrument === 'kalimba' ? 'lightning' : 'light';
     this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
@@ -111,7 +101,7 @@ class SweepSonifier {
     this.settings = { ...SOUND, ...d, instrument: score.sweep.instrument || SOUND.instrument, width: mono ? 0 : SOUND.width };
     this.applyTempo();
     mapping.configure(this.settings);
-    this.audio = new AudioEngine({ humNotes: mapping.HUM_NOTES, settings: this.settings, synths: mapping.SYNTHS });
+    this.audio = new AudioEngine({ humNotes: mapping.HUM_NOTES, settings: this.settings });
     this.audio.muted = new Set(muted);
     this.audio.setVolume(dbFor(volume));
     this.player = new Player({
@@ -131,7 +121,6 @@ class SweepSonifier {
   /** Longitude under the scan line at `step` (whole or fractional) of segment `seg`. */
   lonAt(seg, step) {
     const t = this.track;
-    if (this.mapping.lonAt) return this.mapping.lonAt(seg, step);
     if (t.grid) return t.grid.lonWest + (step + 0.5) * t.grid.cellDeg;
     return wrapLon(t.lonAtStep0 + t.lonPerStep * (seg.frame.startStep + step));
   }
@@ -145,10 +134,10 @@ class SweepSonifier {
 
   voice(ev) {
     const t = this.track, seg = this.player.segmentAt(this.player.currentPosition);
-    const lat = ev.lat !== undefined ? ev.lat : ev.row !== undefined && t.grid
+    const lat = ev.row !== undefined && t.grid
       ? t.grid.latNorth - (ev.row + 0.5) * t.grid.cellDeg
       : (Math.asin(clamp(-ev.pos, -1, 1)) * 180) / Math.PI;
-    const lon = ev.lon !== undefined ? ev.lon : ev.col !== undefined && t.grid ? t.grid.lonWest + (ev.col + 0.5) * t.grid.cellDeg : this.lonAt(seg, 0);
+    const lon = ev.col !== undefined && t.grid ? t.grid.lonWest + (ev.col + 0.5) * t.grid.cellDeg : this.lonAt(seg, 0);
     this.lastNote = { kind: ev.kind, midi: ev.midi, lat, lon, pos: ev.pos, velocity: ev.velocity, at: performance.now() };
     this.onNote(this.lastNote);
   }
@@ -167,7 +156,6 @@ class SweepSonifier {
   headLon(always = false) {
     if (!this.player.playing && !always) return null;
     const seg = this.player.segmentAt(this.player.currentPosition);
-    if (this.mapping.lonAt) return this.lonAt(seg, this.progress() * seg.steps);
     return this.track.grid ? this.track.grid.lonWest + this.progress() * 360 : this.lonAt(seg, this.progress() * seg.steps);
   }
 
@@ -228,29 +216,6 @@ class SweepSonifier {
   }
   posForLat(lat) { return clamp(((90 - lat) / 180) * 2 - 1, -1, 1); }
 
-  // ---- the mixer (synth-voice tracks) ----
-
-  /** The mixer's voices: [{id, name, instrument, colour, share}], or [] for sampled tracks. */
-  voices() { return this.kind === 'aerosols' ? this.track.voices : []; }
-  /** Mute these voice ids. Live: notes already sounding fade too, and no note changes. */
-  setMuted(ids) { this.audio.muted = new Set(ids); if (this.audio.ready) this.audio.apply(); }
-
-  /** What is in one place of the aerosol map, in words: "strong dust near 21 degrees north; …". */
-  mixWords(mix) {
-    const word = (a) => (a < 0.02 ? 'faint' : a < 0.06 ? 'light' : a < 0.15 ? 'moderate' : 'strong');
-    const lat = (l) => (Math.abs(l) < 0.5 ? 'the equator' : `${Math.round(Math.abs(l))} degrees ${l < 0 ? 'south' : 'north'}`);
-    const heard = mix.map(([a, l], k) => ({ a, l, k })).filter((x) => x.a >= this.track.rules.restAmount).sort((x, y) => y.a - x.a);
-    return heard.length ? heard.map((x) => `${word(x.a)} ${this.track.voices[x.k].name.toLowerCase()} near ${lat(x.l)}`).join('; ') : 'clear air, silence';
-  }
-
-  /** The slice under the needle now (aerosols): {lon, words}, or null. */
-  sliceNow() {
-    if (this.kind !== 'aerosols') return null;
-    const seg = this.player.segmentAt(this.player.currentPosition);
-    const st = seg.frame.steps[clamp(Math.floor(this.progress() * seg.steps), 0, seg.steps - 1)];
-    return { lon: (st.lon0 + st.lon1) / 2, words: this.mixWords(st.mix) };
-  }
-
   /** Play one 10-degree cell of frame i, the way the sweep would, and say what it holds. */
   async probe(c, r, i = this.index) {
     const v = this.score.frames[i]?.grid?.[r]?.[c];
@@ -259,14 +224,6 @@ class SweepSonifier {
     const w = this.score.words;
     if (v === null) return w.missing;
     const lat = 90 - (r + 0.5) * 10, t = T.now() + 0.05, a = this.audio;
-    if (this.kind === 'aerosols') {
-      const mix = this.track.cells[r][c];
-      for (const n of aerosols.chordFor(this.track, mix)) {
-        a.play({ voice: n.voice, midi: n.midi, velocity: n.loudness, duration: 1.2 }, t, aerosols.posForLat(n.lat));
-        this.onNote({ kind: n.voice, midi: n.midi, lat: n.lat, lon: -180 + (c + 0.5) * 10, pos: aerosols.posForLat(n.lat), velocity: n.loudness, at: performance.now() });
-      }
-      return `${this.mixWords(mix)}.`;
-    }
     const midi = this.noteForLat(lat), pos = this.posForLat(lat);
     const pct = Math.round(Math.abs(v) * 100);
     if (this.kind === 'change') {
@@ -298,17 +255,6 @@ class SweepSonifier {
     try { await this.ensureAudio(); } catch { return 0; }
     const a = this.audio, t = T.now() + 0.05, N = nightLights.BAND_NOTES, mid = N[10];
     const note = (midi, at, pos, vel = 0.6, voice = 'notes', dur = 2) => a.play({ voice, midi, velocity: vel, duration: dur }, t + at, pos);
-    if (this.kind === 'aerosols') {
-      const R = this.track.rules, P = aerosols.posForLat;
-      if (id === 'together') {
-        for (const [v, lat] of [['blackCarbon', -10], ['dust', 20], ['seaSalt', -30], ['sulfate', 5]]) note(aerosols.midiFor(R, v, lat), 0, P(lat), 0.75, v, 1.6);
-        return 2.6;
-      }
-      const v = id.replace('meet-', '');
-      if (!aerosols.SYNTHS[v]) return 0;
-      [-40, 10, 60].forEach((lat, i) => note(aerosols.midiFor(R, v, lat), i * 0.55, P(lat), 0.8, v, 0.5));   // TerraJuke's "Meet the instruments"
-      return 2.4;
-    }
     switch (id) {
       case 'city': note(mid, 0, 0, 0.7); return 2.2;
       case 'north': note(N[18], 0, -1, 0.6); note(N[2], 1.2, 1, 0.6); return 3.2;
@@ -332,9 +278,7 @@ class SweepSonifier {
   async earcon(kind = 'ok') {
     try { await this.ensureAudio(); } catch { return; }
     if (!this.click) this.click = new T.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.03 }, volume: -22 }).toDestination();
-    // Two presses inside one audio block would share a start time, which Tone refuses: keep times rising.
-    this.clickAt = Math.max(T.now() + 0.01, (this.clickAt ?? 0) + 0.01);
-    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, this.clickAt);
+    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, T.now() + 0.01);
   }
 
   /** Stop any example or one-spot sound at once. */
@@ -344,7 +288,7 @@ class SweepSonifier {
 
   passSeconds() { return this.player.duration; }
   async renderOffline(seconds) {
-    return renderBuffer({ track: this.track, mapping: this.mapping, settings: { ...this.settings }, from: 0, seconds, mute: [...this.audio.muted] });
+    return renderBuffer({ track: this.track, mapping: this.mapping, settings: { ...this.settings }, from: 0, seconds });
   }
 
   dispose() {

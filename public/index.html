@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 <a class="skip" href="#keys">Skip to the player</a>
@@ -26,7 +26,7 @@
   <section class="intro" aria-labelledby="title">
     <div>
       <h1 id="title">Hear NASA's views of Earth</h1>
-      <p class="lede">Each track turns a NASA visualization into sound: city lights, the air we breathe, the ocean's great currents, the smoke and dust that travel the world. A line crosses the picture, and whatever it crosses plays.</p>
+      <p class="lede">Each track turns a NASA visualization into sound: city lights, the air we breathe, the ocean's great currents. A line crosses the picture, and whatever it crosses plays.</p>
     </div>
     <div class="start" aria-labelledby="start-h">
       <h2 id="start-h">Start here</h2>
@@ -60,7 +60,6 @@
         <div class="stage-over" aria-hidden="true">
           <p id="stage-when" class="stage-when"></p>
           <div class="stage-bar"><span id="stage-fill"></span></div>
-          <p id="stage-caption" class="stage-caption" hidden></p>
         </div>
         <p class="stage-hint" aria-hidden="true">Drag to turn the globe. Click a place to hear it.</p>
       </div>
@@ -89,12 +88,6 @@
           <button id="where" class="btn" type="button" aria-keyshortcuts="W">Where am I?</button>
           <button id="describe" class="btn" type="button" aria-keyshortcuts="D">Describe this map</button>
           <button id="help" class="btn" type="button" aria-keyshortcuts="H">Keys</button>
-        </div>
-
-        <div id="mixer" class="mixer" role="group" aria-labelledby="mixer-h" aria-describedby="mixer-hint" hidden>
-          <p id="mixer-h" class="mixer-h">Mixer</p>
-          <div id="mixer-strips" class="mixer-strips"></div>
-          <p id="mixer-hint" class="muted small">Mute or solo an instrument. It changes what you hear, never the notes.</p>
         </div>
 
         <div class="announce">
@@ -205,13 +198,13 @@
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality and ocean tracks by Earth Jukebox. The air we share: sound design and NASA image reading adapted from team BoboMimi's TerraJuke.</p>
+    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality and ocean tracks by Earth Jukebox.</p>
     <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Built with help from an AI coding assistant; no data, images or audio are AI-generated.</p>
   </div>
 </footer>
 
 <script src="bundle.js?v=7"></script>
-<script src="globe.js?v=13"></script>
-<script src="app.js?v=14"></script>
+<script src="globe.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
