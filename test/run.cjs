@@ -55,6 +55,12 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   // Read the live region directly: page.textContent waits on animation frames, which a slow
   // machine with software WebGL (the globe) can starve for many seconds.
   const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.evaluate(() => document.getElementById("live").textContent)).trim(); };
+  // After an action that also swaps the globe's picture (Listen to), a slow machine may take a while
+  // to speak: wait for the answer to appear (the live region is cleared first, then filled).
+  const spoken = async () => {
+    await page.waitForFunction(() => document.getElementById("live").textContent.trim().length > 0, null, { timeout: 5000, polling: 50 }).catch(() => {});
+    return live(0);
+  };
   check("ready message tells the next step", (await live(300)).includes("Press Tab to reach the player, then Space"), await live(0));
   check("no sound before a key press", await page.evaluate("EJ.Tone.getContext().state !== 'running' || !son.playing"));
 
@@ -125,7 +131,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     if (k > 0) {
       await page.keyboard.press(String(k + 1));
       await page.waitForFunction(`window.son && son.score.id === "${ids[k]}" && !document.getElementById('play').disabled`, null, { timeout: 15000 });
-      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 5000, polling: 50 }).catch(() => {});
+      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 15000, polling: 50 }).catch(() => {});
       check(`key ${k + 1}: track ${ids[k]} chosen and announced`, (await live(0)).startsWith(`Track ${k + 1} of ${ids.length}`), await live(0));
     }
     await page.keyboard.press("Space");
@@ -172,7 +178,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       const on = await live(300);
       check(`${ids[k]}: C turns on compare and explains the first part`, on.startsWith("Compare with previous part on") && on.includes("nothing to compare") && await page.isChecked("#compare"), on.slice(0, 90));
       await page.keyboard.press("ArrowRight");
-      check(`${ids[k]}: compare names both parts`, /^Part 2 of \d+ compared with Part 1\./.test(await live()), await live(0));
+      check(`${ids[k]}: compare names both parts (after the key's own name)`, /^Next map\. Part 2 of \d+ compared with Part 1\./.test(await live()), await live(0));
       await page.keyboard.press("d");
       check(`${ids[k]}: D describes the change`, /compared with Part 1\. Lightning grew in/.test(await live()), (await live(0)).slice(0, 90));
       const cmp = await page.evaluate(async () => { const b = await son.renderOffline(4); let pk = 0; for (const x of b.getChannelData(0)) pk = Math.max(pk, Math.abs(x)); return +(20 * Math.log10(pk)).toFixed(1); });
@@ -192,13 +198,13 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
         radios.map((r) => r.id).join(", "));
       await page.focus("#listen-all");
       await page.keyboard.press("ArrowRight");
-      const moved = await live();
+      const moved = await spoken();
       check(`${ids[k]}: arrow key chooses ${lay[0].name} and says so`, moved.startsWith(`${lay[0].name} only.`)
         && await page.isChecked(`#listen-${lay[0].id}`) && await page.evaluate(`son.solo === "${lay[0].id}"`), moved);
       await page.focus("#keys");
       for (const L of lay) {
         await page.keyboard.press(L.key.toLowerCase());
-        const said = await live();
+        const said = await spoken();
         check(`${ids[k]}: ${L.key} chooses ${L.name}`, said.startsWith(`${L.name} only.`)
           && await page.isChecked(`#listen-${L.id}`) && await page.evaluate(`son.solo === "${L.id}"`), said);
       }
@@ -207,7 +213,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       check(`${ids[k]}: W says what you listen to and what is under the line`,
         where.includes(`Listening to ${lay[lay.length - 1].name.toLowerCase()} only`) && where.includes("scan line is at"), where.slice(0, 160));
       await page.keyboard.press("a");
-      const all = await live();
+      const all = await spoken();
       check(`${ids[k]}: A goes back to all`, /^All \w+ /.test(all) && await page.isChecked("#listen-all") && await page.evaluate("son.solo === null"), all);
       await page.keyboard.press("h");
       const help = await live();
