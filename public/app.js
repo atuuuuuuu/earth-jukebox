@@ -12,8 +12,10 @@
 
   // ---------- Speaking ----------
   // One polite live region. Clearing it first makes a repeated message speak again.
-  let sayTimer;
+  let sayTimer, echo = null;
   const say = (text) => {
+    // Key echo: the name of the key or button just used, said once before its answer.
+    if (echo) { text = `${echo}. ${text}`; echo = null; }
     clearTimeout(sayTimer);
     $("live").textContent = "";
     sayTimer = setTimeout(() => { $("live").textContent = text; }, 60);
@@ -53,6 +55,21 @@
   $("mono").checked = settings.mono;
   $("announce").checked = store.get("announce", true);
   $("speak").checked = store.get("speak", false);
+  for (const id of ["keyecho", "clicks", "vibrate"]) {
+    $(id).checked = store.get(id, true);
+    $(id).addEventListener("change", (e) => store.set(id, e.target.checked));
+  }
+  // Vibration only where the device has it (Android phones); hide the option elsewhere.
+  const canBuzz = "vibrate" in navigator;
+  $("vibrate-row").hidden = $("vibrate-hint").hidden = !canBuzz;
+  let lastBuzz = 0;
+  const buzz = (ms) => {
+    if (!canBuzz || !$("vibrate").checked || document.hidden) return;
+    const now = performance.now();
+    if (now - lastBuzz < 70) return;            // phones cannot follow faster than this
+    lastBuzz = now;
+    navigator.vibrate(ms);
+  };
   const speedRadio = document.querySelector(`input[name="speed"][value="${settings.bpm}"]`);
   if (speedRadio) speedRadio.checked = true;
   const volText = () => `${settings.volume} percent`;
@@ -120,9 +137,8 @@
   // ---------- The globe (or a flat image when WebGL is missing) ----------
   let globe = null;
   try {
-    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit), clock: () => EJ.Tone.getContext().currentTime });
+    globe = new Globe($("globe"), { onPick: (hit) => pickSpot(hit) });
     globe.follow = true;
-    globe.ninoOn = false;
     globe.spin = !reduced.matches;
     const earth = new Image();
     earth.onload = () => globe.setEarth(earth);
@@ -143,7 +159,7 @@
 
   // ---------- Player state ----------
   let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
-  const usesVideo = () => !!score?.frames && score.sweep.mapping === "co2";
+  const usesVideo = () => !!score?.frames && ["co2", "ocean"].includes(score.sweep.mapping);
   const n = () => score.frames.length;
   const pos = () => tracks.indexOf(track) + 1;
   // A map's spoken name; in lightning's compare mode, "Part 6 of 14 compared with Part 5".
@@ -196,6 +212,8 @@
   const tick = () => {
     if (!playing || !son) return;
     $("stage-fill").style.width = `${son.progress() * 100}%`;
+    const here = son.placeNow();
+    if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
     syncVideo();
     requestAnimationFrame(tick);
   };
@@ -211,6 +229,7 @@
   const onStep = (i, info) => { son.info = info; };
   const onNote = (note) => {
     lastNote = note;
+    buzz(Math.round(12 + 30 * (note.velocity ?? 0.5)));
     if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
   };
   const onEnd = () => {
@@ -236,7 +255,7 @@
       sweepMod ||= await import("./sweep/sonifier.js");
       if (mine !== gen) return;
       score = s;
-      son = await sweepMod.createSweep(score, { ...settings, startIndex: 0, onFrame, onStep, onEnd, onNote });
+      son = await sweepMod.createSweep(score, { ...settings, startIndex: 0, onFrame, onStep, onEnd, onNote, onBeat: () => buzz(60) });
     } catch (e) {
       console.error(e);
       if (mine !== gen) return;
@@ -408,13 +427,22 @@
       return `${s}${playing ? `Playing. ${at}` : `Paused. ${at}`}${underText()}${playing ? "" : " Press Space to play."} Press H for keys.`;
     }
     if (playing) {
-      const lon = son.headLon();
-      s += `Playing. The scan line is at ${lonWords(lon)}, ${Math.round(son.progress() * 100)} percent of the way across.`;
-      if (son.info?.change !== undefined) {
-        const c = son.info.change;
-        s += c > 0.05 ? " Under it: more lightning than in the previous part." : c < -0.05 ? " Under it: less lightning than in the previous part." : " Under it: about the same as the previous part.";
-      } else if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest ${son.bedWord}.` : " It is crossing a quiet stretch.";
-      if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
+      const here = son.placeNow?.();
+      if (here) {
+        s += `Playing. ${here.date}. The camera is over ${here.place}, ${Math.round(son.progress() * 100)} percent of the way through this scene.`;
+        if (son.info) s += son.info.light > 0.2 ? ` The swell is at ${Math.round(son.info.light * 100)} percent.` : " The water on the line is calm.";
+        if (lastNote && performance.now() - lastNote.at < 4000) {
+          const p = lastNote.pos;
+          s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
+        }
+      } else {
+        s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across.`;
+        if (son.info?.change !== undefined) {
+          const c = son.info.change;
+          s += c > 0.05 ? " Under it: more lightning than in the previous part." : c < -0.05 ? " Under it: less lightning than in the previous part." : " Under it: about the same as the previous part.";
+        } else if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest ${son.bedWord}.` : " It is crossing a quiet stretch.";
+        if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
+      }
     } else {
       s += "Paused. Press Space to play.";
     }
@@ -440,14 +468,23 @@
     say("Stopped.");
   };
 
-  $("play").addEventListener("click", play);
-  $("prev").addEventListener("click", () => step(-1));
-  $("next").addEventListener("click", () => step(1));
+  // Every key and player button confirms itself: a soft click (a low one when nothing is there),
+  // and, if "Name each key I press" is on, its name before the answer: "Next map. 2014, map 3 of 12."
+  const atEdge = (d) => !son || n() < 2 || son.index + d < 0 || son.index + d >= n();
+  const run = (name, fn, edge = false) => {
+    if ($("clicks").checked) son?.earcon(edge ? "edge" : "ok");
+    echo = $("keyecho").checked ? name : null;
+    fn();
+    echo = null;
+  };
+  $("play").addEventListener("click", () => run(null, play));
+  $("prev").addEventListener("click", () => run("Previous map", () => step(-1), atEdge(-1)));
+  $("next").addEventListener("click", () => run("Next map", () => step(1), atEdge(1)));
   $("map").addEventListener("input", (e) => goTo(Number(e.target.value), false));
   $("map").addEventListener("change", (e) => say(`${mapText(Number(e.target.value))}.`));
-  $("describe").addEventListener("click", describe);
-  $("where").addEventListener("click", () => say(whereText()));
-  $("help").addEventListener("click", () => say(helpText()));
+  $("describe").addEventListener("click", () => run("Describe", describe));
+  $("where").addEventListener("click", () => run(null, () => say(whereText())));
+  $("help").addEventListener("click", () => run(null, () => say(helpText())));
 
   document.querySelector("#track-list").addEventListener("change", (e) => {
     if (e.target.name === "track") loadTrack(tracks.find((t) => t.id === e.target.value));
@@ -465,22 +502,27 @@
     const field = t.closest("input, select, textarea");
     if (field && !((field.type === "radio" || field.type === "checkbox") && listenKeys().has(k))) return;
     const onButton = t.closest("button, a");
-    const act = (fn) => { e.preventDefault(); fn(); };
+    const act = (fn, name = null, edge = false) => { e.preventDefault(); run(name, fn, edge); };
     if (listenKeys().has(k)) { act(() => setListen(listenKeys().get(k))); return; }
     switch (k) {
       case " ": case "Enter": if (!onButton) act(play); break;
       case "k": act(play); break;
-      case "ArrowLeft": act(() => step(-1)); break;
-      case "ArrowRight": act(() => step(1)); break;
-      case "Home": act(() => goTo(0)); break;
-      case "End": act(() => goTo(n() - 1)); break;
+      case "ArrowLeft": act(() => step(-1), "Previous map", atEdge(-1)); break;
+      case "ArrowRight": act(() => step(1), "Next map", atEdge(1)); break;
+      case "Home": act(() => goTo(0), "First map"); break;
+      case "End": act(() => goTo(n() - 1), "Last map"); break;
       case "w": act(() => say(whereText())); break;
-      case "d": act(describe); break;
+      case "d": act(describe, "Describe"); break;
       case "h": case "?": act(() => say(helpText())); break;
-      case "s": act(() => say(soundsText())); break;
+      case "s": act(() => say(soundsText()), "What the sounds mean"); break;
       case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
       case "c": act(() => setCompare(!$("compare").checked)); break;
       default:
+        // A letter or digit with no job: say so, so a key press is never met with silence.
+        if (t === $("keys") && k.length === 1 && !(/^[1-9]$/.test(k) && tracks[Number(k) - 1])) {
+          act(() => say(`${/[a-z]/.test(k) ? k.toUpperCase() : k === " " ? "Space" : k} does nothing here. Press H to hear the keys.`), null, true);
+          break;
+        }
         if (/^[1-9]$/.test(k) && tracks[Number(k) - 1]) {
           act(() => {
             const r = $(`track-${tracks[Number(k) - 1].id}`);

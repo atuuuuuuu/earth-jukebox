@@ -10,11 +10,12 @@ import { renderBuffer } from './render.js';
 import { clamp } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
+import * as ocean from './tracks/ocean.js';
 import * as lightning from './tracks/lightning.js';
 import * as aerosols from './tracks/aerosols.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, lightning, aerosols };
+const MAPPINGS = { 'night-lights': nightLights, co2, ocean, lightning, aerosols };
 const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
@@ -69,6 +70,17 @@ const DEMOS = {
     ['beat', 'Heartbeat', 'A soft double beat', 'The heartbeat. One soft double beat for each day of data, at midnight.'],
   ],
 };
+DEMOS.air = [
+  ['city', 'Thick pollution', 'One ringing note', 'Thick pollution. Where a pollutant is thick, a note rings as the scan line crosses it. Thicker rings louder.'],
+  ['tense', 'The worst air', 'The drone turns sour', 'The worst air. Where pollution is thickest, clashing notes creep into the drone and it turns harsh.'],
+  DEMOS.light[1],
+];
+DEMOS.ocean = [
+  ['city', 'A current', 'One harp note', 'A current or eddy. When bright, fast water crosses the line, a harp note rings. Brighter water rings louder.'],
+  ['swell', 'The swell', 'Grows, then settles', 'The swell. It follows all the moving water on the line: soft over calm sea, full over strong currents.'],
+  ['beat', 'A new month', 'A soft low pulse', 'A new month. One soft low pulse at the start of each month of the tour.'],
+  ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Water near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
+];
 // Lightning's examples follow its legend, in the same order, then the stereo sweep.
 DEMOS.lightning = [
   ['marks', 'Lightning marks', 'Lone notes, then a flurry', 'Lightning marks. Each mark in NASA\'s movie plays one quiet, short harp note as the scan line crosses it. A lone mark is a single note; where many marks crowd together they make a soft, quick flurry. Higher notes are farther north.'],
@@ -97,11 +109,12 @@ const about = (n) => {
 class SweepSonifier {
   constructor(score, data, mapping, {
     bpm = 84, volume = 100, mono = false, startIndex = 0, muted = [],
-    onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {},
+    onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {}, onBeat = () => {},
   } = {}) {
-    Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, bpm, volume });
-    this.kind = mapping === co2 ? 'co2' : mapping === lightning ? 'lightning' : mapping === aerosols ? 'aerosols'
-      : score.sweep.chapter === 'change' ? 'change' : 'light';
+    Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
+    this.kind = mapping === co2 ? 'co2' : mapping === ocean ? 'ocean' : mapping === lightning ? 'lightning'
+      : mapping === aerosols ? 'aerosols' : score.sweep.chapter === 'change' ? 'change'
+        : score.sweep.chapter === 'pollutants' ? 'air' : 'light';
     this.bedWord = this.kind === 'lightning' ? 'bass' : 'hum';   // what "Where am I" calls the low layer
     this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
     this.track = { ...data, chapters: [this.chapter] };
@@ -116,6 +129,7 @@ class SweepSonifier {
     this.player = new Player({
       track: this.track, mapping, audio: this.audio, settings: this.settings,
       onVoice: (ev) => this.voice(ev),
+      onBeat: (v) => this.onBeat(v),
       onStep: (seg, step, plan) => this.stepped(seg, step, plan),
       onEnd: () => this.onEnd(),
     });
@@ -154,7 +168,7 @@ class SweepSonifier {
       ? t.grid.latNorth - (ev.row + 0.5) * t.grid.cellDeg
       : (Math.asin(clamp(-ev.pos, -1, 1)) * 180) / Math.PI);
     const lon = ev.lon ?? (ev.col !== undefined && t.grid ? t.grid.lonWest + (ev.col + 0.5) * t.grid.cellDeg : this.lonAt(seg, 0));
-    this.lastNote = { kind: ev.kind, midi: ev.midi, lat, lon, pos: ev.pos, at: performance.now() };
+    this.lastNote = { kind: ev.kind, midi: ev.midi, lat, lon, pos: ev.pos, velocity: ev.velocity, at: performance.now() };
     this.onNote(this.lastNote);
   }
 
@@ -173,6 +187,14 @@ class SweepSonifier {
     if (!this.player.playing && !always) return null;
     const seg = this.player.segmentAt(this.player.currentPosition);
     return this.track.grid ? this.track.grid.lonWest + this.progress() * 360 : this.lonAt(seg, this.progress() * seg.steps);
+  }
+
+  /** For the ocean tour: where the camera is and the date on screen, in words; else null. */
+  placeNow() {
+    if (this.kind !== 'ocean') return null;
+    const seg = this.player.segmentAt(this.player.currentPosition);
+    const s = Math.floor(seg.frame.startStep + this.progress() * (seg.steps - 1));
+    return { place: seg.frame.place, date: ocean.dateAt(this.track, s) };
   }
 
   /** For tracks played from a NASA video: the video time that matches the sound, in seconds. */
@@ -549,11 +571,22 @@ class SweepSonifier {
         a.setHum(0, 0, t + 3.8, 0.3); return 4;
       case 'tense':
         a.setHum(0.6, 0, t, 0.3); a.setHum(0.8, 0, t + 0.4, 1.2, 1); a.setHum(0, 0, t + 2.6, 0.6, 0); return 3.4;
-      case 'beat': a.beat(t, 0.9); a.beat(t + 1.2, 0.9); return 2;
+      case 'beat': a.beat(t, 0.9); if (this.kind !== 'ocean') a.beat(t + 1.2, 0.9); return 2;
+      case 'swell':
+        a.setHum(0.1, 0, t, 0.2); a.setHum(0.85, 0, t + 0.2, 1.8); a.setHum(0.1, 0, t + 2.4, 1.6);
+        a.setHum(0, 0, t + 4.2, 0.4); return 4.4;
+      case 'top': note(N[17], 0, -1, 0.6); note(N[3], 1.2, 1, 0.6); return 3.4;
       case 'gain': note(mid, 0, 0, 0.6); note(N[11], 0.11, 0, 0.45); return 2.2;
       case 'loss': note(mid - 12, 0, 0, 0.6, 'cello', 1.4); note(N[9] - 12, 0.3, 0, 0.4, 'cello', 1.6); return 2.6;
       default: return 0;
     }
+  }
+
+  /** A short, quiet click that confirms a key press: 'ok' (an action), 'edge' (nothing there). */
+  async earcon(kind = 'ok') {
+    try { await this.ensureAudio(); } catch { return; }
+    if (!this.click) this.click = new T.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.03 }, volume: -22 }).toDestination();
+    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, T.now() + 0.01);
   }
 
   /** Stop any example or one-spot sound at once. */
@@ -570,5 +603,6 @@ class SweepSonifier {
     this.disposed = true;
     this.player.pause();
     this.audio.dispose();
+    this.click?.dispose();
   }
 }

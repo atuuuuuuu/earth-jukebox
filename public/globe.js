@@ -1,6 +1,6 @@
 // globe.js: a 3D globe in plain WebGL. No libraries.
 // The ocean is the NASA data frame itself; land comes from NASA Blue Marble.
-// It shows what the music is doing: the scan strip, the listening cursor and the Niño 3.4 box.
+// It shows what the music is doing: the scan line, the notes just played and the listening cursor.
 (function () {
   "use strict";
 
@@ -31,11 +31,8 @@ uniform sampler2D uData1;
 uniform sampler2D uEarth;
 uniform float uMix;            // crossfade between the previous and current frame
 uniform float uLeftLon;
-uniform float uStrip;          // scan strip 0..15, or -1
-uniform float uHead;           // playhead longitude, gliding through the strip being played
+uniform float uHead;           // scan line longitude, or 999 when nothing is playing
 uniform vec2 uCell;            // listening cursor (col, row), or (-1, -1)
-uniform float uBell;           // 0..1, the El Niño bell glow
-uniform float uNinoOn;         // 1 when the track has Niño 3.4 data, else the box is not drawn
 uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
@@ -56,7 +53,7 @@ float line(float d, float px) {
 }
 
 // How much a frame colour is data. Pure grey (land, ice) has almost no saturation: no data.
-// Near-zero ocean is a bright cream, so brightness keeps it.
+// Very bright colours count as data too.
 float dataOf(vec3 c) {
   float hi = max(c.r, max(c.g, c.b));
   float sat = hi - min(c.r, min(c.g, c.b));
@@ -100,9 +97,7 @@ void main() {
     float around = n > 0.5 ? sum / n : 1.0;
     isData = max(isData, ink * smoothstep(0.6, 0.95, around));
   }
-  // The NASA date stamp sits in the bottom-left corner of every frame: never paint it on the globe.
   isData = mix(isData, 1.0, uFull);
-  isData *= 1.0 - (1.0 - uFull) * smoothstep(0.895, 0.905, uvImg.y) * (1.0 - smoothstep(0.14, 0.15, uvImg.x));
   isData *= uDataOn;
   vec3 land = earth * 0.82;
   vec3 col = mix(land, data, isData);
@@ -116,20 +111,6 @@ void main() {
   float gLon = line(15.0 - abs(mod(lon + 180.0, 30.0) - 15.0), 1.0) * meridianFade;
   float gLat = line(15.0 - abs(mod(lat + 90.0, 30.0) - 15.0), 1.0);
   col = mix(col, vec3(1.0), 0.10 * max(gLon, gLat));
-
-  // Scan strip: the 22.5 degree slice being played right now.
-  if (uStrip >= 0.0) {
-    float c = uLeftLon + (uStrip + 0.5) * 22.5;
-    float dd = lonDist(lon, c);
-    float inside = 1.0 - smoothstep(10.9, 11.25, dd);
-    float edge = line(abs(dd - 11.25), 1.5) * meridianFade;
-    col = mix(col, col * 1.18 + 0.06, 0.55 * inside);
-    col = mix(col, vec3(1.0), 0.45 * edge);
-    // Playhead: where in this strip the music is right now. Its own warm colour, so it stays
-    // one clear line when it reaches the strip edge.
-    float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
-    col = mix(col, vec3(1.0, 0.9, 0.55), 0.95 * ph);
-  }
 
   // Sweep tracks: one thin scan line moving west to east. The part not yet heard rests dimmer.
   if (uSweep > 0.5 && uHead < 900.0) {
@@ -159,19 +140,6 @@ void main() {
     float box = max(dx, dy);
     float ring = line(abs(box - 5.0), 2.0) * step(min(dx, dy), 5.4);
     col = mix(col, vec3(1.0, 0.86, 0.3), 0.95 * ring);
-  }
-
-  // Niño 3.4 box: 5S to 5N, 170W to 120W. Glows when the bell rings.
-  {
-    float dx = lonDist(lon, -145.0), dy = abs(lat);
-    float edgeX = line(abs(dx - 25.0), 1.5) * step(dy, 5.3);
-    float edgeY = line(abs(dy - 5.0), 1.5) * step(dx, 25.3);
-    float dash = step(0.5, fract((lon + lat) / 3.0));
-    float e = max(edgeX, edgeY);
-    vec3 boxCol = mix(vec3(0.85, 0.95, 1.0), vec3(1.0, 0.95, 0.6), uBell);
-    col = mix(col, boxCol, uNinoOn * e * (0.35 + 0.55 * uBell) * mix(dash, 1.0, uBell));
-    float inBox = step(dx, 25.0) * step(dy, 5.0);
-    col += uNinoOn * inBox * uBell * 0.22 * vec3(1.0, 0.9, 0.5);
   }
 
   // Soft light from the upper left, never so dark that the data is hard to read.
@@ -230,14 +198,10 @@ void main() {
       this.tilt = 12;
       this.targetYaw = null;
       this.spin = true;
-      this.strip = -1;
       this.follow = false;   // turn with the scan
-      this.clock = opts.clock || (() => performance.now() / 1000);   // the audio clock, in seconds
       this.fps = 24;         // smooth enough, and light on older laptops
       this.nextDraw = 0;
       this.cell = [-1, -1];
-      this.bell = 0;
-      this.ninoOn = true;   // false for tracks without Niño 3.4 data
       this.mix = 1;
       this.dataOn = true;
       this.scale = 0.9;
@@ -285,7 +249,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uStrip", "uHead", "uCell", "uBell", "uNinoOn", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -335,25 +299,10 @@ void main() {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.tex[1]);
     }
 
-    ringBell() { this.bell = 1; }
     // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
     ping(lon, lat, kind = 0) {
       this.pings.push({ lon, lat, kind, born: performance.now() });
       if (this.pings.length > 6) this.pings.shift();
-    }
-    // The music reached strip s at audio time `at` (seconds on this.clock); it lasts `seconds`.
-    // The playhead glides through it on the audio clock, so it matches what you hear even if frames bunch up.
-    step(s, seconds, at) {
-      this.strip = s;
-      this.stepDur = seconds;
-      this.stepAt = typeof at === "number" ? at : this.clock();
-    }
-    // Playhead position in strips (0..16), or -1 when nothing is being scanned.
-    head() {
-      if (this.strip < 0) return -1;
-      if (this.reduced.matches || !this.stepDur) return this.strip + 0.5;
-      // Up to two strips ahead: if the page stalls and a step callback is dropped, keep following the audio.
-      return this.strip + clamp((this.clock() - this.stepAt) / this.stepDur, 0, 2);
     }
     lookAt(lon, lat) {
       this.targetYaw = lon;
@@ -425,9 +374,7 @@ void main() {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       const still = this.reduced.matches;
-      const h = this.head();
-      this.headPos = h;
-      this.headLon = h < 0 ? 999 : this.leftLon + h * 22.5;
+      this.headLon = 999;
       if (this.headFn) {
         // Sweep tracks: the line's longitude comes straight from the audio clock.
         const l = this.headFn();
@@ -439,7 +386,7 @@ void main() {
       if (this.follow && this.headLon < 900) {
         // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
         const diff = wrap(this.headLon - this.yaw);
-        const moving = still ? 0 : this.headFn ? this.headSpeed : h < this.strip + 2 ? 22.5 / this.stepDur : 0;
+        const moving = still ? 0 : this.headSpeed;
         this.yaw = still ? wrap(this.headLon) : wrap(this.yaw + moving * dt + diff * Math.min(1, dt * 5));
         this.targetYaw = this.yaw;   // stay here when the music stops
       } else if (this.targetYaw !== null && this.targetYaw !== undefined) {
@@ -454,7 +401,6 @@ void main() {
         this.tilt += still ? d : d * Math.min(1, dt * 4);
       }
       this.mix = Math.min(1, this.mix + dt * 4);
-      this.bell = Math.max(0, this.bell - dt * 0.9);
       this.draw();
     }
 
@@ -477,12 +423,8 @@ void main() {
       gl.uniformMatrix3fv(this.u.uRot, false, new Float32Array(R));
       gl.uniform1f(this.u.uMix, this.mix);
       gl.uniform1f(this.u.uLeftLon, this.leftLon);
-      // The lit strip is the one under the playhead (the same as this.strip unless a step callback was dropped).
-      gl.uniform1f(this.u.uStrip, this.strip < 0 ? -1 : Math.floor(this.headPos) % 16);
-      gl.uniform1f(this.u.uHead, this.headLon === undefined ? 999 : this.headLon);
+      gl.uniform1f(this.u.uHead, this.headLon);
       gl.uniform2f(this.u.uCell, this.cell[0], this.cell[1]);
-      gl.uniform1f(this.u.uBell, this.bell);
-      gl.uniform1f(this.u.uNinoOn, this.ninoOn ? 1 : 0);
       gl.uniform1f(this.u.uDataOn, this.dataOn ? 1 : 0);
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.uniform1f(this.u.uFull, this.full ? 1 : 0);

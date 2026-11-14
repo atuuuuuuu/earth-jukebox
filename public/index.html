@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Earth Jukebox: hear NASA's views of Earth</title>
-<meta name="description" content="NASA maps of Earth at night, carbon dioxide, lightning and aerosols, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
+<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, carbon dioxide, lightning and aerosols, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
 <meta name="theme-color" content="#0a0d14">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0d14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffc861' stroke-width='2.5'/%3E%3Cpath d='M16 7v18' stroke='%23ffc861' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <a class="skip" href="#keys">Skip to the player</a>
@@ -26,7 +26,7 @@
   <section class="intro" aria-labelledby="title">
     <div>
       <h1 id="title">Hear NASA's views of Earth</h1>
-      <p class="lede">Each track turns a NASA map into sound. A scan line crosses the world from west to east, and whatever it crosses plays.</p>
+      <p class="lede">Each track turns a NASA visualization into sound: city lights, the air we breathe, the ocean's great currents. A line crosses the picture, and whatever it crosses plays.</p>
     </div>
     <div class="start" aria-labelledby="start-h">
       <h2 id="start-h">Start here</h2>
@@ -35,6 +35,7 @@
         <li>Press <kbd>Tab</kbd> to reach the player's keyboard area, then <kbd>Space</kbd> to play or pause.</li>
         <li>In the player, press <kbd>H</kbd> to hear every key, and <kbd>W</kbd> to ask where you are.</li>
         <li>Use headphones if you can: the north sounds in your left ear, the south in your right.</li>
+        <li>Every key you press is named out loud, with a soft click. Turn that off in Settings.</li>
       </ol>
     </div>
   </section>
@@ -158,9 +159,15 @@
       </fieldset>
       <div class="checks">
         <label class="check"><input id="announce" type="checkbox" checked aria-describedby="announce-hint"> Say each new map</label>
-        <p id="announce-hint" class="muted small">While playing, says the year, week or month as each map starts.</p>
+        <p id="announce-hint" class="muted small">While playing, says the year, pollutant, scene, week or part as each map starts.</p>
         <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
         <p id="mono-hint" class="muted small">Every sound in the centre, for one earbud or hearing in one ear.</p>
+        <label class="check"><input id="keyecho" type="checkbox" checked aria-describedby="keyecho-hint"> Name each key I press</label>
+        <p id="keyecho-hint" class="muted small">Says what a key did, like "Next map", before the answer, and tells you when a key does nothing.</p>
+        <label class="check"><input id="clicks" type="checkbox" checked aria-describedby="clicks-hint"> Click on each key</label>
+        <p id="clicks-hint" class="muted small">A soft high click when a key works, a low one when there is nothing there.</p>
+        <label class="check" id="vibrate-row"><input id="vibrate" type="checkbox" checked aria-describedby="vibrate-hint"> Vibrate with the sound</label>
+        <p id="vibrate-hint" class="muted small">On phones that can: a short buzz for each note, stronger for louder notes, and a pulse on each beat.</p>
         <label class="check"><input id="speak" type="checkbox" aria-describedby="speak-hint"> Read aloud</label>
         <p id="speak-hint" class="muted small">Speaks with your device's voice. Leave this off if you use a screen reader.</p>
       </div>
@@ -168,6 +175,28 @@
         <button id="save" class="btn" type="button" aria-describedby="save-hint">Save as audio file</button>
         <p id="save-hint" class="muted small">Downloads this track as a WAV file, up to 3 minutes.</p>
       </div>
+    </div>
+  </section>
+
+  <section id="how" class="block" aria-labelledby="how-h">
+    <h2 id="how-h">How it was made, and why</h2>
+    <div class="how-grid">
+      <article aria-labelledby="how-1">
+        <h3 id="how-1">Listening comes first</h3>
+        <p>Most data sonification is made for sighted people, with sound added on top of a chart. We built it the other way round: a blind listener can open this page alone, with no one explaining it. Every key says what it did, every sound has an example button, and <kbd>W</kbd> always tells you where you are. The globe and the video are there for sighted friends listening along.</p>
+      </article>
+      <article aria-labelledby="how-2">
+        <h3 id="how-2">Reading NASA's pictures</h3>
+        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: a line through the middle of NASA's picture measures the bright white flow lines, ten times per second of video.</p>
+      </article>
+      <article aria-labelledby="how-3">
+        <h3 id="how-3">Turning numbers into sound</h3>
+        <p>The rule is the same on every track, so you only learn it once. Up is higher pitch and your left ear; down is lower and your right. A note rings where a place is bright, thick or fast; a deep drone carries everything under the line. Notes use a pentatonic scale, so they never clash by accident; when they do clash, it means something.</p>
+      </article>
+      <article aria-labelledby="how-4">
+        <h3 id="how-4">Beauty and urgency</h3>
+        <p>We let the sound carry the feeling of the data. Clean air is a calm, open drone; where pollution is worst, the drone turns sour and the notes slip into a minor key. The ocean gets a harp and no sourness at all: its currents link every coast on Earth. Light that is new since 2012 rises; light that went out falls, on a cello.</p>
+      </article>
     </div>
   </section>
 
@@ -180,13 +209,13 @@
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar.</p>
+    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality and ocean tracks by Earth Jukebox.</p>
     <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Built with help from an AI coding assistant; no data, images or audio are AI-generated.</p>
   </div>
 </footer>
 
-<script src="bundle.js?v=6"></script>
-<script src="globe.js?v=9"></script>
-<script src="app.js?v=11"></script>
+<script src="bundle.js?v=7"></script>
+<script src="globe.js?v=12"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

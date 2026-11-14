@@ -1,0 +1,74 @@
+# Track 06 — Air Quality Model Runs (GEOS-CF), July-August 2024: the flat map movie with sliding strips
+id: 06_air_quality
+title: "Air Quality, Summer 2024"
+short: "Air quality"
+builder: air_quality
+
+source:
+  video: 06_Air_Quality/EIC_AirQuality_Preview_3840x1080.mp4
+  svs_id: 5533
+  url: https://svs.gsfc.nasa.gov/5533/
+  svs_title: "Air Quality Model Runs"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: ""
+  dataset: "NASA GEOS Composition Forecasting system (GEOS-CF), July-August 2024"
+
+geometry:
+  # NASA's wide EIC version. Measured on landmarks (India's southern tip, the Cape of Good Hope): the
+  # map is 6 px per degree, 180 W at the left edge, 90 N at the top, and repeats every 2160 px, so
+  # 3840 px show the whole world once and 180 W to 100 E twice. (The 16:9 map movie stops at 140 E.)
+  work: [3840, 1080]
+  px_per_deg: 6
+
+time:
+  span: "July and August 2024"
+
+extraction:
+  cell_deg: 3
+  strip_width: 500           # px; measured: the green strip is 500 px, the period 2000
+  edge_guard: 8              # px skipped at each strip edge (soft boundaries)
+  label_box: [882, 964, 100] # the label boxes: rows 882-964, within 100 px of each strip's centre
+  sample_every: 3
+  min_clear: 0.5             # skip frames where the strips do not show (fades, titles)
+  min_pixels: 30             # a 3-degree cell needs this many pixel readings to count
+
+pollutants:                  # playing order
+  - id: pm
+    title: "Fine particles (PM2.5)"
+    alt: "World map of fine particles, PM2.5, summer 2024: cream where the air is clean, orange to dark brown where smoke and dust are thick, over Canada, Siberia, the Sahara and Central Africa."
+  - id: co
+    title: "Carbon monoxide"
+    alt: "World map of carbon monoxide, summer 2024: pale yellow where it is low, red where it is high, over the Canadian and Siberian fires and the burning season in Central Africa."
+  - id: nox
+    title: "Nitrogen oxides"
+    alt: "World map of nitrogen oxides, summer 2024: black and white where there is almost none, dark green over industry and traffic in eastern China, India, Europe and the United States."
+  - id: o3
+    title: "Ozone"
+    alt: "World map of surface ozone, summer 2024: grey where it is low, deep purple where it is high, over the Mediterranean, the Middle East, China and North America."
+
+media:
+  width: 2048
+  height: 1024
+  webp_quality: 82
+
+playback:
+  seconds_per_sweep: 14
+
+legend:
+  summary: >
+    Four kinds of air pollution from NASA's GEOS-CF model, July and August 2024, a summer of huge
+    wildfires in Canada: fine particles, carbon monoxide, nitrogen oxides and ozone. A scan line
+    crosses the world once for each, west to east.
+  method: >
+    Places in the north sound higher and in your left ear; places in the south lower and in your
+    right. Clean air is a quiet, open drone. Where the air is dirty, notes ring and the drone turns
+    harsh and sour, so the worst air sounds the most uneasy.
+  items:
+    - sound: "Ringing notes"
+      meaning: "Places where this pollutant is thick, played as the scan line crosses them. Louder = thicker."
+    - sound: "Drone"
+      meaning: "All the pollution under the scan line. It grows rough and sour where the air is worst."
+  caveat: >
+    Levels are read from the colours of NASA's movie, so they are relative: 0 is the clean end of
+    NASA's colour scale for that pollutant, 100 the dirty end. Each pollutant has its own scale, so
+    compare places, not pollutants.

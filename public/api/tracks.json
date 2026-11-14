@@ -42,8 +42,46 @@
       }
     },
     {
-      "id": "carbon-dioxide",
+      "id": "air-quality",
       "code": "3",
+      "title": "Air quality",
+      "subtitle": "Four pollutants, summer 2024",
+      "description": "NASA's model of the air we breathe in July and August 2024, a summer of huge wildfires. One scan for each pollutant: fine particles, carbon monoxide, nitrogen oxides and ozone. Clean air is a calm drone; dirty air rings notes and turns the drone sour.",
+      "score": "api/scores/air-quality.json",
+      "frames": 4,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "Fine particles (PM2.5) to Ozone",
+      "units": "position on NASA's colour scale for that pollutant",
+      "engine": "sweep",
+      "source": {
+        "title": "Air Quality Model Runs",
+        "url": "https://svs.gsfc.nasa.gov/5533/",
+        "credit": "NASA's Scientific Visualization Studio. Data: NASA GEOS Composition Forecasting system (GEOS-CF), July-August 2024"
+      }
+    },
+    {
+      "id": "ocean-currents",
+      "code": "4",
+      "title": "Ocean currents",
+      "subtitle": "Perpetual Ocean, 2021 to 2023",
+      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
+      "score": "api/scores/ocean-currents.json",
+      "frames": 8,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "The whole ocean to The whole ocean again",
+      "units": "brightness of moving water on the line",
+      "engine": "sweep",
+      "source": {
+        "title": "Perpetual Ocean 2: Western Boundary Currents",
+        "url": "https://svs.gsfc.nasa.gov/5425/",
+        "credit": "NASA's Scientific Visualization Studio, visualizer Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL). Data: ECCO2 high-resolution ocean and sea ice model (NASA/JPL); Blue Marble: Next Generation"
+      }
+    },
+    {
+      "id": "carbon-dioxide",
+      "code": "5",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
       "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
@@ -62,7 +100,7 @@
     },
     {
       "id": "lightning",
-      "code": "4",
+      "code": "6",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
       "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
@@ -81,7 +119,7 @@
     },
     {
       "id": "aerosols",
-      "code": "5",
+      "code": "7",
       "title": "Aerosols",
       "subtitle": "Four winds, 19 August 2025",
       "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",

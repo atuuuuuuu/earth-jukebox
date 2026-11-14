@@ -65,12 +65,6 @@ class Stats(unittest.TestCase):
         none = [[None] * 36 for _ in range(18)]
         self.assertIsNone(bs.stats(none, 0.5)["mean"])
 
-    def test_strips_cover_the_world_west_to_east(self):
-        g = [[float(c) for c in range(36)] for _ in range(18)]
-        s = bs.strips(g)
-        self.assertEqual(len(s), 16)
-        self.assertLess(s[0], s[-1])
-
 
 class NewBuilders(unittest.TestCase):
     def test_weeks_fill_only_the_cells_the_line_crossed(self):
@@ -186,6 +180,30 @@ class Still(unittest.TestCase):
             problems = validate_api.check(public)
             self.assertTrue(any("layer 'dust'" in m for m in problems))
             self.assertTrue(any("layer keys" in m for m in problems))
+
+    def test_pollutants_skip_unread_cells_and_name_the_thickest(self):
+        v = fine(10)
+        for j in [at(lat, lon) for lat in (32, 35, 38) for lon in (111, 114, 117)]:
+            v[j] = 100                               # Beijing's 10-degree square
+        east = [at(lat, lon) for lat in range(-88, 90, 3) for lon in range(142, 180, 3)]
+        for j in east:
+            v[j] = 100                               # would be thickest, but NASA's map has no reading there
+        out = bs.build_pollutants({"grid": G}, {"frames": [
+            {"label": "Ozone", "span": "July and August 2024", "image": "o3.webp", "glow": v, "core": v,
+             "total": 1.0, "missing": east}]}, {"hotLine": 0.5})
+        self.assertTrue(out[0]["text"].startswith("Ozone, July and August 2024. Thickest: around Beijing"), out[0]["text"])
+        self.assertIsNone(out[0]["grid"][5][33])     # 40-50 N, 150-160 E: not read
+        self.assertIsNone(out[0]["date"])
+
+    def test_scenes_have_no_map_and_tell_the_story(self):
+        out = bs.build_scenes({}, {"frames": [
+            {"label": "Gulf Stream", "from": "1 May 2023", "to": "2 June 2023", "place": "the Gulf Stream",
+             "image": "s.webp", "alt": "", "relative": 1, "story": "It carries warmth to Europe."}]}, {"hotLine": 0.5})
+        f = out[0]
+        self.assertEqual(f["text"], "Gulf Stream, 1 May 2023 to 2 June 2023. The camera is over the Gulf Stream. "
+                                    "Bright moving water in the picture: the busiest scene. It carries warmth to Europe.")
+        self.assertTrue(all(c is None for row in f["grid"] for c in row))
+        self.assertEqual((len(f["grid"]), len(f["grid"][0])), (18, 36))
 
 
 class Build(unittest.TestCase):

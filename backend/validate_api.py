@@ -12,10 +12,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-COLS, GRID_COLS, GRID_ROWS = 16, 36, 18
+GRID_COLS, GRID_ROWS = 36, 18
 TRACK_KEYS = ("id", "code", "title", "score", "frames", "firstDate", "lastDate", "units", "source")
-SCORE_KEYS = ("api", "id", "units", "range", "hotLine", "ninoLine", "leftLon", "tuning", "frames")
-FRAME_KEYS = ("date", "image", "mean", "spread", "hot", "clusters", "valid", "columns", "grid", "text")
+SCORE_KEYS = ("api", "id", "units", "range", "hotLine", "leftLon", "frames")
+FRAME_KEYS = ("date", "image", "mean", "spread", "hot", "clusters", "valid", "grid", "text")
 # Letters the player already uses (public/app.js): play (K), W, D, H, S, M, C, and A for "all layers".
 PLAYER_KEYS = set("kwdhsmca")
 
@@ -66,7 +66,7 @@ def check(public: Path) -> list[str]:
     bad = problems.append
     index_path = public / "api" / "tracks.json"
     if not index_path.exists():
-        return [f"Missing {index_path}. Run build_api.py first."]
+        return [f"Missing {index_path}. Run npm run api (build_sweep.py) first."]
     index = json.loads(index_path.read_text(encoding="utf-8"))
     if index.get("api") != 1:
         bad("tracks.json: 'api' must be 1")
@@ -131,21 +131,10 @@ def check(public: Path) -> list[str]:
                 bad(f"{at}: image not found: {f.get('image')}")
             if not in_range(f.get("mean")):
                 bad(f"{at}: mean {f.get('mean')} outside the range")
-            for k in ("nino34", "tropics"):
-                if k in f and not in_range(f[k]):
-                    bad(f"{at}: {k} {f[k]} outside the range")
-            if "nino34" in f:
-                rel, n34, trop = f.get("nino34Relative"), f.get("nino34"), f.get("tropics")
-                if (rel is None) != (n34 is None or trop is None) or (
-                        rel is not None and abs(rel - (n34 - trop)) > 0.002):
-                    bad(f"{at}: nino34Relative must equal nino34 minus tropics")
             if not 0 <= f.get("hot", -1) <= 1 or not 0 <= f.get("valid", -1) <= 1:
                 bad(f"{at}: hot and valid must be between 0 and 1")
             if not isinstance(f.get("clusters"), int) or f["clusters"] < 0:
                 bad(f"{at}: clusters must be a whole number")
-            cols = f.get("columns") or []
-            if len(cols) != COLS or not all(in_range(x) for x in cols):
-                bad(f"{at}: columns must be {COLS} numbers or nulls inside the range")
             grid = f.get("grid") or []
             if len(grid) != GRID_ROWS or any(len(r) != GRID_COLS or not all(in_range(x) for x in r) for r in grid):
                 bad(f"{at}: grid must be {GRID_ROWS} rows of {GRID_COLS} numbers or nulls inside the range")

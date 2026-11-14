@@ -12,7 +12,7 @@ Stage 2, this script, uses only the Python standard library. For every track in 
 config it writes a score that follows backend/API.md, so every part of the page works
 on it (Describe, Listen to one spot, Hear the change, the globe and the flat map):
 
-    api/scores/<track id>.json   grid (18 x 36), columns (16), mean, text ... per map
+    api/scores/<track id>.json   grid (18 x 36), mean, text ... per map
     api/tracks.json              the sweep tracks added or replaced; other tracks kept
 
 The sweep engine itself plays the full 3-degree grid: the score names it in "sweep".
@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 API_VERSION = 1
-GRID_ROWS, GRID_COLS, STRIPS = 18, 36, 16
+GRID_ROWS, GRID_COLS = 18, 36
 LAT_MIN, LAT_MAX = -60.0, 76.0   # the same rows the sweep engine reads: no ice-sheet texture
 
 # Big cities, most populous first. Only used to name a 10-degree square in the spoken text;
@@ -115,31 +115,14 @@ def pool(values: list[float], g: dict, lat_range: tuple[float, float] = (LAT_MIN
         w = math.cos(math.radians(lat))
         R = min(GRID_ROWS - 1, int((90 - lat) // 10))
         for c in range(cols):
+            v = values[r * cols + c]
+            if v is None:                       # no reading in this fine cell
+                continue
             lon = g["lonWest"] + (c + 0.5) * step
             C = min(GRID_COLS - 1, int(((lon + 180) % 360) // 10))
-            total[R][C] += w * values[r * cols + c]
+            total[R][C] += w * v
             weight[R][C] += w
     return [[total[R][C] / weight[R][C] if weight[R][C] else None for C in range(GRID_COLS)] for R in range(GRID_ROWS)]
-
-
-def strips(grid: list[list[float | None]]) -> list[float | None]:
-    """16 west-to-east strips of 22.5 degrees, area-weighted, from the 10-degree grid."""
-    out = []
-    for s in range(STRIPS):
-        west, east = -180 + s * 22.5, -180 + (s + 1) * 22.5
-        tot = wsum = 0.0
-        for C in range(GRID_COLS):
-            overlap = max(0.0, min(east, -180 + (C + 1) * 10) - max(west, -180 + C * 10)) / 10
-            if not overlap:
-                continue
-            for R in range(GRID_ROWS):
-                v = grid[R][C]
-                if v is not None:
-                    w = overlap * math.cos(math.radians(cell_lat(R)))
-                    tot += w * v
-                    wsum += w
-        out.append(tot / wsum if wsum else None)
-    return out
 
 
 def percentile(xs: list[float], q: float) -> float:
@@ -244,7 +227,6 @@ def build_years(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": rel,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text,
         })
@@ -278,7 +260,6 @@ def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
             "image": f["image"],
             "alt": f.get("alt", ""),
             **st,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -306,7 +287,7 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
         mid = (f["startStep"] + f["steps"] / 2) * data["framesPerStep"] / data["media"]["fps"]
         # as_posix: the path goes into the score as a URL, so forward slashes on Windows too
         image = f.get("image") or still(t["_public"], data["media"]["src"], mid,
-                                         (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())
+                                         (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())  # a web path: / even on Windows
         total = [[0.0] * GRID_COLS for _ in range(GRID_ROWS)]
         count = [[0] * GRID_COLS for _ in range(GRID_ROWS)]
         for s_ in range(f["startStep"], f["startStep"] + f["steps"]):
@@ -333,7 +314,6 @@ def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": rel,
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -371,7 +351,6 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
             "alt": f.get("alt", ""),
             **st,
             "relativeTotal": round(rel, 3),
-            "columns": [None if v is None else round(v, 4) for v in strips(grid)],
             "grid": r3(grid),
             "text": text.strip(),
         })
@@ -409,7 +388,6 @@ def build_still(data: dict, chapter: dict, t: dict) -> list[dict]:
             "image": f["image"],
             "alt": f.get("alt", ""),
             **st,
-            "columns": [None if v is None else round(v, 4) for v in strips(combined)],
             "grid": r3(combined),
             "layers": {k: r3(gr) for k, gr in grids.items()},
             "text": text.strip(),
@@ -417,10 +395,52 @@ def build_still(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+def build_scenes(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """Ocean tour: a moving camera, so there is no map of places: every grid cell is None, and the
+    spoken text names where the camera is, the dates, and the scene's story."""
+    frames = []
+    for f in chapter["frames"]:
+        rel = f.get("relative") or 0
+        grid = [[None] * GRID_COLS for _ in range(GRID_ROWS)]
+        busiest = "the busiest scene" if rel == 1 else f"{round(rel * 100)} percent of the busiest scene"
+        text = (f"{f['label']}, {f['from']} to {f['to']}. The camera is over {f['place']}. "
+                f"Bright moving water in the picture: {busiest}. {f.get('story', '')}")
+        frames.append({
+            "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""),
+            **stats(grid, t["hotLine"]), "relativeTotal": rel,
+            "grid": grid, "text": text.strip(),
+        })
+    return frames
+
+
+def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """Air quality: one map per pollutant, each on its own colour scale (0 clean .. 1 dirty)."""
+    g = data["grid"]
+    frames = []
+    for f in chapter["frames"]:
+        gone = set(f.get("missing", []))
+        grid = pool([None if j in gone else v / 100 for j, v in enumerate(f["glow"])], g,
+                    tuple(t.get("latRange", (LAT_MIN, LAT_MAX))))
+        st = stats(grid, t["hotLine"])
+        worst = ranked(grid, 1, 4, t["hotLine"] * 0.8)
+        cleanest = ranked([[None if v is None else 1 - v for v in row] for row in grid], 1, 2, 0.0)
+        when = f["label"]
+        text = (f"{when}, {f.get('span', '')}. "
+                + (f"Thickest: {listing(worst)}. " if worst else "Nowhere very thick on this map. ")
+                + f"{round(st['hot'] * 100)} percent of the map with a reading is in the dirty half of the scale. "
+                + (f"Cleanest: {listing(cleanest)}." if cleanest else ""))
+        frames.append({
+            "date": None, "when": when, "image": f["image"], "alt": f.get("alt", ""), **st,
+            "relativeTotal": round((f.get("total") or 0) / max(x.get("total") or 0 for x in chapter["frames"]), 3),
+            "grid": r3(grid), "text": text.strip(),
+        })
+    return frames
+
+
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
 BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts,
-            "still": build_still}
+            "pollutants": build_pollutants, "scenes": build_scenes, "still": build_still}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 
@@ -450,9 +470,7 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "units": t["units"],
         "range": t["range"],
         "hotLine": t["hotLine"],
-        "ninoLine": None,
         "leftLon": data.get("grid", {}).get("lonWest", -180),
-        "tuning": {},
         "words": t["words"],
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
                   "instrument": t.get("instrument", "vibraphone")},
@@ -502,7 +520,8 @@ def main(config_path: Path) -> None:
         index["tracks"].append(entry)
         print(f"{entry['code']} {entry['title']}: {entry['frames']} maps -> {out.relative_to(public)} "
               f"({out.stat().st_size / 1024:.0f} KB)")
-    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # newline="\n": the same bytes on Windows as on Mac and Linux, so a rebuild makes no diff
+    index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

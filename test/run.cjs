@@ -87,17 +87,24 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   const w = await live();
   check("W: where am I", w.startsWith("You are in the player. Track 1 of") && w.includes("scan line is at"), w.slice(0, 120));
   await page.keyboard.press("ArrowRight");
-  check("Right arrow: next map", (await live()).startsWith("2013, map 2 of 12"), await live(0));
+  check("Right arrow: next map, named first", (await live()).startsWith("Next map. 2013, map 2 of 12"), await live(0));
   check("map slider follows", (await page.getAttribute("#map", "aria-valuetext")).startsWith("2013"));
   await page.keyboard.press("Home");
-  check("Home: first map", (await live()).startsWith("2012, map 1"));
+  check("Home: first map", (await live()).startsWith("First map. 2012, map 1"));
   await page.keyboard.press("ArrowLeft");
-  check("Left arrow at the start says so", (await live()).startsWith("Already at the first map"));
+  check("Left arrow at the start says so", (await live()).startsWith("Previous map. Already at the first map"));
+  await page.evaluate(() => { document.getElementById("keyecho").click(); document.getElementById("keys").focus(); });
+  await page.keyboard.press("End");
+  check("key names can be turned off", (await live()).startsWith("2023, map 12"), await live(0));
+  await page.evaluate(() => { document.getElementById("keyecho").click(); document.getElementById("keys").focus(); });
+  await page.keyboard.press("Home");
+  await page.keyboard.press("q");
+  check("a key with no job says so", (await live()) === "Q does nothing here. Press H to hear the keys.", await live(0));
   await page.keyboard.press("h");
   check("H: every key", (await live()).startsWith("Player keys. Space: play or pause."));
   await page.keyboard.press("d");
   const d = await live();
-  check("D: describe pauses and says the map", d.startsWith("Paused. 2012.") && d.endsWith("Press Space to play."), d.slice(0, 80));
+  check("D: describe pauses and says the map", d.startsWith("Describe. Paused. 2012.") && d.endsWith("Press Space to play."), d.slice(0, 80));
   check("D paused the sound", !(await page.evaluate("son.playing")));
   await page.keyboard.press("s");
   check("S: what the sounds mean", (await live()).includes("scan line"));
@@ -131,7 +138,9 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     check(`${ids[k]}: plays`, tp > -40 && tp < 0, `peak ${tp} dB${extra !== null ? `, video off by ${extra} s` : ""}`);
     if (extra !== null) check(`${ids[k]}: NASA video in step with the sound`, Number(extra) < 0.4);
     await page.keyboard.press("w");
-    check(`${ids[k]}: where am I`, (await live()).includes(`Track ${k + 1} of`));
+    const wk = await live();
+    check(`${ids[k]}: where am I`, wk.includes(`Track ${k + 1} of`)
+      && (ids[k] !== "ocean-currents" || /The camera is over .+\d{4}|\d{4}\. The camera is over/.test(wk)), wk.slice(0, 140));
     await page.keyboard.press("Space");   // pause
     const axe = await page.evaluate(AXE);
     check(`${ids[k]}: axe`, axe.violations.length === 0, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", ") || `${axe.passes.length} rules passed`);

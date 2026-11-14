@@ -50,8 +50,57 @@
       "summary": "A slow scan line moves west to east once across NASA's map of how night lights changed from 2012 to 2023."
     },
     {
-      "id": "carbon-dioxide",
+      "id": "air-quality",
       "code": "3",
+      "title": "Air quality",
+      "subtitle": "Four pollutants, summer 2024",
+      "description": "NASA's model of the air we breathe in July and August 2024, a summer of huge wildfires. One scan for each pollutant: fine particles, carbon monoxide, nitrogen oxides and ozone. Clean air is a calm drone; dirty air rings notes and turns the drone sour.",
+      "data": "data/06_air_quality.json",
+      "chapter": "pollutants",
+      "instrument": "vibraphone",
+      "units": "position on NASA's colour scale for that pollutant",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "planet",
+        "map": "air quality map",
+        "dates": "pollutant",
+        "what": "pollution",
+        "top": "thickest",
+        "missing": "not read. NASA's model has no reading here."
+      }
+    },
+    {
+      "id": "ocean-currents",
+      "code": "4",
+      "title": "Ocean currents",
+      "subtitle": "Perpetual Ocean, 2021 to 2023",
+      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
+      "data": "data/07_ocean_currents.json",
+      "chapter": "scenes",
+      "mapping": "ocean",
+      "instrument": "harp",
+      "units": "brightness of moving water on the line",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "ocean",
+        "map": "scene",
+        "dates": "scene",
+        "what": "moving water",
+        "top": "brightest",
+        "missing": "not a place on a map. This track follows NASA's moving camera, so it has no map of places to explore. Try Air quality or Earth at night."
+      }
+    },
+    {
+      "id": "carbon-dioxide",
+      "code": "5",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
       "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
@@ -75,7 +124,7 @@
     },
     {
       "id": "lightning",
-      "code": "4",
+      "code": "6",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
       "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
@@ -104,7 +153,7 @@
     },
     {
       "id": "aerosols",
-      "code": "5",
+      "code": "7",
       "title": "Aerosols",
       "subtitle": "Four winds, 19 August 2025",
       "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",

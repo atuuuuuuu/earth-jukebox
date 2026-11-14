@@ -8,8 +8,8 @@ GitHub Pages. All paths are relative to `public/`.
 | --- | --- |
 | `api/tracks.json` | The list of tracks the jukebox shows |
 | `api/scores/<track id>.json` | One track's score: every number the page shows and says |
-| `data/<name>.json` | The fine grid the sound engine plays (3 degree cells, or one line per step for carbon dioxide); a track with layers also holds one such grid per layer in each map, under `layers` |
-| `media/<name>/...` | Map images (and NASA's carbon dioxide video) |
+| `data/<name>.json` | The fine grid the sound engine plays (3 degree cells, or one line per step for carbon dioxide and the ocean); a track with layers also holds one such grid per layer in each map, under `layers` |
+| `media/<name>/...` | Map images (and NASA's carbon dioxide and ocean videos) |
 
 Built in two stages:
 
@@ -35,8 +35,8 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `id`, `code`, `title`, `subtitle`, `description` | Names; `description` is read by screen readers with the track's radio button |
 | `score` | Path of the score |
 | `frames` | Number of maps |
-| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (lightning months) |
-| `when` | The span, spoken: `"2012 to 2023"`, `"January to December"` |
+| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (air quality, ocean scenes, lightning parts) |
+| `when` | The span, spoken: `"2012 to 2023"`, `"Part 1 of 14 to Part 14 of 14"` |
 | `units` | What the values mean, like `"share of the brightest light"` |
 | `engine` | `"sweep"` |
 | `source` | `title`, `url`, `credit`: show them on the page |
@@ -49,7 +49,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `weeks`, `parts`, or `still` for one map), `mapping` (`night-lights`, `co2`, `lightning` or `aerosols`), `instrument` for the ringing notes (`vibraphone`, `harp`) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`, or `still` for one map), `mapping` (`night-lights`, `co2`, `ocean`, `lightning` or `aerosols`), `instrument` for the ringing notes (`vibraphone`, `harp`, `kalimba`) |
 | `layers` | Optional. Separate things drawn on one map, each heard and chosen on its own (aerosols: black carbon, dust, sea salt, sulfate), in the order the page lists them: `id`, `name` (spoken), `key` (its one-letter shortcut in the player), `image` (the map with only this layer; optional). Tracks without it are unchanged |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
@@ -59,12 +59,11 @@ Each frame:
 
 | Field | Meaning |
 | --- | --- |
-| `when` | The map's name, spoken: `"2013"`, `"Change from 2012 to 2023"`, `"Week from 21 January 2020"`, `"July"` |
-| `date` | `YYYY-MM-DD`, or `null` when `when` names something with no single date (a month across years) |
+| `when` | The map's name, spoken: `"2013"`, `"Change from 2012 to 2023"`, `"Ozone"`, `"Gulf Stream, off the United States"`, `"Week from 21 January 2020"`, `"Part 3 of 14"` |
+| `date` | `YYYY-MM-DD`, or `null` when `when` names something with no single date (a part of the lightning video) |
 | `image`, `alt` | The map image and its description |
 | `text` | The spoken description. Starts with `when`. Built from the same numbers |
-| `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, or not crossed by carbon dioxide's line that week) |
-| `columns` | 16 west-to-east strips of 22.5 degrees |
+| `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, not crossed by carbon dioxide's line that week; every cell for ocean scenes, which follow a moving camera and have no map) |
 | `mean`, `spread`, `hot`, `clusters`, `valid` | Area-weighted average, spread, share of the map read at or above `hotLine`, number of separate high patches, share of the Earth with a reading |
 | `relativeTotal` | Total compared with the first map (night lights) or the busiest map (carbon dioxide, lightning) |
 | `layers` | Only when the score has `layers`: `{"<layer id>": grid}`, each 18 × 36 like `grid` and inside `range`. `grid` is then the strongest layer in each cell |
@@ -76,7 +75,7 @@ Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 `python3 backend/validate_api.py public` checks before every deploy:
 
 - every file named in `tracks.json` exists, and every map image exists
-- `grid` is always 18 × 36 and `columns` 16, every value a number inside `range` or `null`
+- `grid` is always 18 × 36, every value a number inside `range` or `null`
 - every `text` starts with its map's `when` (or date)
 - dated maps are in date order
 - `sweep.src` exists, its chapter has as many maps with the same images, and its arrays are full size

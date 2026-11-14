@@ -31,6 +31,11 @@ const EXTRA_MIN_BANDS = 3;         // …and sit at least 18° of latitude from 
 const CHANGE_MIN = 0.3;            // ~top 10% of changed cells
 const CHANGE_PAIR = 0.5;           // strong change: add the rising/falling second note
 const HUM_GATE = 0.08;             // below this the hum is silent: dark land / open ocean
+// Air quality only: the air is never empty, so the drone never stops; over the worst air it turns
+// sour (tension) and notes slip into E minor, so dirty air sounds uneasy, not just louder.
+const AIR_FLOOR = 0.12;
+const AIR_HOT = 0.4;               // notes this far from the note line to the top slip into minor
+const MINOR_SHIFT = new Set([6, 8, 1]);      // F#, G#, C# -> G, A, D: E major pentatonic -> E minor
 
 export const voices = {
   note: { label: 'Notes', colour: 'var(--lamp)' },
@@ -115,6 +120,14 @@ export function prepare(track) {
         colSums.push(s);
       }
     }
+    if (ch.id === 'pollutants') {     // notes ring for each pollutant's thickest tenth (its scale differs)
+      for (const fr of ch.frames) {
+        const v = [];
+        for (let i = 0; i < fr._core.length; i++) if (inRange(g, Math.floor(i / g.cols))) v.push(fr._core[i]);
+        v.sort((a, b) => a - b);
+        fr._noteMin = Math.max(0.3, v[Math.floor(v.length * 0.9)] ?? 0.3);
+      }
+    }
     colSums.sort((a, b) => a - b);
     cells.sort((a, b) => a - b);
     ch._humNorm = Math.max(1e-6, colSums[Math.floor(colSums.length * 0.95)] ?? 1);
@@ -145,7 +158,13 @@ function hum(track, chapter, frame, c) {
     moment += v * (((r + 0.5) / g.rows) * 2 - 1);
   }
   const level = clamp(Math.sqrt(sum / chapter._humNorm), 0, 1);
-  return { level: level < HUM_GATE ? 0 : level, pan: sum > 0 ? moment / sum : 0 };
+  const pan = sum > 0 ? moment / sum : 0;
+  if (chapter.id === 'pollutants') {
+    const top = peaks(frame._core, g, c, 0).slice(0, 3);
+    const worst = top.length ? top.reduce((a, q) => a + q.v, 0) / top.length : 0;
+    return { level: AIR_FLOOR + (1 - AIR_FLOOR) * level, pan, tension: clamp((worst - frame._noteMin) / 0.2, 0, 1) };
+  }
+  return { level: level < HUM_GATE ? 0 : level, pan };
 }
 
 /** Rows that are local maxima above `min`, strongest first. */
@@ -172,9 +191,9 @@ export function planStep(track, seg, c) {
   const events = [];
   const ring = params.ring;
 
-  // Every chapter but the change map is a map of light (night lights by year, lightning by month).
+  // Every chapter but the change map is a map of one quantity (light, lightning, a pollutant).
   if (chapter.id !== 'change') {
-    const min = params.coreMin;
+    const min = frame._noteMin ?? params.coreMin;
     const chosen = [];
     for (const q of peaks(frame._core, g, c, min)) {
       if (chosen.length >= MAX_NOTES) break;
@@ -183,8 +202,10 @@ export function planStep(track, seg, c) {
     }
     chosen.forEach((q, i) => {
       const t = clamp((q.v - min) / (1 - min), 0, 1);
+      let midi = noteOfRow(q.r);
+      if (chapter.id === 'pollutants' && q.v >= min + AIR_HOT * (1 - min) && MINOR_SHIFT.has(midi % 12)) midi += 1;
       events.push({
-        voice: 'notes', kind: 'note', row: q.r, col: c, midi: noteOfRow(q.r),
+        voice: 'notes', kind: 'note', row: q.r, col: c, midi,
         velocity: 0.22 + 0.62 * Math.pow(t, 0.8), offset: i * 0.03, duration: ring,
       });
     });
