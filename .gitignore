@@ -6,3 +6,8 @@ data/eic/
 backend/eic/debug/
 # Python environment for backend/eic (pip install -r backend/eic/pipeline/requirements.txt)
 .venv/
+
+# Vercel's local project link
+.vercel
+public/.vercel
+public/.env*
