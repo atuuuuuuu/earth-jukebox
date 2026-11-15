@@ -27,11 +27,28 @@ import numpy as np
 
 from ..config import MEDIA_DIR, WEB_DIR, source_path
 from ..lib import grid, video
-from .co2_dyamond import co2_value
-from .ocean_currents import current_value
 
 MAP_W, MAP_H = 1440, 720          # 0.25 degrees per pixel
-VALUES = {"currents": current_value, "co2": co2_value}
+
+
+def co2_value(bgr: np.ndarray, ex: dict) -> np.ndarray:
+    """Relative CO2 level 0..1 from colour: transparent -> tan -> orange -> red.
+
+    The base globe is neutral grey (deserts, ice) or near-black (ocean); CO2 is a warm,
+    saturated overlay. Warmth (R-B) times a saturation gate separates the two.
+    """
+    f = bgr.astype(np.float32)
+    b, g, r = f[..., 0], f[..., 1], f[..., 2]
+    mx = f.max(axis=-1)
+    sat = (mx - f.min(axis=-1)) / np.maximum(mx, 1.0)
+    gate = np.clip((sat - ex["sat_lo"]) / (ex["sat_hi"] - ex["sat_lo"]), 0, 1)
+    warmth = np.clip(r - b, 0, None) / 255.0
+    # orange (g about r/2) -> red (g about r/5): redder = more
+    redness = np.clip(1.0 - (g - b) / np.maximum(r - b, 1.0) * 1.6, 0, 1)
+    return np.power(warmth * gate, ex["gamma"]) * (0.8 + 0.2 * redness)
+
+
+VALUES = {"co2": co2_value}
 
 
 def blue_marble_land(width: int = MAP_W, height: int = MAP_H) -> np.ndarray:
@@ -197,7 +214,7 @@ def flat_film(cfg: dict):
 def turning_globe(cfg: dict):
     """A film of NASA's globe turning, projected back onto the world map (see the top of this file)."""
     g, tr, ex = cfg["geometry"], cfg["turn"], cfg["extraction"]
-    path = WEB_DIR / cfg["film"]
+    path = source_path(cfg)
     info = video.video_info(path)
     first, last = cfg["frames"]["from"], cfg["frames"]["to"]
     print(f"Film {path.name}: {info}; frames {first} to {last}")
@@ -209,7 +226,7 @@ def turning_globe(cfg: dict):
                                   list(range(first, last + 1, cfg["frames"]["every"])))
     seen = acc_w >= cfg["min_weight"]
     val = np.where(seen, acc_v / np.maximum(acc_w, 1e-9), np.nan)
-    use = seen & ((blue_marble_land() < 0.5) if cfg["value"] == "currents" else True)
+    use = seen
 
     # The picture: NASA's own colours where the film showed the place; elsewhere a dim grey Earth.
     col = acc_c / np.maximum(acc_w, 1e-9)[..., None]

@@ -67,21 +67,6 @@ class Stats(unittest.TestCase):
 
 
 class NewBuilders(unittest.TestCase):
-    def test_weeks_fill_only_the_cells_the_line_crossed(self):
-        rows, steps = 50, 4
-        line = [0] * (steps * rows)
-        line[2 * rows + 18] = 100                    # step 2, row 18: lat 75 - 3 * 18.5 = 19.5 N
-        data = {"rows": rows, "latTop": 75, "latStep": 3, "line": line,
-                "lonAtStep0": 126, "lonPerStep": 0, "framesPerStep": 3, "media": {"fps": 30, "src": "v.mp4"}}
-        chapter = {"frames": [{"startStep": 0, "steps": steps, "from": "14 January", "region": "Asia",
-                               "relative": 1.0, "image": "w.jpg"}]}
-        f = bs.build_weeks(data, chapter, {"hotLine": 0.5})[0]
-        crossed = [(r, c) for r, row in enumerate(f["grid"]) for c, v in enumerate(row) if v is not None]
-        self.assertTrue(crossed and all(c == int((126 + 180) // 10) for _, c in crossed))
-        self.assertGreater(f["grid"][int((90 - 19.5) // 10)][30], 0)
-        self.assertEqual(f["date"], "2020-01-14")
-        self.assertTrue(f["text"].startswith("Week from 14 January 2020. The scan line crosses Asia."))
-
     def test_parts_name_the_busiest_part_and_the_hemisphere(self):
         north, south = fine(), fine()
         north[at(10, 20)] = 100

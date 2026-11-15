@@ -1,12 +1,11 @@
 # Track 5 as a map: NASA's DYAMOND film of carbon dioxide on a turning globe (14 Jan to 3 Mar 2020),
 # flattened into one world map so a scan line can cross it like every other map track.
-# See pipeline/tracks/globe_map.py. Reads the web copy of the film.
+# See pipeline/tracks/globe_map.py. Reads the web copy of the film from EJ_RESOURCES (data/eic).
 id: 06_co2_map
 title: "Carbon Dioxide Around the Globe, Early 2020, on a world map"
 short: "Carbon Dioxide"
 builder: globe_map
 
-film: media/06_co2_dyamond/orbit.mp4    # under public/: the 1280 x 720 web copy of NASA's film
 frames: {from: 0, to: 1175, every: 2}
 time:
   start: "2020-01-14"                    # NASA's date label: 14 Jan 2020 22:00 UTC at frame 0,
@@ -51,7 +50,7 @@ about: >
   it faced the camera: East Asia in January, Africa in February, the Americas in early March.
 
 source:
-  video: media/06_co2_dyamond/orbit.mp4
+  video: 06_CO2_DYAMOND/orbit.mp4        # under EJ_RESOURCES (data/eic): the 1280 x 720 web copy of NASA's film
   svs_id: 5196
   url: https://svs.gsfc.nasa.gov/5196/
   svs_title: "DYAMOND Global Carbon Dioxide"

@@ -8,8 +8,9 @@ const T = window.EJ.Tone;
 
 export async function renderBuffer({ track, mapping, settings, from = 0, seconds = 20, sampleRate = 44100, mute = [] }) {
   const tail = 4;
+  let audio;
   const buffer = await T.Offline(async () => {
-    const audio = new AudioEngine({ offline: true, humNotes: mapping.HUM_NOTES, settings });
+    audio = new AudioEngine({ offline: true, humNotes: mapping.HUM_NOTES, settings });
     await audio.init();
     // solo/mute for analysis: 'notes' | 'cello' | 'hum'
     if (mute.includes('hum')) audio.humBus.level.disconnect();
@@ -18,6 +19,7 @@ export async function renderBuffer({ track, mapping, settings, from = 0, seconds
     const player = new Player({ track, mapping, audio, settings });
     player.scheduleAll(from, from + seconds, 0.05);
   }, seconds + tail, 2, sampleRate);
+  audio.dispose();          // its samples and reverb would otherwise stay in memory after every saved file
   return buffer.get(); // AudioBuffer
 }
 

@@ -6,8 +6,9 @@ id: 07_ocean_lesson
 title: "The Gulf Stream, step by step"
 builder: ocean_lesson
 
-film: media/07_ocean_currents/tour.mp4     # under public/: the ocean tour's web copy of NASA's film
-tour: data/07_ocean_currents.json          # the tour's clock (startDate, daysPerStep, framesPerStep)
+time:                                      # NASA's date overlay: 15 Jan 2021 at frame 0, 1071 days over 9503 frames
+  start: "2021-01-15"
+  days_per_frame: 0.11271311302883603
 window:                                    # seconds of the film where NASA's camera holds still
   from: 234
   to: 262
@@ -16,6 +17,7 @@ radius: 5                                  # each place averages an 11 x 11 px p
 land_red_over_blue: 10                     # land is tan or green (red above blue); the sea is blue
 
 source:
+  video: 07_Perpetual_Ocean/tour.mp4       # under EJ_RESOURCES (data/eic): the 640 x 360 web copy of NASA's film
   svs_id: 5425
   url: https://svs.gsfc.nasa.gov/5425/
   svs_title: "Perpetual Ocean 2: Western Boundary Currents"

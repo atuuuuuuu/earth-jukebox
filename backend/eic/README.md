@@ -13,13 +13,14 @@ into the website:
 pip install -r backend/eic/pipeline/requirements.txt
 export EJ_RESOURCES=/path/to/EarthJukebox_NASA_resources   # default: data/eic in the repo
 npm run eic -- 07_lightning                                 # = cd backend/eic && python3 -m pipeline.run --track 07_lightning
-cd backend/eic && python3 -m pipeline.validate --track 01   # checks known places (night lights, CO2), heatmaps in backend/eic/debug/
+cd backend/eic && python3 -m pipeline.validate --track 01   # checks known places (night lights), heatmaps in backend/eic/debug/
 ```
 
 Each track is configured in `tracks/<id>.yaml`: source video, geometry calibration, masks,
 colour key, grid, playback timing and the screen-reader sound legend. The tracks are
 `01_night_lights`, `06_air_quality` (four pollutant strips rebuilt into one world map each),
-`07_ocean_currents` and `06_co2_dyamond` (both played against NASA's own video, since the camera
-moves or the globe turns) and `07_lightning` (corrected for how often the space station looks at
-each latitude).
+`07_ocean_map` and `06_co2_map` (one world map each: NASA's flat ECCO2 film, and NASA's turning
+globe flattened; `pipeline/tracks/globe_map.py`), `07_ocean_lesson` (the guided Gulf Stream lesson),
+`08_atmospheric_river` (played against NASA's own video, with NASA's clock) and `07_lightning`
+(corrected for how often the space station looks at each latitude).
 `pipeline.fetch_samples` downloads the instrument samples into `public/samples/`.

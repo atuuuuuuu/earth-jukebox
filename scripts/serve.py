@@ -63,6 +63,9 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     handler = functools.partial(NoCache, directory=str(PUBLIC))
     http.server.ThreadingHTTPServer.allow_reuse_address = sys.platform != "win32"   # Windows would share a busy port
+    # The page asks for about 20 sound files at once. With Python's default queue of 5, Windows turns
+    # the rest away and the browser retries seconds later: a track took up to 13 s to start.
+    http.server.ThreadingHTTPServer.request_queue_size = 64
     try:
         httpd = http.server.ThreadingHTTPServer(("", port), handler)
     except OSError:

@@ -66,6 +66,9 @@ class Lesson {
     $("lesson-img").src = this.data.image;
     $("lesson-mark").setAttribute("viewBox", `0 0 ${this.data.width} ${this.data.height}`);
     $("lesson-caveat").textContent = this.data.caveat;
+    // After the buttons, so Tab from the track list still lands in the lesson's keyboard area first.
+    const src = Object.assign(document.createElement("a"), { href: this.data.source.url, textContent: this.data.source.svs_title });
+    $("lesson-source").replaceChildren("Source: ", src, `, ${this.data.source.credit}.`);
     $("lesson-back").addEventListener("click", () => this.run("Back", () => this.move(-1), this.i <= 0), on);
     $("lesson-next").addEventListener("click", () => this.run("Next step", () => this.move(1), this.i >= n - 1), on);
     $("lesson-play").addEventListener("click", () => this.run(null, () => this.toggle()), on);

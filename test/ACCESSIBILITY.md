@@ -12,11 +12,11 @@ not a file. The tester drives; the observer only writes down what happens.
 
 ## What the page should say (2 minutes)
 
-On load the page says: "Ready. 6 tracks. Track 1, Earth at night, is chosen. Press Tab to reach
+On load the page says: "Ready. 7 tracks. Track 1, Earth at night, is chosen. Press Tab to reach
 the player, then Space to play." Then press Tab from the top. Expected order:
 
 1. "Skip to the player, link". Enter moves to the player's keyboard area.
-2. "Tracks, grouping. 1. Earth at night. City lights, 2012 to 2023, radio button, checked, 1 of 6",
+2. "Tracks, grouping. 1. Earth at night. City lights, 2012 to 2023, radio button, checked, 1 of 7",
    then the track's one-sentence description. Arrow keys change track; the new track is announced.
 3. "Player keys, keyboard area". Space plays or pauses here, Left and Right change the map,
    W says where you are, D describes the map, S says what the sounds mean, H lists every key.
@@ -42,7 +42,7 @@ While playing, the page says only the year, week or part as each map starts (tur
 - [ ] Space in the keyboard area plays; Space again pauses
 - [ ] Left and Right change the map and say which one; at the first map, Left says so
 - [ ] W, D, S and H each speak; D pauses the music first
-- [ ] Keys 1 to 6 choose a track; changing track never doubles the notes
+- [ ] Keys 1 to 7 choose a track; changing track never doubles the notes
 - [ ] M turns mono on and off: sounds stay in the middle, then move between the ears again
 - [ ] Escape stops all sound and speech, from anywhere on the page
 - [ ] Each example button plays a sound, then says what it means
@@ -68,9 +68,9 @@ Give each task in these words. Do not help. Note time taken and what the tester 
    ear (north) and parts where they sound lower and on the right (south). W or D can confirm
    ("mostly north of the equator").
 
-4. **On Carbon dioxide, explain what the hum and the heartbeat mean.**
-   The tester may press S first. Pass: the hum is the carbon dioxide on the scan line, and it
-   turns tense over dense plumes; the heartbeat is one beat for each day of data.
+4. **On Carbon dioxide, explain what the hum and the ringing notes mean.**
+   The tester may press S first. Pass: the hum is all the carbon dioxide on the scan line, and a
+   note rings where the line crosses a dense plume (higher and in the left ear further north).
 
 ## Notes for the team
 

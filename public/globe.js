@@ -213,6 +213,9 @@ void main() {
       const gl = canvas.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: false, preserveDrawingBuffer: false });
       if (!gl) throw new Error("WebGL is not available");
       this.gl = gl;
+      // No graphics card (software WebGL): every frame is drawn by the CPU and the sound waits for it. Draw less.
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      if (/swiftshader|llvmpipe|software|basic render/i.test(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER))) this.fps = 4;
       this.init();
       this.bind();
       this.last = performance.now();

@@ -1,8 +1,9 @@
-name: Browser tests
+name: Tests
 
-# The real page in Chromium: every key, speech text, sound level, axe on every track, and every
-# layout from 320 to 1440 px. Separate from the deploy, so a slow runner never blocks a launch;
-# a red cross here still means something to look at.
+# browser: the real page in Chromium: every key, speech text, sound level, axe on every track, the
+# guided lesson, and every layout from 320 to 1440 px. backend: the API is up to date with its
+# config and follows the contract, and the builders' tests pass. Separate from the deploy, so a slow
+# runner never blocks a launch; a red cross here still means something to look at.
 on:
   push:
   pull_request:
@@ -27,3 +28,17 @@ jobs:
       - run: npm test
       - run: npm run test:responsive
       - run: npm run test:lesson
+
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r backend/eic/pipeline/requirements.txt
+      - name: The API matches its config (rebuild, then nothing may change)
+        run: python backend/build_sweep.py backend/sweep.config.json && git diff --exit-code public/api
+      - run: python backend/validate_api.py public
+      - run: python -m unittest discover backend/tests -v

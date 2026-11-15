@@ -11,14 +11,13 @@ second: NASA's flow lines are drawn for the eye, so their speed on screen is not
 """
 from __future__ import annotations
 
-import json
 from datetime import date, timedelta
 from math import asin, cos, radians, sin, sqrt
 
 import cv2
 import numpy as np
 
-from ..config import MEDIA_DIR, WEB_DIR
+from ..config import MEDIA_DIR, source_path
 from ..lib import video
 
 COMPASS = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
@@ -74,8 +73,7 @@ def measure(frames: list[np.ndarray], parts: int) -> np.ndarray:
 
 
 def build(cfg: dict) -> dict:
-    tour = json.loads((WEB_DIR / cfg["tour"]).read_text(encoding="utf-8"))
-    path = WEB_DIR / cfg["film"]
+    path = source_path(cfg)
     info = video.video_info(path)
     w = cfg["window"]
     f0, f1 = round(w["from"] * info["fps"]), round(w["to"] * info["fps"])
@@ -104,8 +102,8 @@ def build(cfg: dict) -> dict:
     fastest = float(np.percentile(np.stack([q[2] for q in parts]), 99.9))   # the fastest water, any part
     print(f"  fastest water {fastest:.3f} px a frame; land drift removed")
 
-    start = date.fromisoformat(tour["startDate"])
-    day = lambda f: start + timedelta(days=f * tour["daysPerStep"] / tour["framesPerStep"])
+    start = date.fromisoformat(cfg["time"]["start"])
+    day = lambda f: start + timedelta(days=f * cfg["time"]["days_per_frame"])
     dname = lambda d: f"{d.day} {d:%B %Y}"
     span = {"from": dname(day(f0)), "to": dname(day(f1))}
     H, W = mid.shape[:2]

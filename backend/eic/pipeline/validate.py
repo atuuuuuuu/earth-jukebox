@@ -78,58 +78,7 @@ def validate_night_lights(data: dict) -> bool:
     return ok
 
 
-def validate_co2(data: dict) -> bool:
-    """Known features of the DYAMOND CO2 globe, checked where each crosses the centre line."""
-    steps, rows = data["steps"], data["rows"]
-    line = np.array(data["line"], dtype=np.float32).reshape(steps, rows) / 100.0
-    out_dir = DEBUG_DIR / data["id"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    img = cv2.applyColorMap((np.clip(line.T, 0, 1) * 255).astype(np.uint8), cv2.COLORMAP_INFERNO)
-    cv2.imwrite(str(out_dir / "line_time_by_latitude.png"),
-                cv2.resize(img, (steps * 3, rows * 8), interpolation=cv2.INTER_NEAREST))
-
-    def row(lat):
-        return int(np.clip((data["latTop"] - lat) / data["latStep"], 0, rows - 1))
-
-    def step(lon):  # when the line is over this longitude
-        return int(np.clip((lon - data["lonAtStep0"]) / data["lonPerStep"], 0, steps - 1))
-
-    def box(lon0, lon1, lat_n, lat_s):
-        a, b = sorted((step(lon0), step(lon1)))
-        return float(line[a : b + 1, row(lat_n) : row(lat_s) + 1].mean())
-
-    # Levels are relative (the colour key has no numbers), so the checks are too: known source
-    # regions must sit clearly above the whole track's average, clean ocean air far below it.
-    avg = float(line.mean())
-    ok = True
-    checks = [
-        ("Eastern China (industry)", box(122, 108, 40, 24), ">=", 1.3 * avg),
-        ("Central Africa (fires)", box(30, 12, 10, -12), ">=", 1.3 * avg),
-        ("Amazon basin (fires, forest)", box(-50, -70, 5, -15), ">=", 1.3 * avg),
-        ("Southern Indian Ocean (clean air)", box(95, 55, -30, -60), "<=", 0.3 * avg),
-        ("South Atlantic (clean air)", box(-5, -25, -30, -60), "<=", 0.3 * avg),
-    ]
-    print(f"  track-wide average level {avg:.2f}")
-    for name, v, op, limit in checks:
-        passed = v >= limit if op == ">=" else v <= limit
-        ok &= passed
-        print(f"  [{'PASS' if passed else 'FAIL'}] {name:<34} mean={v:.2f} (want {op} {limit:.2f})")
-
-    # Daily pulse: over central Africa the 8-steps-per-day rhythm should stand out.
-    a, b = sorted((step(30), step(12)))
-    series = line[a : b + 1, row(5) : row(-10) + 1].mean(axis=1)
-    series = series - np.convolve(series, np.ones(8) / 8, mode="same")
-    spectrum = np.abs(np.fft.rfft(series))
-    k = int(round(len(series) / 8))  # frequency bin of one cycle per day
-    strength = float(spectrum[k - 1 : k + 2].max() / (np.median(spectrum[1:]) + 1e-9))
-    passed = strength >= 3
-    ok &= passed
-    print(f"  [{'PASS' if passed else 'FAIL'}] daily pulse over central Africa        {strength:.1f}x the median (want >= 3)")
-    print(f"  debug image: {out_dir}")
-    return ok
-
-
-VALIDATORS = {"night_lights": validate_night_lights, "co2_dyamond": validate_co2}
+VALIDATORS = {"night_lights": validate_night_lights}
 
 
 def main() -> None:

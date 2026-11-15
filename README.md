@@ -100,12 +100,21 @@ GitHub runs the backend tests and the API check before every deploy (`.github/wo
 the two browser tests on every push (`.github/workflows/tests.yml`).
 
 To rebuild a track from NASA's video, put the video in `data/eic/` (see each `backend/eic/tracks/*.yaml`
-for the file and URL), then:
+for the file and URL; `data/eic/` is not in git), then:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
 npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_map, 07_ocean_map, 07_ocean_lesson, 07_lightning
 npm run api && npm run validate
+```
+
+Two builders read our smaller web copies of NASA's films, which used to sit in `public/media/` and are
+kept in git history. Restore them with:
+
+```bash
+mkdir -p data/eic/07_Perpetual_Ocean data/eic/06_CO2_DYAMOND
+git show 281f561:public/media/07_ocean_currents/tour.mp4 > data/eic/07_Perpetual_Ocean/tour.mp4   # 07_ocean_lesson
+git show 281f561:public/media/06_co2_dyamond/orbit.mp4 > data/eic/06_CO2_DYAMOND/orbit.mp4       # 06_co2_map
 ```
 
 ## How it works

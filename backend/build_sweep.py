@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import json
 import math
-import shutil
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -212,7 +210,7 @@ def build_years(data: dict, chapter: dict, t: dict) -> list[dict]:
         st = stats(grid, t["hotLine"])
         rel = f.get("relativeTotal")
         if f["label"] == base or rel is None:
-            change = f"Baseline year for this track."
+            change = "Baseline year for this track."
         else:
             pct = round((rel - 1) * 100)
             change = f"Total light in NASA's map: {abs(pct)} percent {'more' if pct >= 0 else 'less'} than {base}."
@@ -266,59 +264,6 @@ def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
-def still(public: Path, video: str, seconds: float, out: str) -> str:
-    """One frame of a NASA video as a JPEG, made once with ffmpeg (the only non-stdlib step)."""
-    dest = public / out
-    if not dest.is_file():
-        if not shutil.which("ffmpeg"):
-            raise ConfigError(f"{out} is missing and ffmpeg is not installed to make it")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{seconds:.2f}", "-i", str(public / video),
-                        "-frames:v", "1", "-vf", "scale=1024:-2", "-q:v", "4", str(dest)], check=True)
-    return out
-
-
-def build_weeks(data: dict, chapter: dict, t: dict) -> list[dict]:
-    """Spin sweep (carbon dioxide): a fixed line crosses a turning globe. Each step reads one
-    meridian, so a week fills only the 10-degree cells the line crossed; the rest stay None."""
-    rows, lat_top, lat_step = data["rows"], data["latTop"], data["latStep"]
-    line = data["line"]
-    frames = []
-    for n, f in enumerate(chapter["frames"], 1):
-        mid = (f["startStep"] + f["steps"] / 2) * data["framesPerStep"] / data["media"]["fps"]
-        image = f.get("image") or still(t["_public"], data["media"]["src"], mid,
-                                         (Path(data["media"]["src"]).parent / f"week-{n}.jpg").as_posix())  # a web path: / even on Windows
-        total = [[0.0] * GRID_COLS for _ in range(GRID_ROWS)]
-        count = [[0] * GRID_COLS for _ in range(GRID_ROWS)]
-        for s_ in range(f["startStep"], f["startStep"] + f["steps"]):
-            lon = (data["lonAtStep0"] + data["lonPerStep"] * s_ + 180) % 360 - 180
-            C = min(GRID_COLS - 1, int((lon + 180) // 10))
-            for r in range(rows):
-                lat = lat_top - lat_step * (r + 0.5)
-                R = min(GRID_ROWS - 1, int((90 - lat) // 10))
-                total[R][C] += line[s_ * rows + r] / 100
-                count[R][C] += 1
-        grid = [[total[R][C] / count[R][C] if count[R][C] else None for C in range(GRID_COLS)] for R in range(GRID_ROWS)]
-        st = stats(grid, t["hotLine"])
-        year = data.get("year", 2020)
-        when = f"Week from {f['from']} {year}"
-        rel = f.get("relative")
-        busiest = "the busiest week" if rel == 1 else f"{round(rel * 100)} percent of the busiest week"
-        dense = ranked(grid, 1, 3, 0.05)
-        text = (f"{when}. The scan line crosses {f['region']}. Carbon dioxide on the line: {busiest}. "
-                + (f"Densest: {listing(dense)}." if dense else ""))
-        frames.append({
-            "date": f"{year}-{MONTHS.index(f['from'].split()[1]) + 1:02d}-{int(f['from'].split()[0]):02d}",
-            "when": when,
-            "image": image,
-            "alt": f.get("alt", ""),
-            **st,
-            "relativeTotal": rel,
-            "grid": r3(grid),
-            "text": text.strip(),
-        })
-    return frames
-
-
 def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
     """Lightning in equal parts of NASA's movie, in order: where the storms are in each part."""
     g = data["grid"]
@@ -353,7 +298,7 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
 
 
 def build_map(data: dict, chapter: dict, t: dict) -> list[dict]:
-    """One world map flattened from NASA's turning globe (ocean currents, carbon dioxide)."""
+    """One world map from a NASA film: ocean currents (NASA's flat map), carbon dioxide (its turning globe, flattened)."""
     g = data["grid"]
     pooled = [pool([None if v is None else v / 100 for v in f["glow"]], g) for f in chapter["frames"]]
     scale = percentile([v for grid in pooled for row in grid for v in row if v], 0.99) or 1.0
@@ -423,9 +368,7 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
-MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
-          "October", "November", "December"]
-BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants,
+BUILDERS = {"years": build_years, "change": build_change, "parts": build_parts, "pollutants": build_pollutants,
             "scenes": build_scenes, "currents": build_map, "plumes": build_map}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}

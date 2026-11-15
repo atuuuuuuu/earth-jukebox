@@ -56,6 +56,8 @@ const check = (name, ok, detail = "") => { if (!ok) failures++; console.log(`${o
   check("no lesson sound before a key press", await page.evaluate("window.lesson.voices.length === 0 && !window.lesson.A"));
   await page.keyboard.press("Tab");
   check("Tab from the track list lands in the lesson's keyboard area", await page.evaluate("document.activeElement.id === 'lesson-keys'"));
+  check("the lesson names NASA's film and links to it", /^Source: Perpetual Ocean 2/.test(await page.textContent("#lesson-source"))
+    && (await page.getAttribute("#lesson-source a", "href")) === "https://svs.gsfc.nasa.gov/5425/");
   check("step 1 shown in words", (await page.textContent("#lesson-pos")) === "Step 1 of 13" && (await page.textContent("#lesson-step-h")) === "What is an ocean current?");
 
   // ---- Step 1 explains before it plays; Space plays both examples, each named first.

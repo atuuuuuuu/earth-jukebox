@@ -164,7 +164,7 @@
   let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
   let lesson = null, lessonMod = null;   // the guided lesson before the player, for tracks that have one
   window.lesson = null;                   // a global, not the <section id="lesson"> the browser would give
-  const usesVideo = () => !!score?.frames && ["co2", "ocean", "river"].includes(score.sweep.mapping);
+  const usesVideo = () => !!score?.frames && score.sweep.mapping === "river";   // NASA's own film, not the globe
   const n = () => score.frames.length;
   const pos = () => tracks.indexOf(track) + 1;
   const whenOf = (i) => score.frames[i].when;
@@ -193,7 +193,7 @@
     syncVideo(true);
   };
 
-  // NASA's own videos (carbon dioxide, ocean, atmospheric river): keep them in step with the sound.
+  // NASA's own film (the atmospheric river): keep it in step with the sound.
   const syncVideo = (jump = false) => {
     if (!usesVideo() || !son) return;
     const v = $("video"), t = son.mediaTime();
@@ -279,17 +279,14 @@
       }
     }
 
-    // The picture: NASA's video for carbon dioxide, the globe for map tracks.
+    // The picture: NASA's film for the atmospheric river, the globe for map tracks.
     const video = usesVideo();
     $("video-wrap").hidden = !video;
     $("globe").hidden = video || !globe;
     $("map-img").hidden = video || !!globe;
     document.querySelector(".stage-hint").hidden = video || !globe;
-    if (video) {
-      const v = $("video");
-      const data = await (await fetch(score.sweep.src)).json().catch(() => null);
-      if (data?.media) { v.poster = data.media.poster; if (!v.src.endsWith(data.media.src)) v.src = data.media.src; }
-    }
+    const media = video && son.track.media;
+    if (media) { const v = $("video"); v.poster = media.poster; if (!v.src.endsWith(media.src)) v.src = media.src; }
     if (globe) {
       globe.headFn = video ? null : () => son?.headLon();
       globe.full = true;

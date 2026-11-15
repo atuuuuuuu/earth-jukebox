@@ -8,8 +8,12 @@ import sys
 import unittest
 from pathlib import Path
 
-import cv2
-import numpy as np
+try:                               # the pipeline's packages; without them these tests are skipped
+    import cv2  # noqa: F401
+    import numpy as np
+    import yaml  # noqa: F401
+except ImportError:
+    raise unittest.SkipTest("needs the pipeline's packages: pip install -r backend/eic/pipeline/requirements.txt")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eic"))
 from pipeline.tracks.ocean_lesson import bearing_of, compass, fit_georef, measure, to_px  # noqa: E402

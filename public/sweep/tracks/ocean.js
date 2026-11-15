@@ -1,5 +1,5 @@
 // Track 07 — Perpetual Ocean 2: a camera tour, read along a fixed vertical line through the middle
-// of NASA's picture. Pure planning logic (no Tone.js), modelled on tracks/co2.js.
+// of NASA's picture. Pure planning logic (no Tone.js), first written for NASA's ocean tour.
 // The atmospheric river film (mapping "river") plays the same way: hum = water vapour, notes = the
 // river's deep-blue core, pulse = each midnight on NASA's clock.
 //
