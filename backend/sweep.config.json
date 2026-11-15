@@ -118,13 +118,13 @@
       "id": "ocean-currents",
       "code": "3",
       "title": "Ocean currents",
-      "subtitle": "Perpetual Ocean, 2021 to 2023",
-      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
-      "data": "data/07_ocean_currents.json",
-      "chapter": "scenes",
-      "mapping": "ocean",
+      "subtitle": "Surface currents, 2007 to 2008",
+      "description": "Starts with a guided lesson: what a current is, then the Gulf Stream's direction, speed and changes, one idea at a time. Then a scan line crosses NASA's world map of the ocean's surface currents, March 2007 to March 2008: only what is under the line plays.",
+      "data": "data/07_ocean_map.json",
+      "lesson": "data/07_ocean_lesson.json",
+      "chapter": "currents",
       "instrument": "harp",
-      "units": "brightness of moving water on the line",
+      "units": "brightness of moving water, relative",
       "range": [
         0,
         1
@@ -132,19 +132,20 @@
       "hotLine": 0.5,
       "words": {
         "subject": "ocean",
-        "map": "scene",
-        "dates": "scene",
+        "map": "ocean currents map",
+        "dates": "map",
         "what": "moving water",
         "top": "brightest",
-        "missing": "not a place on a map. This track follows NASA's moving camera, so it has no map of places to explore. Try Air quality or Earth at night."
+        "busiest": "Strongest currents",
+        "missing": "land, or too far north, so there is no current reading here. Try a place at sea."
       },
       "about": {
-        "what": "NASA's tour of the ocean's great currents: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream.",
-        "who": "Greg Shirah and Horace Mitchell at NASA's Scientific Visualization Studio, with scientists Atousa Saberi and Josh Willis. The currents come from the ECCO2 ocean model (NASA and JPL).",
-        "when": "January 2021 to December 2023.",
-        "where": "The global ocean and three western boundary currents.",
-        "why": "To hear how fast, narrow currents carry heat across the planet.",
-        "how": "A harp rings where bright, fast water crosses a line through NASA's moving camera view, and a soft pulse marks each month.",
+        "what": "NASA's world map of the ocean's surface currents from March 2007 to March 2008, after a guided lesson on the Gulf Stream from NASA's Perpetual Ocean 2 film.",
+        "who": "Greg Shirah, Horace Mitchell and Eric Sokolowsky at NASA's Scientific Visualization Studio, with scientists Hong Zhang (UCLA) and Dimitris Menemenlis (NASA JPL). The currents come from the ECCO2 ocean model.",
+        "when": "The map: March 2007 to March 2008, averaged over the year. The lesson: 17 March to 19 June 2023, from NASA's Perpetual Ocean 2 film.",
+        "where": "The whole world ocean. The lesson follows the Gulf Stream from Miami to the open Atlantic.",
+        "why": "To hear where the strong, fast currents run, like the Gulf Stream and the Kuroshio, which carry warm water around the planet.",
+        "how": "The lesson first explains direction and speed, one sound at a time. Then a scan line crosses the map west to east: a harp rings where it crosses a strong current, and a low hum follows all the moving water under it.",
         "journey": [
           {
             "title": "Satellites and ocean floats",
@@ -152,11 +153,11 @@
           },
           {
             "title": "ECCO2 ocean model",
-            "detail": "NASA and JPL's reconstruction of the ocean's motion."
+            "detail": "MIT and NASA JPL's reconstruction of the ocean's motion and sea ice."
           },
           {
             "title": "NASA Scientific Visualization Studio",
-            "detail": "SVS 5425, Perpetual Ocean 2: Western Boundary Currents."
+            "detail": "SVS 3912, Global Sea Surface Currents and Temperature; the lesson, SVS 5425, Perpetual Ocean 2."
           },
           {
             "title": "NASA Earth Information Center",
@@ -394,6 +395,55 @@
           {
             "title": "NASA Earth Information Center",
             "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
+      }
+    },
+    {
+      "id": "el-nino",
+      "code": "8",
+      "title": "El Niño: then and now",
+      "subtitle": "Sea temperature, 2025 and 2026",
+      "description": "NASA's map of how much warmer or cooler than normal the sea is, one map a month: each month of 2025, then the same month of 2026. A rising pair of notes is sea much warmer than normal; a low falling cello, much cooler. Listen to the middle of the Pacific: in 2026, El Niño warms it.",
+      "data": "data/09_el_nino.json",
+      "chapter": "anomaly",
+      "units": "degrees C from normal",
+      "range": [
+        -4,
+        4
+      ],
+      "hotLine": 1.0,
+      "words": {
+        "subject": "ocean",
+        "map": "map of sea temperature compared with normal",
+        "dates": "month",
+        "what": "difference from normal",
+        "top": "largest",
+        "missing": "land or sea ice, so there is no sea temperature here. Try a place at sea."
+      },
+      "about": {
+        "what": "NASA's map of how much warmer or cooler than normal the sea surface is, one map a month: each month of 2025, then the same month of 2026.",
+        "who": "NASA's Scientific Visualization Studio, from the MUR sea surface temperature data of NASA JPL's PO.DAAC.",
+        "when": "January to November 2025, each month followed by the same month of 2026.",
+        "where": "The world ocean. El Niño shows in the central and eastern tropical Pacific.",
+        "why": "El Niño warms the tropical Pacific and shifts heat and rain around the world. Hearing a month of 2025 next to the same month of 2026 makes the change stand out.",
+        "how": "A scan line crosses each map west to east. A rising pair of notes rings where the sea is much warmer than normal, a low cello falls where it is much cooler, and a deep hum grows with how far from normal the sea under the line is.",
+        "journey": [
+          {
+            "title": "Satellites",
+            "detail": "Several instruments measure the sea surface temperature every day."
+          },
+          {
+            "title": "MUR sea surface temperature",
+            "detail": "NASA JPL's daily blend of those measurements (PO.DAAC, MUR SST v4.1)."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5176, Sea Surface Temperature Anomaly, Near Real Time."
           },
           {
             "title": "Hearth",

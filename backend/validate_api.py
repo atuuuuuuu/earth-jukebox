@@ -58,6 +58,14 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
         for L in s.get("layers") or []:
             if len((fine.get("layers") or {}).get(L.get("id"), [])) != cells:
                 out.append(f"{where} frame {n}: sweep data needs {cells} cells for layer '{L.get('id')}'")
+    if s.get("lesson"):
+        lesson = public / str(s["lesson"])
+        if not lesson.is_file():
+            out.append(f"{where}: lesson not found: {lesson}")
+        else:
+            steps = json.loads(lesson.read_text(encoding="utf-8")).get("steps") or []
+            if not steps or any(not st.get("title") or not st.get("text") for st in steps):
+                out.append(f"{where}: a lesson needs steps, each with a title and a text")
     if not (s.get("legend") or {}).get("items"):
         out.append(f"{where}: a sweep score needs a legend with items (the Key reads it)")
     if "scan" in sw and sw["scan"] not in ("east", "south"):

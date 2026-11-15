@@ -12,6 +12,8 @@
 
   // ---------- Speaking ----------
   // One polite live region. Clearing it first makes a repeated message speak again.
+  // "Read aloud" uses the device's voice, at the volume and speed set in the lesson's settings.
+  const voice = { vol: store.get("voiceVol", 100), rate: store.get("voiceRate", 100) };
   let sayTimer, echo = null;
   const say = (text) => {
     // Key echo: the name of the key or button just used, said once before its answer.
@@ -22,7 +24,8 @@
     if ($("speak").checked && "speechSynthesis" in window) {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = 1;
+      u.rate = voice.rate / 100;
+      u.volume = voice.vol / 100;
       speechSynthesis.speak(u);
     }
   };
@@ -163,7 +166,9 @@
 
   // ---------- Player state ----------
   let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
-  const usesVideo = () => !!score?.frames && ["co2", "ocean"].includes(score.sweep.mapping);
+  let lesson = null, lessonMod = null;   // the guided lesson before the player, for tracks that have one
+  window.lesson = null;                   // a global, not the <section id="lesson"> the browser would give
+  const usesVideo = () => !!score?.frames && score.sweep.mapping === "co2";
   // The maps heard now: the track's own, or those of the region or stories chosen (score.views).
   const frames = () => son?.frames ?? score.frames;
   const n = () => frames().length;
@@ -231,14 +236,13 @@
   const tick = () => {
     if (!playing || !son) return;
     $("stage-fill").style.width = `${son.progress() * 100}%`;
-    const here = son.placeNow();
-    if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
     syncVideo();
     moveNeedle();
     const sea = son.info?.sea;
     if (sea && Number.isFinite(sea.temp)) $("readout").textContent = `${Math.round(sea.temp)} °C · note ${noteName(son.mapping.melodyMidi(sea.temp))} · ${son.mapping.chordFor(son.track, sea.temp, sea.share).levels.filter((l) => l > 0.02).length} chord voices · ${latWords(sea.lat)}`;
     const d = son.info?.decade;
     if (d && son.isDecade() && $("view-map-note")) $("view-map-note").textContent = decadeText(d);
+    if (d && son.isDecade()) drawDecade(d.year + 1);
     requestAnimationFrame(tick);
   };
 
@@ -257,7 +261,8 @@
     lastNote = note;
     if (note.midi) $("readout").textContent = `${noteName(note.midi)} · ${hertz(note.midi)} Hz · ${latWords(note.lat)}`;
     buzz(Math.round(12 + 30 * (note.velocity ?? 0.5)));
-    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
+    const ring = score.sweep.chapter === "anomaly" ? { gain: 2, loss: 3 } : { gain: 1, loss: 2 };
+    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, ring[note.kind] ?? 0);
   };
   const onEnd = () => {
     playing = false; setPlayButton(); idle();
@@ -267,12 +272,60 @@
     $("stage-fill").style.width = son ? `${son.progress() * 100}%` : "0";
     syncVideo();
     moveNeedle();
+    drawDecade();
   };
+
+  // The decade as a picture, for sighted listeners: time runs left to right, and each year's note is a
+  // dot, higher when the place had more light than in its first year. The dots appear as the notes play;
+  // at rest all of them show. Drawn from the same numbers the notes are made from (son.decadeSeries).
+  const SVG = "http://www.w3.org/2000/svg";
+  let decadeDrawn = null;
+  const drawDecade = (upTo = Infinity) => {
+    const fig = $("decade-chart"), series = son?.isDecade() && !$("view-map").hidden ? son.decadeSeries() : null;
+    fig.hidden = !series;
+    if (!series) { decadeDrawn = null; return; }
+    const W = Math.max(260, fig.clientWidth || 320), H = 230, m = { l: 50, r: 16, t: 16, b: 36 };
+    const n = series.length, shown = Math.min(n, upTo);
+    const key = `${W}|${shown}|${upTo === Infinity}|${son.index}|${son.view?.id ?? ""}`;
+    if (key === decadeDrawn) return;
+    decadeDrawn = key;
+    const start = series.find((v) => v > 0) ?? 0, ratio = series.map((v) => (start ? v / start : 0));
+    const lo = Math.min(1, ...ratio) - 0.04, hi = Math.max(1, ...ratio) + 0.04;
+    const x = (i) => m.l + (n > 1 ? i / (n - 1) : 0.5) * (W - m.l - m.r);
+    const y = (r) => m.t + (1 - (r - lo) / (hi - lo)) * (H - m.t - m.b);
+    const svg = $("decade-svg"), first = frames()[0].when;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("height", H);
+    const add = (tag, attrs, text) => { const e = document.createElementNS(SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; svg.append(e); return e; };
+    svg.replaceChildren();
+    // Light compared with the first year: gridlines every 10 or 20 percent, the first year's level dashed.
+    const span = (hi - lo) * 100, stepP = span > 60 ? 20 : span > 24 ? 10 : 5;
+    for (let p = Math.ceil((lo - 1) * 100 / stepP) * stepP; p <= (hi - 1) * 100; p += stepP) {
+      const yy = y(1 + p / 100);
+      add("line", { x1: m.l, x2: W - m.r, y1: yy, y2: yy, class: p === 0 ? "dc-base" : "dc-grid" });
+      add("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end", class: "dc-text" }, p === 0 ? first : `${p > 0 ? "+" : ""}${p}%`);
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - m.l - m.r) / 56))));
+    for (let i = 0; i < n; i += every) add("text", { x: x(i), y: H - 12, "text-anchor": "middle", class: "dc-text" }, frames()[i].when);
+    add("line", { x1: m.l, x2: m.l, y1: m.t, y2: H - m.b, class: "dc-axis" });
+    add("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, class: "dc-axis" });
+    if (shown > 1) add("polyline", { points: ratio.slice(0, shown).map((r, i) => `${x(i)},${y(r)}`).join(" "), class: "dc-line" });
+    ratio.slice(0, shown).forEach((r, i) => {
+      const now = upTo !== Infinity && i === shown - 1;
+      const dot = add("circle", { cx: x(i), cy: y(r), r: now ? 7 : 5, class: now ? "dc-dot is-now" : "dc-dot" });
+      const pct = Math.round((r - 1) * 100);
+      dot.append(Object.assign(document.createElementNS(SVG, "title"), { textContent: `${frames()[i].when}: ${Math.abs(pct) < 3 ? "about the same light" : `${Math.abs(pct)} percent ${pct > 0 ? "more" : "less"} light`} than ${first}` }));
+    });
+    $("decade-caption").textContent = `Time runs left to right, one dot for each year's note. A dot higher up means more light than in ${first}, lower means less.`;
+  };
+  window.addEventListener("resize", () => { decadeDrawn = null; if (!playing) drawDecade(); });
 
   const loadTrack = async (t, { announce = true, fromShow = false } = {}) => {
     if (!fromShow) showing = false;       // choosing a track ends the show
     const mine = ++gen;
     if (son) { son.dispose(); son = null; }
+    if (lesson) { lesson.dispose(); lesson = window.lesson = null; }
+    $("lesson").hidden = $("to-lesson").hidden = true;
     playing = false; setPlayButton();
     $("play").disabled = true;
     $("alert").hidden = true;
@@ -297,6 +350,19 @@
     lastNote = null;
     $("continuous-row").hidden = $("continuous-hint").hidden = !son.hasNotes;
 
+    // A guided lesson comes before the player where the track has one (ocean currents).
+    if (score.lesson) {
+      try {
+        lessonMod ||= await import("./lesson.js");
+        const l = await lessonMod.createLesson(score.lesson, { $, say, run, store, onSound: () => pauseForSpeech() });
+        if (mine !== gen) { l.dispose(); return; }
+        lesson = window.lesson = l;
+        $("lesson").hidden = $("to-lesson").hidden = false;
+      } catch (e) {
+        console.error(e);   // the track still plays without its lesson
+      }
+    }
+
     // The picture: NASA's video for carbon dioxide, the globe for map tracks.
     const video = usesVideo();
     $("video-wrap").hidden = !video;
@@ -313,7 +379,8 @@
       // A line moving south (sea heat) is drawn as a circle of latitude; the others as a meridian.
       globe.scanLat = son.scan === "south";
       globe.headFn = video ? null : globe.scanLat ? () => son?.headLat() : () => son?.headLon();
-      globe.full = true;
+      // Sea maps: NASA paints land plain grey (no reading there), so the planet's own land shows instead.
+      globe.full = !["anomaly", "currents"].includes(score.sweep.chapter);
       globe.pings = [];
     }
 
@@ -342,8 +409,12 @@
       const choose = L.length
         ? `${listenText(null)} play together. Press ${orList(L.map((x) => x.key.toUpperCase()))} for ${orList(L.map((x) => x.name.toLowerCase()))} alone. `
         : "";
-      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}${viewTip()}${sidewaysTip()}${decadeIndex() >= 0 ? "The last map is the change over the decade: press End, or the Hear the change over the decade button. " : ""}`
-        + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
+      const inPlayer = document.activeElement?.closest?.("#player");
+      say(lesson
+        ? `Track ${pos()} of ${tracks.length}, ${t.title}. It starts with a guided lesson, ${lesson.title}, in ${lesson.count} short steps. `
+          + (inPlayer ? "Press L to go to the lesson, or Space to play the full tour." : "Press Tab to reach the lesson. The full tour player comes after it.")
+        : `Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}${viewTip()}${sidewaysTip()}${decadeIndex() >= 0 ? "The last map is the change over the decade: press End, or the Hear the change over the decade button. " : ""}`
+          + (inPlayer ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
     }
   };
   const orList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`);
@@ -495,6 +566,7 @@
     $("view-map-caption").append(small);
     for (const b of $("story-buttons").children) b.setAttribute("aria-pressed", String(unit() === "story" && Number(b.dataset.story) === i));
     moveNeedle();
+    drawDecade();
   };
   // The scan line on the flat map: inside the window heard, or from top to bottom on the whole map.
   const moveNeedle = () => {
@@ -556,6 +628,7 @@
       say(`Paused at ${whenOf(son.index)}.`);
       return;
     }
+    lesson?.stop();   // one thing at a time
     if (!son.ready) say("Loading sounds.");
     playing = true; setPlayButton();
     son.started = false;
@@ -654,15 +727,7 @@
       return `${s}${playing ? `Playing. ${at}` : `Paused. ${at}`}${underText()}${playing ? "" : " Press Space to play."} Press H for keys.`;
     }
     if (playing) {
-      const here = son.placeNow?.();
-      if (here) {
-        s += `Playing. ${here.date}. The camera is over ${here.place}, ${Math.round(son.progress() * 100)} percent of the way through this scene.`;
-        if (son.info) s += son.info.light > 0.2 ? ` The swell is at ${Math.round(son.info.light * 100)} percent.` : " The water on the line is calm.";
-        if (lastNote && performance.now() - lastNote.at < 4000) {
-          const p = lastNote.pos;
-          s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
-        }
-      } else if (son.isDecade() && son.info?.decade) {
+      if (son.isDecade() && son.info?.decade) {
         s += `Playing the decade, one note per year. ${decadeText(son.info.decade)}.`;
       } else {
         s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across${across}.`;
@@ -685,6 +750,7 @@
     + (layers().length ? `A: ${allText()}. ${layers().map((L) => `${L.key.toUpperCase()}: ${L.name.toLowerCase()} only.`).join(" ")} ` : "")
     + (viewKey() ? `${viewKey().toUpperCase()}: ${score.views.legend.toLowerCase()}: ${orList(["whole map", ...views().map((o) => o.name)])}, in turn. ` : "")
     + sidewaysTip()
+    + (lesson ? "L: go to the guided lesson. " : "")
     + "Escape: stop. Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
 
   const soundsText = () => {
@@ -695,6 +761,7 @@
   const stopAll = () => {
     showing = false;
     if (son) { if (playing) { son.pause(); playing = false; setPlayButton(); idle(); } son.hush(); }
+    lesson?.stop();
     clearTimeout(demoTimer);
     if ("speechSynthesis" in window) speechSynthesis.cancel();
     say("Stopped.");
@@ -750,6 +817,11 @@
       case "s": act(() => say(soundsText()), "What the sounds mean"); break;
       case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
       case "c": act(() => setCompare(!$("compare").checked)); break;
+      case "l": act(() => {
+        if (!lesson) { say(`Track ${pos()}, ${track.title}, has no guided lesson.`); return; }
+        $("lesson-keys").focus();
+        lesson.where();
+      }, "Lesson"); break;
       default:
         // A letter or digit with no job: say so, so a key press is never met with silence.
         if (t === $("keys") && k.length === 1 && !(/^[1-9]$/.test(k) && tracks[Number(k) - 1])) {
@@ -895,6 +967,7 @@
   // sound and never moves focus on its own: focus goes into the panel when the listener opens it.
   const GUIDE = [
     ["#tracks", "Choose a track here with the arrow keys. Inside the player, the number keys 1 to 7 choose a track too."],
+    ["#lesson", "This track starts with a guided lesson: one idea at a time, at your own pace. Tab reaches its keyboard area; T goes on to the player."],
     ["#keys", "This is the keyboard area. Press Tab to reach it. Inside it single keys work: Space plays or pauses, W says where you are, D describes the map, H lists every key."],
     ["#play", "Play or pause. No sound starts until you press this, or Space."],
     ["#view-field", "This track has more than one way to listen: its regions, or NASA's stories. R moves to the next one."],
@@ -1016,6 +1089,20 @@
   $("mono").addEventListener("change", (e) => { settings.mono = e.target.checked; store.set("mono", settings.mono); son?.setMono(settings.mono); });
   $("continuous").addEventListener("change", (e) => { settings.continuous = e.target.checked; store.set("continuous", settings.continuous); son?.setContinuous(settings.continuous); });
   $("announce").addEventListener("change", (e) => store.set("announce", e.target.checked));
+  // Narration (Read aloud): the lesson's switch is the same setting as the one in Settings.
+  $("lesson-speak").checked = $("speak").checked;
+  $("lesson-speak").addEventListener("change", (e) => { $("speak").checked = e.target.checked; $("speak").dispatchEvent(new Event("change")); });
+  $("speak").addEventListener("change", (e) => { $("lesson-speak").checked = e.target.checked; });
+  for (const [id, key, unit] of [["voice-vol", "vol", "percent"], ["voice-rate", "rate", "percent of normal speed"]]) {
+    const el = $(id);
+    el.value = voice[key];
+    el.setAttribute("aria-valuetext", `${el.value} ${unit}`);
+    el.addEventListener("input", () => {
+      voice[key] = Number(el.value);
+      store.set(key === "vol" ? "voiceVol" : "voiceRate", voice[key]);
+      el.setAttribute("aria-valuetext", `${el.value} ${unit}`);
+    });
+  }
   $("speak").addEventListener("change", (e) => {
     store.set("speak", e.target.checked);
     if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel();

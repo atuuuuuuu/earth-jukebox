@@ -10,13 +10,12 @@ import { renderBuffer } from './render.js';
 import { clamp, midiToNote } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
-import * as ocean from './tracks/ocean.js';
 import * as lightning from './tracks/lightning.js';
 import * as aerosols from './tracks/aerosols.js';
 import * as seaHeat from './tracks/sea-heat.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, ocean, lightning, aerosols, 'sea-heat': seaHeat };
+const MAPPINGS = { 'night-lights': nightLights, co2, lightning, aerosols, 'sea-heat': seaHeat };
 const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
@@ -76,11 +75,16 @@ DEMOS.air = [
   ['tense', 'The worst air', 'The drone turns sour', 'The worst air. Where pollution is thickest, clashing notes creep into the drone and it turns harsh.'],
   DEMOS.light[1],
 ];
-DEMOS.ocean = [
-  ['city', 'A current', 'One harp note', 'A current or eddy. When bright, fast water crosses the line, a harp note rings. Brighter water rings louder.'],
-  ['swell', 'The swell', 'Grows, then settles', 'The swell. It follows all the moving water on the line: soft over calm sea, full over strong currents.'],
-  ['beat', 'A new month', 'A soft low pulse', 'A new month. One soft low pulse at the start of each month of the tour.'],
-  ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Water near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
+DEMOS.currents = [
+  ['city', 'A strong current', 'One harp note', 'A strong current. When the scan line crosses fast, bright water such as the Gulf Stream, a harp note rings. Stronger rings louder.'],
+  DEMOS.light[1],
+  ['hum', 'The hum', 'Swells, then fades', 'The hum. It follows all the moving water under the scan line: quiet over calm sea, fuller over strong currents, silent over land. It is not the sound of waves.'],
+];
+DEMOS.anomaly = [
+  ['gain', 'Warmer than normal', 'A rising pair of notes', 'Warmer than normal. Where the sea is at least 1.2 degrees warmer than usual for the time of year, a note rings as the scan line crosses it; from 2 degrees, a rising pair. Warmer rings louder.'],
+  ['loss', 'Cooler than normal', 'A low falling cello', 'Cooler than normal. Where the sea is at least 1.2 degrees cooler than usual, a low cello falls. Cooler rings louder.'],
+  ['hum', 'Deep hum', 'Swells, then fades', 'The deep hum. It grows with how far from normal the sea under the scan line is, warm or cool. It is quiet where the sea is close to normal, and silent over land.'],
+  DEMOS.light[1],
 ];
 // Lightning's examples follow its legend, in the same order, then the stereo sweep.
 DEMOS.lightning = [
@@ -113,8 +117,11 @@ class SweepSonifier {
     onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {}, onBeat = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
-    this.kind = mapping === co2 ? 'co2' : mapping === ocean ? 'ocean' : mapping === lightning ? 'lightning'
-      : mapping === aerosols ? 'aerosols' : mapping === seaHeat ? 'sea' : score.sweep.chapter === 'change' ? 'change'
+    // Maps on the night-lights mapping take their kind from the chapter: 'change' (lights 2012 to 2023),
+    // 'currents' (ocean surface currents), 'anomaly' (El Niño: sea temperature from normal, two-sided).
+    this.kind = mapping === co2 ? 'co2' : mapping === lightning ? 'lightning'
+      : mapping === aerosols ? 'aerosols' : mapping === seaHeat ? 'sea'
+        : ['change', 'currents', 'anomaly'].includes(score.sweep.chapter) ? score.sweep.chapter
         : score.sweep.chapter === 'pollutants' ? 'air' : 'light';
     this.bedWord = this.kind === 'lightning' ? 'bass' : this.kind === 'sea' ? 'chord' : 'hum';   // what "Where am I" calls the low layer
     // Which way the scan line moves (score.sweep.scan): "east" (a north-south line, the default) or
@@ -218,6 +225,13 @@ class SweepSonifier {
     return false;
   }
 
+  /** The light of each year for the place of map i when it is the decade (whole map or the region heard), else null. */
+  decadeSeries(i = this.index) {
+    let k = i;
+    for (const c of this.track.chapters) { if (k < c.frames.length) return c.id === 'change' ? c.frames[k].decade ?? null : null; k -= c.frames.length; }
+    return null;
+  }
+
   /** The window of map i ([west, south, east, north]) while a view is heard, else null. */
   boxOf(i = this.index) { return this.view ? this.frames[i]?.box ?? null : null; }
 
@@ -284,14 +298,6 @@ class SweepSonifier {
     const seg = this.player.segmentAt(this.player.currentPosition);
     const s = clamp(Math.floor(this.progress() * seg.steps), 0, seg.steps - 1);
     return this.mapping.planStep(this.track, seg, s).sea;
-  }
-
-  /** For the ocean tour: where the camera is and the date on screen, in words; else null. */
-  placeNow() {
-    if (this.kind !== 'ocean') return null;
-    const seg = this.player.segmentAt(this.player.currentPosition);
-    const s = Math.floor(seg.frame.startStep + this.progress() * (seg.steps - 1));
-    return { place: seg.frame.place, date: ocean.dateAt(this.track, s) };
   }
 
   /** For tracks played from a NASA video: the video time that matches the sound, in seconds. */
@@ -475,19 +481,21 @@ class SweepSonifier {
     if (this.kind === 'sea') return this.probeSea(c, v, t);
     const midi = this.noteForLat(lat), pos = this.posForLat(lat);
     const pct = Math.round(Math.abs(v) * 100);
-    if (this.kind === 'change' || this.isDecade(i)) {
-      if (v >= 0.05) {
-        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * v, duration: 1.5 }, t, pos);
-        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * v, duration: 1.5 }, t + 0.11, pos);
-        return `light grew, ${pct} percent of the strongest change on this map.`;
+    if (this.kind === 'change' || this.kind === 'anomaly' || this.isDecade(i)) {
+      // Night lights: v is -1..1 of the strongest change. El Niño: v is degrees C from normal, 4 = the end of NASA's bar.
+      const sea = this.kind === 'anomaly', u = sea ? Math.min(1, Math.abs(v) / 4) : Math.abs(v), deg = `${Math.abs(v).toFixed(1)} degrees C`;
+      if (v >= (sea ? 0.25 : 0.05)) {
+        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * u, duration: 1.5 }, t, pos);
+        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * u, duration: 1.5 }, t + 0.11, pos);
+        return sea ? `${deg} warmer than normal for the time of year.` : `light grew, ${pct} percent of the strongest change on this map.`;
       }
-      if (v <= -0.05) {
-        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * -v, duration: 1.4 }, t, pos);
-        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * -v, duration: 1.6 }, t + 0.3, pos);
-        return `light dimmed, ${pct} percent of the strongest change on this map.`;
+      if (v <= (sea ? -0.25 : -0.05)) {
+        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * u, duration: 1.4 }, t, pos);
+        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * u, duration: 1.6 }, t + 0.3, pos);
+        return sea ? `${deg} cooler than normal for the time of year.` : `light dimmed, ${pct} percent of the strongest change on this map.`;
       }
       a.play({ voice: 'notes', midi, velocity: 0.15, duration: 0.8 }, t, pos);
-      return 'about the same as in 2012.';
+      return sea ? 'close to normal for the time of year.' : 'about the same as in 2012.';
     }
     const how = v >= 0.5 ? 'high' : v >= 0.05 ? 'some' : 'almost none';
     if (this.kind === 'lightning') return this.probeLightning(c, r, i, v, { lat, midi, t, how, pct });
@@ -758,7 +766,7 @@ class SweepSonifier {
         a.setHum(0, 0, t + 3.8, 0.3); return 4;
       case 'tense':
         a.setHum(0.6, 0, t, 0.3); a.setHum(0.8, 0, t + 0.4, 1.2, 1); a.setHum(0, 0, t + 2.6, 0.6, 0); return 3.4;
-      case 'beat': a.beat(t, 0.9); if (this.kind !== 'ocean') a.beat(t + 1.2, 0.9); return 2;
+      case 'beat': a.beat(t, 0.9); a.beat(t + 1.2, 0.9); return 2;
       case 'swell':
         a.setHum(0.1, 0, t, 0.2); a.setHum(0.85, 0, t + 0.2, 1.8); a.setHum(0.1, 0, t + 2.4, 1.6);
         a.setHum(0, 0, t + 4.2, 0.4); return 4.4;

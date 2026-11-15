@@ -57,13 +57,14 @@ function audit(touch) {
     await page.goto("http://localhost:8124/");
     await page.waitForFunction("window.ready === true");
     // Every kind of stage must fit: NASA's video (carbon dioxide), lightning (with its compare
-    // control), aerosols (with its Listen to radios), then the globe (track 1).
+    // control), aerosols (with its Listen to radios), the guided lesson above the globe (ocean
+    // currents), then the globe (track 1).
     let flat = { cut: [], small: [], overflow: 0 };
-    for (const id of ["carbon-dioxide", "lightning", "aerosols"]) {
+    for (const id of ["carbon-dioxide", "lightning", "aerosols", "ocean-currents"]) {
       const radio = await page.evaluate((v) => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === v)?.id, id);
       if (!radio) continue;
       await page.evaluate((x) => document.getElementById(x).click(), radio);
-      await page.waitForFunction(`window.son && window.son.score.id === '${id}'`);
+      await page.waitForFunction(`window.son && window.son.score.id === '${id}'` + (id === "ocean-currents" ? " && window.lesson" : ""));
       const a = await page.evaluate(audit, touch);
       flat = { cut: [...flat.cut, ...a.cut], small: [...flat.small, ...a.small], overflow: Math.max(flat.overflow, a.overflow) };
     }

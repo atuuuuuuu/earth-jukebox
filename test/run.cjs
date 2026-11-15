@@ -155,7 +155,22 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     await page.keyboard.press("w");
     const wk = await live();
     check(`${ids[k]}: where am I`, wk.includes(`Track ${k + 1} of`)
-      && (ids[k] !== "ocean-currents" || /The camera is over .+\d{4}|\d{4}\. The camera is over/.test(wk)), wk.slice(0, 140));
+      && (ids[k] !== "ocean-currents" || /The scan line is at/.test(wk)), wk.slice(0, 140));
+    if (["ocean-currents", "el-nino"].includes(ids[k])) {
+      // A world map from NASA's film: our globe shows it (with the planet's own land), and the scan line moves west to east.
+      const sweep = await page.evaluate(async () => {
+        const a = son.headLon(); await new Promise((r) => setTimeout(r, 700)); const b = son.headLon();
+        return { a, b, globe: !document.getElementById("globe").hidden, video: !document.getElementById("video-wrap").hidden, full: window.globe ? window.globe.full : false };
+      });
+      check(`${ids[k]}: globe with a scan line moving west to east`, sweep.globe && !sweep.video && !sweep.full && sweep.b > sweep.a,
+        `${sweep.a?.toFixed(1)} to ${sweep.b?.toFixed(1)} degrees`);
+    }
+    if (ids[k] === "ocean-currents") check("ocean-currents: its guided lesson is shown, L in the help", await page.evaluate("!!window.lesson && !document.getElementById('lesson').hidden && !document.getElementById('to-lesson').hidden"));
+    if (ids[k] === "el-nino") {
+      // A place in the warm Pacific in 2026: said in degrees C from normal, warm or cool.
+      const nino = await page.evaluate(async () => { const i = son.frames.findIndex((f) => f.when === "September 2026"); return son.probe(3, 9, i); });   // 145 degrees west, 5 south: the El Niño box
+      check("el-nino: a spot is said in degrees from normal", /degrees C (warmer|cooler) than normal|close to normal/.test(nino || ""), nino);
+    }
     // A line moving south (sea heat, score.sweep.scan): its latitude, degrees Celsius, and the ears turned round.
     const headLat = await page.evaluate("son.scan === 'south' ? son.headLat(true) : null");
     if (headLat !== null) {
@@ -198,7 +213,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     check(`${ids[k]}: About this track has the six answers and where it comes from`, !about.hidden && about.dt === 6 && about.chain >= 4, JSON.stringify(about));
     const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#csv", { force: true })]);
     const csv = require("fs").readFileSync(await dl.path(), "utf8");
-    check(`${ids[k]}: CSV has its source, units and rows`, dl.suggestedFilename() === `earth-jukebox-${ids[k]}.csv` && csv.startsWith("# ") && csv.includes("Units:") && (csv.split("\n").length > 100 || ids[k] === "ocean-currents"), `${dl.suggestedFilename()}, ${csv.split("\n").length} lines`);
+    check(`${ids[k]}: CSV has its source, units and rows`, dl.suggestedFilename() === `earth-jukebox-${ids[k]}.csv` && csv.startsWith("# ") && csv.includes("Units:") && csv.split("\n").length > 100, `${dl.suggestedFilename()}, ${csv.split("\n").length} lines`);
     // Compare with previous part: only where the track has it (lightning), by key C and the checkbox.
     const canCompare = await page.evaluate("son.canCompare");
     check(`${ids[k]}: compare control shown only where it works`, (await page.isVisible("#compare")) === canCompare);

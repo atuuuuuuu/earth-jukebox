@@ -22,11 +22,12 @@ Resource numbers are the order on the challenge's Resources tab.
 | --- | --- | --- |
 | 1 | **Earth at night**, one scan per year, 2012 to 2023, then NASA's change map heard as the decade (one note per year); for the whole map or one of NASA's four zoom regions | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
 | 2 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
-| 3 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
+| 3 | **Ocean currents**, NASA's world map of the ocean's surface currents, March 2007 to March 2008, after a guided lesson on the Gulf Stream (direction, speed, change, one idea at a time) | 2: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/); the lesson, 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
 | 4 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | 5 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
 | 6 | **Aerosols**, four winds over one moment of NASA's model, 19 August 2025; or NASA's six stories on that map, one after another | [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/) |
 | 7 | **Warm and cold seas**, sea surface temperature in four seasons, March 2007 to March 2008: a level line moves from the Arctic to Antarctica and warm water adds chord voices | 2: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/) |
+| 8 | **El Niño: then and now**, how much warmer or cooler than normal the sea is, one map a month: each month of 2025, then the same month of 2026 | Extra NASA resource: [Sea Surface Temperature Anomaly, Near Real Time](https://svs.gsfc.nasa.gov/5176/) |
 
 ## Using it without sight
 
@@ -45,7 +46,8 @@ In the keyboard area (and on any player button):
 | D | Describe this map (pauses first) |
 | S | What the sounds mean |
 | H | Every key |
-| 1 to 7 | Choose a track |
+| 1 to 8 | Choose a track |
+| L | On a track with a guided lesson (ocean currents): go to the lesson; T in the lesson comes back |
 | M | Mono on or off |
 | C | On Lightning: compare each part with the previous part |
 | A, B, U, T, L | On Aerosols: all four winds, or black carbon, dust, sea salt or sulfate alone (also the "Listen to" radios) |
@@ -58,8 +60,9 @@ with no job says so. The single-letter keys work only inside the player, so they
 by themselves. Every key is also a button. Below the player: **What the sounds mean** (each sound with
 an example button), **Explore one place** (city buttons and two sliders: hear one 10 degree square),
 and **Settings** (volume, speed, mono, continuous sound, say each new map, name each key, click on each key, vibrate,
-read aloud, save as audio file). Settings are remembered on the device. The ocean track follows a
-moving camera, so it has no map of places to explore.
+read aloud, save as audio file). Settings are remembered on the device. Ocean currents starts with a
+**guided lesson** above the player: the Gulf Stream one idea at a time, with its own keyboard area
+(arrows move through the steps, Space plays each step's sound, T goes on to the player).
 
 ## Run it
 
@@ -94,7 +97,7 @@ folder that holds it (see each `backend/eic/tracks/*.yaml` for the file and URL)
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
-npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_dyamond, 07_ocean_currents, 07_lightning, 03_aerosols
+npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_dyamond, 07_ocean_map, 07_ocean_lesson, 07_lightning, 03_aerosols, 09_el_nino
 npm run api && npm run validate
 cd backend/eic && python3 -m pipeline.validate --track 03   # known places, and heat maps in backend/eic/debug/
 ```
@@ -106,7 +109,10 @@ cd backend/eic && python3 -m pipeline.validate --track 03   # known places, and 
    the base map. Carbon dioxide: a thin line through the centre of NASA's turning globe, read every 3
    hours of model time. Air quality: four pollutants in strips that slide over one flat map; each
    strip is found in every frame and its colours rebuilt into a full world map per pollutant. Ocean:
-   a line through the middle of NASA's moving camera view, ten readings per second of video.
+   NASA's flat ECCO2 film of surface currents, averaged over the year, where brighter flow lines mean
+   faster water; the lesson measures how NASA's flow lines move off Florida in Perpetual Ocean 2.
+   El Niño: every daily sea temperature anomaly map is read back into degrees from NASA's colour bar
+   (-4 to +4 degrees C) and averaged by month.
    Lightning: NASA's Science On a Sphere movie is already a flat world map, read at its own 4096 x 2048
    pixels in 14 equal parts, in order; each yellow mark is counted once, when it first appears, on a
    1 x 3 degree grid, and the share of each 3 degree cell covered by marks is averaged over the part.
@@ -122,8 +128,8 @@ cd backend/eic && python3 -m pipeline.validate --track 03   # known places, and 
 3. **Sound** (`public/sweep/`, team RUSTMN's engine on Tone.js). The scan advances one 3 degree column
    at a time; notes ring as it crosses bright places (vibraphone for lights and air, harp for the
    ocean), a drone follows everything under the line. The worst air turns the drone sour and the
-   notes minor; carbon dioxide adds tension over dense plumes and a heartbeat for each day; the ocean
-   adds a soft pulse for each month. Lightning is a small orchestra in E flat, after NASA's Butterfly
+   notes minor; carbon dioxide adds tension over dense plumes and a heartbeat for each day; El Niño
+   plays a rising pair where the sea is warmer than normal and a falling cello where it is cooler. Lightning is a small orchestra in E flat, after NASA's Butterfly
    Nebula sonification (a sustained texture under distinct notes): a quiet, muted harp note for each
    lightning mark (crowded marks become a soft flurry), a storm wind that swells with the marks near
    the line, a deep contrabass for how much lightning is under the line, and bowed strings that sit
@@ -183,7 +189,11 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
   Night lights: Kel Elkins (USRA); Black Marble: Next Generation (Suomi NPP VIIRS). Carbon dioxide:
   AJ Christensen, Greg Shirah, Helen-Nicole Kostis, Mark SubbaRao; DYAMOND, GEOS-MITgcm. Lightning:
   Lightning Imaging Sensor on the ISS, NASA GHRC DAAC. Air quality: NASA GEOS-CF. Ocean: Greg
-  Shirah, Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL); ECCO2.
+  Shirah, Horace Mitchell, Eric Sokolowsky; scientists Hong Zhang (UCLA), Dimitris Menemenlis (NASA/JPL);
+  ECCO2. The Gulf Stream lesson: Perpetual Ocean 2, Greg Shirah, Horace Mitchell (NASA/GSFC); scientists
+  Atousa Saberi (NASA/GSFC), Josh Willis (JPL). El Niño: [Sea Surface Temperature Anomaly, Near Real
+  Time](https://svs.gsfc.nasa.gov/5176/), NASA's Scientific Visualization Studio; data: MUR SST v4.1
+  (NASA JPL PO.DAAC).
   Aerosols: [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/), NASA's GEOS model (Goddard Earth
   Observing System); visualizers Joseph V. Ardizzone (NASA/GSFC) and Helen-Nicole Kostis (STC),
   scientist Lesley Ott (NASA/GSFC). NASA's stories on the aerosol map come from the facts on that page,
@@ -203,7 +213,7 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
   sonification by SYSTEM Sounds (M. Russo, A. Santaguida).
 - Land on the globe: [NASA Visible Earth, Blue Marble](https://visibleearth.nasa.gov/collection/1484/blue-marble).
 - Sound design and video reading for night lights and carbon dioxide: team RUSTMN (Ulaanbaatar).
-- The ocean web video is a 640 x 360 copy of NASA's; the raw NASA videos are not in the repository.
+- The raw NASA videos are not in the repository; only the maps and images read from them are.
 - Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via
   [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts). Sound: [Tone.js](https://tonejs.github.io/).
 

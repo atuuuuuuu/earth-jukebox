@@ -41,7 +41,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+html { scroll-padding-top: 16px; }   /* no smooth scrolling: motion is only the scan line and state changes */
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 400 var(--t-md)/1.6 var(--font);
@@ -124,6 +124,8 @@ input[type="radio"]:focus-visible, input[type="checkbox"]:focus-visible { outlin
 .console h2 { font-size: var(--t-lg); margin-bottom: var(--s4); min-height: 1.75rem; }
 @media (min-width: 1200px) {
   .console { grid-template-columns: minmax(15rem, 17.5rem) minmax(0, 1fr); align-items: start; }
+  .console > #tracks { grid-column: 1; grid-row: 1 / span 2; }
+  .console > #lesson, .console > #player { grid-column: 2; }   /* the lesson, when there is one, above the player */
   #track-list { grid-template-columns: 1fr !important; }
 }
 
@@ -226,7 +228,13 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; margin:
 }
 .keys p { margin: 0; font-size: var(--t-sm); line-height: 1.5; }
 .keys:focus-visible { border-color: var(--accent); color: var(--text); }
-.keys:focus-visible::before { content: "Keys active"; display: block; color: var(--accent); font-weight: 700; margin-bottom: var(--s1); }
+/* "Keys active" sits on the top edge like a legend: gaining or losing focus never moves the page
+   (a moving page turns a click into a mouse-down on one control and a mouse-up on another). */
+.keys { position: relative; }
+.keys:focus-visible::before {
+  content: "Keys active"; position: absolute; top: -0.75em; left: var(--s3); padding: 0 var(--s1);
+  background: var(--bg); color: var(--accent); font-size: var(--t-sm); font-weight: 700; line-height: 1.5;
+}
 .btn-play {
   display: flex; align-items: center; justify-content: center; gap: var(--s3); min-height: 3.5rem; font-size: var(--t-lg);
   border-color: var(--muted);
@@ -259,12 +267,12 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; margin:
 /* Settings */
 .settings-grid { display: grid; gap: var(--s5) var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); align-items: start; }
 @media (min-width: 1100px) {   /* three columns: sound, what is said, files (read down each, in page order) */
-  .settings-grid { grid-template-columns: 1fr 1.3fr 1fr; }
-  .settings-grid > :nth-child(1) { grid-area: 1 / 1; }
-  .settings-grid > :nth-child(2) { grid-area: 2 / 1; }
-  .settings-grid > .checks { grid-area: 1 / 2 / span 3; }
-  .settings-grid > :nth-child(4) { grid-area: 1 / 3; }
-  .settings-grid > :nth-child(5) { grid-area: 2 / 3; }
+  #settings .settings-grid { grid-template-columns: 1fr 1.3fr 1fr; }
+  #settings .settings-grid > :nth-child(1) { grid-area: 1 / 1; }
+  #settings .settings-grid > :nth-child(2) { grid-area: 2 / 1; }
+  #settings .settings-grid > .checks { grid-area: 1 / 2 / span 3; }
+  #settings .settings-grid > :nth-child(4) { grid-area: 1 / 3; }
+  #settings .settings-grid > :nth-child(5) { grid-area: 2 / 3; }
 }
 #settings .seg { grid-template-columns: repeat(3, 1fr); }
 
@@ -296,7 +304,6 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; margin:
 #mystery-again { margin-top: var(--s2); }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
   .btn, .seg label, .track label { transition: none; }
   .btn:active:not(:disabled) { transform: none; }
 }
@@ -305,3 +312,38 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; margin:
   .track input:checked + label, .seg label:has(input:checked) { border: 3px solid Highlight; }
   .step, .btn-play { forced-color-adjust: none; }
 }
+
+/* The guided lesson (ocean currents): the same shape as the player, picture left, steps right */
+.lesson-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1.5fr) minmax(19rem, 1fr); align-items: start; }
+@media (max-width: 899px) { .lesson-grid { grid-template-columns: 1fr; } }
+.lesson-fig { margin: 0; }
+.lesson-pic { position: relative; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); background: var(--display); }
+.lesson-pic img { display: block; width: 100%; height: auto; }
+.lesson-pic svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lesson-fig figcaption { margin-top: var(--s2); }
+.lesson-body { display: grid; gap: var(--s3); align-content: start; }
+.lesson-pos { margin: 0; color: var(--faint); font: 400 var(--t-sm)/1.5 var(--mono); }
+.lesson-body h3 { margin: 0; }
+#lesson-text { margin: 0; max-width: 62ch; }
+#lesson-try-h { margin: 0 0 var(--s2); font-size: var(--t-md); }
+#lesson-try .demos { margin-bottom: 0; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr)); }
+.btn-row.four { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 480px) { .btn-row.four { grid-template-columns: 1fr 1fr; } }
+.lesson .btn-play { min-height: 3rem; font-size: var(--t-md); gap: var(--s2); }
+#lesson-state { margin: 0; }
+.lesson-settings { margin: var(--s5) 0 0; padding: var(--s3) var(--s4) var(--s4); border: 1px solid var(--line); border-radius: var(--r-lg); min-width: 0; }
+.lesson-settings > legend { font-weight: 700; padding: 0 var(--s2); }
+.lesson-settings-grid { display: grid; gap: var(--s5) var(--gap); grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); align-items: start; }
+.btn-link { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+
+/* The decade as a picture (night lights' change map): dots for each year's note, higher = more light */
+.decade-chart { margin: 0; padding: var(--s3) var(--s3) var(--s2); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
+.decade-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.decade-chart figcaption { margin: var(--s2) 0 0; color: var(--faint); }
+.dc-text { fill: var(--faint); font: 400 12px var(--mono); }
+.dc-grid { stroke: var(--line); stroke-width: 1; }
+.dc-base { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 4 4; }
+.dc-axis { stroke: var(--line-strong); stroke-width: 1; }
+.dc-line { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.dc-dot { fill: var(--text); stroke: var(--bg); stroke-width: 2; }
+.dc-dot.is-now { fill: var(--accent); }   /* the note sounding now */
