@@ -50,7 +50,7 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
             out.append(f"{where} frame {n}: image differs from the sweep data")
         if not g:   # spin sweep: one line of rows per step, shared by the whole chapter
             continue
-        arrays = [k for k in ("core", "glow", "gain", "loss") if k in fine]
+        arrays = [k for k in ("core", "glow", "gain", "loss", "temp") if k in fine]
         if not arrays or any(len(fine[k]) != cells for k in arrays):
             out.append(f"{where} frame {n}: sweep arrays must each hold {cells} cells")
         for L in s.get("layers") or []:
@@ -58,6 +58,78 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
                 out.append(f"{where} frame {n}: sweep data needs {cells} cells for layer '{L.get('id')}'")
     if not (s.get("legend") or {}).get("items"):
         out.append(f"{where}: a sweep score needs a legend with items (the Key reads it)")
+    if "scan" in sw and sw["scan"] not in ("east", "south"):
+        out.append(f"{where}: sweep.scan must be \"east\" or \"south\", not {sw['scan']!r}")
+    out.extend(check_views_data(s, data, sw.get("chapter"), where))
+    return out
+
+
+def check_views(s: dict, where: str) -> list[str]:
+    """`views`: other ways to hear the track (regions, stories). Each map names its window and data."""
+    out: list[str] = []
+    v = s.get("views")
+    if v is None:
+        return out
+    options = v.get("options") or []
+    if not v.get("legend") or not options:
+        return [f"{where}: views need a legend and at least one option"]
+    ids = [o.get("id") for o in options]
+    if len(set(ids)) != len(ids) or not all(ids) or "whole" in ids:
+        out.append(f"{where}: view options need unique ids ('whole' is the whole map)")
+    key = str(v.get("key", "")).lower()
+    layer_keys = {str(L.get("key", "")).lower() for L in s.get("layers") or []}
+    if "key" in v and (len(key) != 1 or not key.isalpha() or key in PLAYER_KEYS or key in layer_keys):
+        out.append(f"{where}: the views key must be a single letter the player and the layers do not use")
+    layer_ids = {L.get("id") for L in s.get("layers") or []}
+    base_n = len(s.get("frames") or [])
+    for o in options:
+        at = f"{where} view '{o.get('id')}'"
+        if not o.get("name") or not o.get("frames"):
+            out.append(f"{at}: needs a name and frames")
+            continue
+        for n, f in enumerate(o["frames"], 1):
+            when, box = f.get("when"), f.get("box") or []
+            if not when or not isinstance(f.get("text"), str) or not f["text"].startswith(when):
+                out.append(f"{at} map {n}: text must start with its 'when'")
+            if (len(box) != 4 or not all(isinstance(x, (int, float)) for x in box)
+                    or not (-180 <= box[0] < box[2] <= 180 and -90 <= box[1] < box[3] <= 90)):
+                out.append(f"{at} map {n}: box must be [west, south, east, north] in degrees")
+            if not isinstance(f.get("base"), int) or not 0 <= f["base"] < base_n:
+                out.append(f"{at} map {n}: base must be the index of one of the track's maps")
+            if f.get("focus") is not None and f["focus"] not in layer_ids:
+                out.append(f"{at} map {n}: focus '{f['focus']}' is not one of the layers")
+    return out
+
+
+def check_views_data(s: dict, data: dict, chapter: str, where: str) -> list[str]:
+    """Every map of every view points at data that the sweep engine can play: full-size arrays."""
+    out: list[str] = []
+    if not s.get("views"):
+        return out
+    items = {it.get("id"): it for it in (data.get("views") or {}).get("items", [])}
+    for o in s["views"].get("options") or []:
+        for n, f in enumerate(o.get("frames") or [], 1):
+            at = f"{where} view '{o.get('id')}' map {n}"
+            it = items.get(f.get("view"))
+            if it is None:
+                out.append(f"{at}: view '{f.get('view')}' not in the sweep data")
+                continue
+            g = it.get("grid") or {}
+            cells = g.get("cols", 0) * g.get("rows", 0)
+            chs = it.get("chapters") or {}
+            fr = (chs.get(chapter) or chs.get("still") or [])
+            if not isinstance(f.get("frame"), int) or not 0 <= f["frame"] < len(fr):
+                out.append(f"{at}: frame {f.get('frame')} not in the view's data")
+                continue
+            fine = fr[f["frame"]]
+            arrays = [k for k in ("core", "glow", "gain", "loss", "temp") if k in fine]
+            if any(len(fine[k]) != cells for k in arrays) or (not arrays and not fine.get("layers")):
+                out.append(f"{at}: view arrays must each hold {cells} cells")
+            for L in s.get("layers") or []:
+                if len((fine.get("layers") or {}).get(L.get("id"), [])) != cells:
+                    out.append(f"{at}: view data needs {cells} cells for layer '{L.get('id')}'")
+            if f.get("box") != it.get("box"):
+                out.append(f"{at}: box differs from the sweep data")
     return out
 
 
@@ -143,6 +215,7 @@ def check(public: Path) -> list[str]:
             if not isinstance(f.get("text"), str) or not f["text"].startswith(stamp):
                 bad(f"{at}: text must start with '{stamp}'")
 
+        problems.extend(check_views(s, where))
         if s.get("engine") == "sweep":
             problems.extend(check_sweep(public, s, where))
 

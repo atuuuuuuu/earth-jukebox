@@ -220,6 +220,13 @@ def build(cfg: dict) -> dict:
     cell_h, cell_w = H // rows, W // cols
     strip = cell_h * 5
     cells = np.zeros((rows, cols, n_types), np.float64)
+    # NASA's stories (yaml `views`) are read on a finer world grid, then cut to their windows.
+    views = cfg.get("views") or {}
+    deg = views.get("cell_deg", 0.75)
+    f_rows, f_cols = round(180 / deg), round(360 / deg)
+    if views and (H % f_rows or W % f_cols or strip % (H // f_rows)):
+        raise SystemExit(f"{W}x{H} does not divide into {deg} degree cells strip by strip")
+    fine = np.zeros((f_rows, f_cols, n_types), np.float64) if views else None
     amounts_s = np.zeros((H // q, W // q, m), np.float32)    # per colour, quarter resolution
     resid_s = np.zeros((H // q, W // q), np.float32)
     for y0 in range(0, H, strip):
@@ -238,6 +245,9 @@ def build(cfg: dict) -> dict:
             per_type[:, k] += a[:, j]
         per_type = np.clip(per_type, 0, 1).reshape(h, W, n_types)
         cells[y0 // cell_h : (y0 + h) // cell_h] = per_type.reshape(h // cell_h, cell_h, cols, cell_w, n_types).mean(axis=(1, 3))
+        if fine is not None:
+            fh, fw = H // f_rows, W // f_cols
+            fine[y0 // fh : (y0 + h) // fh] = per_type.reshape(h // fh, fh, f_cols, fw, n_types).mean(axis=(1, 3))
         amounts_s[y0 // q : (y0 + h) // q] = a.reshape(h // q, q, W // q, q, m).mean(axis=(1, 3))
         resid_s[y0 // q : (y0 + h) // q] = res.reshape(h // q, q, W // q, q).mean(axis=(1, 3))
         print(f"  unmixed rows {y0}-{y0 + h} of {H}")
@@ -248,6 +258,30 @@ def build(cfg: dict) -> dict:
     combined = norm.max(axis=2)
     for L, s, k in zip(layers, scales, range(n_types)):
         print(f"  {L['name']:<13} scale {s:.4f}; cells above half: {(norm[..., k] >= 0.5).mean() * 100:.1f} %")
+
+    # The stories: each window cut from the fine grid. Each type has one fine scale for all of them
+    # (its thickest fine cells anywhere on the map), as the whole map has its own.
+    stories = None
+    if fine is not None:
+        f_scales = [float(np.percentile(fine[..., k][fine[..., k] > 0], ex["top_percentile"])) for k in range(n_types)]
+        f_norm = np.clip(fine / np.array(f_scales), 0, 1)
+        items = []
+        for S in views["items"]:
+            g = grid.box_grid(S["box"], deg)
+            r0, c0 = round((90 - g["latNorth"]) / deg), round((g["lonWest"] + 180) / deg)
+            win = f_norm[r0 : r0 + g["rows"], c0 : c0 + g["cols"]]
+            if S.get("focus") not in [L["id"] for L in layers]:
+                raise SystemExit(f"Story {S['id']}: focus '{S.get('focus')}' is not a layer")
+            items.append({
+                "id": S["id"], "name": S["name"], "box": S["box"], "grid": g, "focus": S["focus"],
+                "about": " ".join(S["about"].split()),
+                "secondsPerSweep": S.get("seconds", views["seconds_per_sweep"]),
+                "chapters": {"still": [{"layers": {L["id"]: grid.to_ints(win[..., k]) for k, L in enumerate(layers)}}]},
+            })
+            means = {L["name"]: round(float(win[..., k].mean()), 3) for k, L in enumerate(layers)}
+            print(f"  story {S['name']:<28} {g['cols']} x {g['rows']} cells; mean {means}")
+        stories = {"legend": views["legend"], "key": views.get("key"), "mode": views.get("mode", "tour"),
+                   "name": views.get("name"), "items": items}
 
     # Pictures: NASA's map without the lights and fires, and each type alone on the bare map.
     out_dir = MEDIA_DIR / cfg["id"]
@@ -314,6 +348,7 @@ def build(cfg: dict) -> dict:
                           "glow": grid.to_ints(combined),
                           "layers": {L["id"]: grid.to_ints(norm[..., k]) for k, L in enumerate(layers)},
                       }]}],
+        **({"views": stories} if stories else {}),
         "crossfade": 0.6,
         "legend": cfg["legend"],
     }

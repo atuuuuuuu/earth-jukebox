@@ -3,13 +3,13 @@
 NASA Space Apps 2026, "The Earth Information Jukebox". NASA Earth Information Center videos become
 numbers (the backend), and the numbers become sound live in the browser. The tracks are the
 challenge's NASA resources (numbered as on its Resources tab) 1 and 3 (night lights), 6 (air quality),
-7 (Perpetual Ocean 2), 8 (carbon dioxide) and 9 (lightning), and GEOS Aerosols (SVS 5669). 1, 6 and 7
-come first; aerosols is the last track.
+7 (Perpetual Ocean 2), 8 (carbon dioxide) and 9 (lightning), GEOS Aerosols (SVS 5669) and 2 (sea surface
+currents and temperature, SVS 3912). 1, 6 and 7 come first; sea heat is the last track.
 
 ## Layout
 
 - `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built: Tone.js as `EJ.Tone`, and `EJ.toWav`), `textures/` (NASA Blue Marble), `api/` (scores), `data/` (3 degree grids), `media/` (map images, the CO2 and ocean videos), `samples/`
-- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/ocean.js` / `tracks/lightning.js` / `tracks/aerosols.js`. Air quality uses the night-lights mapping (vibraphone with a sour drone for the `pollutants` chapter). Lightning has its own mapping: muted harp notes per mark, storm wind, contrabass and strings in E flat, stereo following the scan line west to east, and a compare-with-previous-part pass. Aerosols is one noise wind per layer of the map (`winds.js`; the layers, their names, letters and wind colours come from the data), heard all together or one alone ("Listen to")
+- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/co2.js` / `tracks/ocean.js` / `tracks/lightning.js` / `tracks/aerosols.js`. Air quality uses the night-lights mapping (vibraphone with a sour drone for the `pollutants` chapter). Lightning has its own mapping: muted harp notes per mark, storm wind, contrabass and strings in E flat, stereo following the scan line west to east, and a compare-with-previous-part pass. Aerosols is one noise wind per layer of the map (`winds.js`; the layers, their names, letters and wind colours come from the data), heard all together or one alone ("Listen to"). A score's `views` (backend/API.md) are other ways to hear a track, each window on its own finer grid: NASA's four zoom regions on both night lights tracks, NASA's six stories on aerosols (radios "Region" / "Mode", key R). Sea heat (`tracks/sea-heat.js`, `chords.js`) is track 8: a level scan line moving north to south (`sweep.scan: "south"`, so west = left ear there), degrees C read from NASA's key, a warm pad (`samples/pad/`) whose chord grows with the water's temperature
 - `backend/eic/` team RUSTMN's pipeline: NASA videos (and the aerosol still) to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`. `python -m pipeline.validate --track <id>` checks known places and writes heat maps to `backend/eic/debug/` (git-ignored)
 - `backend/build_sweep.py` + `backend/sweep.config.json`: grids to `public/api`. `backend/API.md` is the contract, `backend/validate_api.py` enforces it
 - `test/run.cjs` the real page by keyboard, with axe. `test/responsive.cjs` every layout from 320 to 1440 px. `backend/tests/` the score builders and the validator (`npm run test:backend`)
@@ -36,7 +36,7 @@ come first; aerosols is the last track.
 - Plain HTML, CSS and JavaScript. No frameworks. No new npm packages without asking.
 - One Tone.js only: the sweep engine uses `EJ.Tone`. Dispose the old sonifier before building a new one (`son.dispose()`), or notes double.
 - Static files on GitHub Pages: relative paths only.
-- Keep the hooks the tests use: ids `keys`, `play`, `prev`, `next`, `map`, `where`, `describe`, `help`, `live`, `alert`, `demos`, `places`, `lon`, `lat`, `volume`, `mono`, `keyecho`, `clicks`, `vibrate`, `save`, `compare`, `listen-field` (radios `listen-all` and `listen-<layer id>`, name `listen`), and `window.ready`, `window.son` (with `son.layers`, `son.solo`), `window.globe`, `window.lastProbe`, `window.framesSeen`, global `EJ`. If you change one, update `test/run.cjs` in the same change.
+- Keep the hooks the tests use: ids `keys`, `play`, `prev`, `next`, `map`, `where`, `describe`, `help`, `live`, `alert`, `demos`, `places`, `lon`, `lat`, `volume`, `mono`, `keyecho`, `clicks`, `vibrate`, `save`, `compare`, `listen-field` (radios `listen-all` and `listen-<layer id>`, name `listen`), `view-field` (radios `view-whole` and `view-<option id>`, name `view`), and `window.ready`, `window.son` (with `son.layers`, `son.solo`, `son.viewOptions`, `son.view`, `son.frames`, `son.boxOf`), `window.globe`, `window.lastProbe`, `window.framesSeen`, global `EJ`. If you change one, update `test/run.cjs` in the same change.
 
 ## Check before saying done
 

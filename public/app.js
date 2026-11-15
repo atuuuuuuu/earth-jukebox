@@ -160,12 +160,18 @@
   // ---------- Player state ----------
   let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
   const usesVideo = () => !!score?.frames && ["co2", "ocean"].includes(score.sweep.mapping);
-  const n = () => score.frames.length;
+  // The maps heard now: the track's own, or those of the region or stories chosen (score.views).
+  const frames = () => son?.frames ?? score.frames;
+  const n = () => frames().length;
   const pos = () => tracks.indexOf(track) + 1;
+  const unit = () => son?.unit ?? "map";
   // A map's spoken name; in lightning's compare mode, "Part 6 of 14 compared with Part 5".
-  const whenOf = (i) => son?.mapName?.(i) ?? score.frames[i].when;
-  // "Part 4 of 14" already counts itself; other names get "map 4 of 14".
-  const mapText = (i) => (/ of \d+\b/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, map ${i + 1} of ${n()}`);
+  const whenOf = (i) => son?.mapName?.(i) ?? frames()[i].when;
+  // "Part 4 of 14" already counts itself; other names get "map 4 of 14" (or "story 4 of 6").
+  const mapText = (i) => (/ of \d+\b/.test(whenOf(i)) ? whenOf(i) : `${whenOf(i)}, ${unit()} ${i + 1} of ${n()}`);
+  // Views: the whole map, or one of the score's options (NASA's zoom regions, NASA's stories).
+  const views = () => son?.viewOptions ?? [];
+  const viewName = () => son?.view?.name ?? "Whole map";
   // Layers of one map, heard all together or one alone (aerosols): from the score, never hardcoded.
   const layers = () => son?.layers ?? [];
   const layerName = (id) => layers().find((L) => L.id === id)?.name ?? "";
@@ -173,7 +179,7 @@
   const allText = () => `all ${countWord(layers().length)} ${score.words.what}s`;
   const listenText = (id = son?.solo) => (id ? `${layerName(id)} only` : `${allText()[0].toUpperCase()}${allText().slice(1)}`);
   // The picture of the map, or of the one layer heard alone.
-  const imageOf = (i) => (son?.solo && layers().find((L) => L.id === son.solo)?.image) || score.frames[i].image;
+  const imageOf = (i) => (son?.solo && layers().find((L) => L.id === son.solo)?.image) || frames()[i].image;
 
   const setPlayButton = () => {
     $("play").dataset.state = playing ? "playing" : "paused";
@@ -181,19 +187,27 @@
   };
 
   const showFrame = (i) => {
-    const f = score.frames[i];
+    const f = frames()[i];
     $("map").value = i;
     $("map").setAttribute("aria-valuetext", mapText(i));
-    $("stage-when").textContent = son?.comparing ? (i ? `${f.when} − ${score.frames[i - 1].when.replace(/ of \d+$/, "")}` : `${f.when}: nothing before it`) : f.when;
-    const label = `${(f.alt || score.words.map).replace(/\.$/, "")}. ${n() > 1 ? `Map ${i + 1} of ${n()}.` : ""}`.trim();
+    const where = son?.view && son.view.unit === "map" ? `${son.view.name} · ` : "";
+    $("stage-when").textContent = son?.comparing ? (i ? `${f.when} − ${frames()[i - 1].when.replace(/ of \d+$/, "")}` : `${f.when}: nothing before it`) : `${where}${f.when}`;
+    const box = son?.boxOf(i) ?? null;
+    const inBox = box ? ` Only the ${son.view.unit === "story" ? `window around ${f.when}` : son.view.name} is heard, ${latWords(box[3])} to ${latWords(box[1])}, ${lonWords(box[0])} to ${lonWords(box[2])}.` : "";
+    const label = `${(f.alt || score.words.map).replace(/\.$/, "")}.${inBox} ${n() > 1 ? `${unit()[0].toUpperCase()}${unit().slice(1)} ${i + 1} of ${n()}.` : ""}`.trim();
+    if (globe) {
+      const was = globe.box;
+      globe.box = box;
+      if (box && (!was || was.join() !== box.join())) globe.lookAt((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+    }
     if (usesVideo()) $("video-wrap").setAttribute("aria-label", label);
     else $("globe").setAttribute("aria-label", `3D globe: ${label}`);
     $("map-img").alt = label;
     if (!usesVideo()) {
       const src = imageOf(i);
-      if (globe) loadImg(src).then((im) => { if (im && score.frames[i] === f && imageOf(i) === src) globe.setFrame(im); });
+      if (globe) loadImg(src).then((im) => { if (im && frames()[i] === f && imageOf(i) === src) globe.setFrame(im); });
       else { $("map-img").src = src; }
-      loadImg(score.frames[(i + 1) % n()].image);   // the next map, ready before it is needed
+      loadImg(frames()[(i + 1) % n()].image);   // the next map, ready before it is needed
     }
     syncVideo(true);
   };
@@ -220,10 +234,12 @@
 
   // ---------- Building the sonifier for a track ----------
   let lastNote = null;
+  // What is said as a map starts: its name; for one of NASA's stories, also what it is about.
+  const startText = (i) => (unit() === "story" ? `${whenOf(i)}. ${sentences(frames()[i].text)[1] ?? ""}`.trim() : `${whenOf(i)}.`);
   const onFrame = (f, i) => {
     showFrame(i);
     window.framesSeen = (window.framesSeen || 0) + 1;
-    if (playing && $("announce").checked && son?.started) say(`${whenOf(i)}.`);
+    if (playing && $("announce").checked && son?.started) say(startText(i));
     if (son) son.started = true;
   };
   const onStep = (i, info) => { son.info = info; };
@@ -279,7 +295,9 @@
       if (data?.media) { v.poster = data.media.poster; if (!v.src.endsWith(data.media.src)) v.src = data.media.src; }
     }
     if (globe) {
-      globe.headFn = video ? null : () => son?.headLon();
+      // A line moving south (sea heat) is drawn as a circle of latitude; the others as a meridian.
+      globe.scanLat = son.scan === "south";
+      globe.headFn = video ? null : globe.scanLat ? () => son?.headLat() : () => son?.headLon();
       globe.full = true;
       globe.pings = [];
     }
@@ -292,6 +310,7 @@
     $("compare").checked = false;
     $("compare-field").hidden = !son.canCompare;
     renderListen();
+    renderViews();
     renderSounds();
     showFrame(0);
     idle();
@@ -303,11 +322,70 @@
       const choose = L.length
         ? `${listenText(null)} play together. Press ${orList(L.map((x) => x.key.toUpperCase()))} for ${orList(L.map((x) => x.name.toLowerCase()))} alone. `
         : "";
-      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}`
+      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}${viewTip()}${sidewaysTip()}`
         + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
     }
   };
   const orList = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`);
+  // A line moving south (sea heat) turns the ears round: say so whenever the track comes up.
+  const sideways = () => son?.scan === "south";
+  const sidewaysTip = () => (sideways() ? "On this track the scan line moves from north to south, so west is your left ear and east your right ear. " : "");
+  const lowerFirst = (s) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
+
+  // ---------- Region or stories: other ways to hear the track (score.views) ----------
+  // Native radios in a fieldset, "Whole map" first, built from the score; its letter (R) moves to the next.
+  const viewKey = () => (views().length && score.views.key ? score.views.key.toLowerCase() : null);
+  const viewTip = () => {
+    if (!viewKey()) return "";
+    const what = views().length === 1 ? views()[0].name : `one ${score.views.legend.toLowerCase()}`;
+    return `Press ${viewKey().toUpperCase()} to hear ${what} instead. `;
+  };
+  const renderViews = () => {
+    const opts = views();
+    $("view-field").hidden = !opts.length;
+    $("view-options").innerHTML = "";
+    if (!opts.length) return;
+    $("view-legend").textContent = score.views.legend;
+    const key = viewKey() ? ` In the player, ${viewKey().toUpperCase()} moves to the next one.` : "";
+    $("view-hint").textContent = (opts.length === 1
+      ? `${opts[0].name}: ${opts[0].frames.length} ${opts[0].unit === "story" ? "stories" : "maps"}, one after another, each in its own window.`
+      : `Hear the track inside one ${score.views.legend.toLowerCase()} instead of the whole map. The notes stretch to fit it.`) + key;
+    for (const o of [{ id: "whole", name: "Whole map" }, ...opts]) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = "view"; input.value = o.id; input.id = `view-${o.id}`;
+      input.checked = (son.view?.id ?? "whole") === o.id;
+      if (viewKey()) input.setAttribute("aria-keyshortcuts", viewKey().toUpperCase());
+      label.append(input, o.name);
+      $("view-options").append(label);
+    }
+  };
+  // "Ukraine, change from 2012 to 2023", "India: 12 maps, 2012 to 2023", "NASA's stories: 6 stories, …"
+  const viewText = () => {
+    const name = viewName();
+    if (unit() === "story") return `${name}: ${n()} stories, one after another. First: ${whenOf(0)}`;
+    return n() > 1 ? `${name}: ${n()} maps, ${whenOf(0)} to ${whenOf(n() - 1)}` : `${name}, ${lowerFirst(whenOf(0))}`;
+  };
+  const setView = (id) => {
+    if (!son || !views().length) return;
+    if (playing) { playing = false; setPlayButton(); }
+    son.setView(id && id !== "whole" ? id : null);
+    const r = $(`view-${son.view?.id ?? "whole"}`);
+    if (r) r.checked = true;
+    $("map").max = n() - 1;
+    $("map-field").hidden = n() < 2;
+    $("prev").disabled = $("next").disabled = n() < 2;
+    son.started = false;
+    lastNote = null;
+    showFrame(0);
+    idle();
+    say(`${viewText()}. About ${Math.round(son.passSeconds())} seconds. Press Space to play.`);
+  };
+  $("view-options").addEventListener("change", (e) => { if (e.target.name === "view") setView(e.target.value); });
+  const nextView = () => {
+    const ids = ["whole", ...views().map((o) => o.id)];
+    setView(ids[(ids.indexOf(son.view?.id ?? "whole") + 1) % ids.length]);
+  };
 
   // ---------- Listen to: all layers, or one alone (aerosols) ----------
   // Native radios in a fieldset, built from the score's layers; each also has a letter in the player.
@@ -360,7 +438,7 @@
       say("Sound could not start.");
       return;
     }
-    say(`Playing ${whenOf(son.index)}.`);
+    say(`Playing ${startText(son.index)}`);
     requestAnimationFrame(tick);
   };
 
@@ -374,10 +452,10 @@
     if (speak) say(`${mapText(i)}.${playing ? "" : " Press Space to play."}`);
   };
   const step = (d) => {
-    if (n() < 2) { say("This track has only one map."); return; }
+    if (n() < 2) { say(`${son?.view ? `${son.view.name} has` : "This track has"} only one map. ${viewTip()}`.trim()); return; }
     const i = son.index + d;
-    if (i < 0) { say(`Already at the first map, ${whenOf(0)}.`); return; }
-    if (i >= n()) { say(`Already at the last map, ${whenOf(n() - 1)}.`); return; }
+    if (i < 0) { say(`Already at the first ${unit()}, ${whenOf(0)}.`); return; }
+    if (i >= n()) { say(`Already at the last ${unit()}, ${whenOf(n() - 1)}.`); return; }
     goTo(i);
   };
 
@@ -420,10 +498,29 @@
   const whereText = () => {
     if (!son) return "The player is still loading.";
     const i = son.index;
-    let s = `You are in the player. Track ${pos()} of ${tracks.length}, ${track.title}. ${mapText(i)}. `;
+    let s = `You are in the player. Track ${pos()} of ${tracks.length}, ${track.title}. `
+      + (son.view ? `${score.views.legend}: ${son.view.name}. ` : "") + `${mapText(i)}. `;
+    // How far across: the map, or the region or story window heard now.
+    const across = son.view ? (unit() === "story" ? " this story's window" : ` ${son.view.name}`) : "";
+    // Sea heat: a level line moving south; what is under it is the water's temperature.
+    if (sideways()) {
+      const sea = son.seaNow();
+      const at = `The scan line is at ${latWords(sea.lat)}, ${Math.round(son.progress() * 100)} percent of the way down from the Arctic.`;
+      let under;
+      if (!sea.share || Number.isNaN(sea.temp)) under = " Under it: only land or ice, so the chord is almost silent.";
+      else {
+        const w = sea.warmest;
+        const ear = $("mono").checked ? "" : `, ${w.x < -0.33 ? "in your left ear" : w.x > 0.33 ? "in your right ear" : "in the centre"}`;
+        const voices = son.mapping.chordFor(son.track, sea.temp, sea.share).levels.filter((l) => l > 0.02).length || null;
+        under = ` Under it, ${Math.round(sea.share * 100)} percent of the line is sea, at ${Math.round(sea.temp)} degrees Celsius on average`
+          + (voices ? `: ${voices === 1 ? "the deep base note alone" : `${voices} chord voices`}.` : ".")
+          + ` The warmest water on the line is ${Math.round(w.temp)} degrees, at ${lonWords(w.lon)}${ear}.`;
+      }
+      return `${s}${playing ? "Playing. " : "Paused. "}${at}${under}${playing ? "" : " Press Space to play."} West is your left ear, east your right. Press H for keys.`;
+    }
     if (layers().length) {
       s += `Listening to ${son.solo ? `${layerName(son.solo).toLowerCase()} only` : allText()}. `;
-      const at = `The scan line is at ${lonWords(son.headLon(true))}, ${Math.round(son.progress() * 100)} percent of the way across.`;
+      const at = `The scan line is at ${lonWords(son.headLon(true))}, ${Math.round(son.progress() * 100)} percent of the way across${across}.`;
       return `${s}${playing ? `Playing. ${at}` : `Paused. ${at}`}${underText()}${playing ? "" : " Press Space to play."} Press H for keys.`;
     }
     if (playing) {
@@ -436,7 +533,7 @@
           s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
         }
       } else {
-        s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across.`;
+        s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across${across}.`;
         if (son.info?.change !== undefined) {
           const c = son.info.change;
           s += c > 0.05 ? " Under it: more lightning than in the previous part." : c < -0.05 ? " Under it: less lightning than in the previous part." : " Under it: about the same as the previous part.";
@@ -454,6 +551,8 @@
     + `W: where am I. D: describe this map. S: what the sounds mean. 1 to ${tracks.length}: choose a track. M: mono on or off. `
     + "C: on the Lightning track, compare each part with the previous part, or go back to the part itself. "
     + (layers().length ? `A: ${allText()}. ${layers().map((L) => `${L.key.toUpperCase()}: ${L.name.toLowerCase()} only.`).join(" ")} ` : "")
+    + (viewKey() ? `${viewKey().toUpperCase()}: ${score.views.legend.toLowerCase()}: ${orList(["whole map", ...views().map((o) => o.name)])}, in turn. ` : "")
+    + sidewaysTip()
     + "Escape: stop. Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
 
   const soundsText = () => {
@@ -500,10 +599,11 @@
     // Form controls keep their own keys. On a radio or checkbox (they take no letters), the
     // layer letters still work, so "Listen to" can be changed by letter from inside the group.
     const field = t.closest("input, select, textarea");
-    if (field && !((field.type === "radio" || field.type === "checkbox") && listenKeys().has(k))) return;
+    if (field && !((field.type === "radio" || field.type === "checkbox") && (listenKeys().has(k) || k === viewKey()))) return;
     const onButton = t.closest("button, a");
     const act = (fn, name = null, edge = false) => { e.preventDefault(); run(name, fn, edge); };
     if (listenKeys().has(k)) { act(() => setListen(listenKeys().get(k))); return; }
+    if (k === viewKey()) { act(nextView, score.views.legend); return; }
     switch (k) {
       case " ": case "Enter": if (!onButton) act(play); break;
       case "k": act(play); break;
@@ -596,7 +696,9 @@
     const value = await son.probe(c, r);
     window.lastProbe = value;
     const near = !name && score.places?.[`${r},${c}`];
-    if (value) say(`${name ? `${name}. ` : near ? `Near ${near}. ` : ""}${whenOf(son.index)}, ${cellText(c, r)}: ${value}`);
+    // One spot is always read on the whole map the current map comes from (a story's: the whole still).
+    const mapWhen = unit() === "story" ? score.frames[frames()[son.index].base ?? 0].when : whenOf(son.index);
+    if (value) say(`${name ? `${name}. ` : near ? `Near ${near}. ` : ""}${mapWhen}, ${cellText(c, r)}: ${value}`);
   };
   const pickSpot = ({ lon, lat }, name = "") => {
     $("lon").value = clamp(Math.floor((wrapLon(lon) + 180) / 10), 0, 35);
@@ -630,7 +732,7 @@
     pauseForSpeech();
     btn.disabled = true;
     const seconds = Math.min(180, son.passSeconds());
-    const name = `earth-jukebox-${track.id}.wav`;
+    const name = `earth-jukebox-${track.id}${son.view ? `-${son.view.id}` : ""}.wav`;
     say(`Making the audio file: ${Math.round(seconds)} seconds of sound. This takes a few seconds.`);
     try {
       const url = URL.createObjectURL(EJ.toWav(await son.renderOffline(seconds)));

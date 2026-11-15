@@ -135,6 +135,25 @@
         "url": "https://svs.gsfc.nasa.gov/5669/",
         "credit": "NASA's Scientific Visualization Studio. Data: NASA's GEOS model (Goddard Earth Observing System)"
       }
+    },
+    {
+      "id": "sea-heat",
+      "code": "8",
+      "title": "Warm and cold seas",
+      "subtitle": "Sea surface temperature, March 2007 to March 2008",
+      "description": "NASA's model of the ocean's surface currents, coloured by temperature, over one year. A level scan line moves down the map from the Arctic to Antarctica, once each season, with west in your left ear and east in your right. Cold sea is a deep base note; the warmer the water, the more and higher chord voices join it.",
+      "score": "api/scores/sea-heat.json",
+      "frames": 4,
+      "firstDate": "2007-03-25",
+      "lastDate": "2007-12-08",
+      "when": "25 March to 19 June 2007 to 8 December 2007 to 3 March 2008",
+      "units": "degrees Celsius, read from NASA's colour key",
+      "engine": "sweep",
+      "source": {
+        "title": "Global Sea Surface Currents and Temperature",
+        "url": "https://svs.gsfc.nasa.gov/3912/",
+        "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio, visualizer Greg Shirah. Data: ECCO2 High Resolution Ocean and Sea Ice Model (NASA/JPL); GTOPO30 Topography and Bathymetry (USGS)"
+      }
     }
   ]
 }

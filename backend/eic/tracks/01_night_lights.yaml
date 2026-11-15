@@ -48,6 +48,27 @@ extraction:
   median_frames: 5
   max_key_distance: 28            # Lab distance; farther = "no data"
 
+# Regions: the four pop-out zooms NASA adds in the second half of the EIC video ("zoomed-in views of
+# India, Ukraine, Western Europe, and the Eastern Mediterranean region", SVS 5313). The boxes are
+# NASA's own outline boxes on the map, measured on frame 1200 and converted with the calibration in
+# `geometry`, to the nearest half degree: [west, south, east, north]. Each region is read again from
+# the same frames as the whole map (years and change map), on a finer grid, so a short sweep of just
+# that region still has detail.
+views:
+  legend: Region
+  key: R                          # in the player, R moves to the next region (then back to the whole map)
+  cell_deg: 0.5
+  seconds_per_sweep: 12           # one west->east sweep of the region (each year, or the change map)
+  items:
+    - { id: western-europe, name: "Western Europe", box: [-11.5, 35.0, 13.5, 57.0] }
+    - { id: eastern-mediterranean, name: "Eastern Mediterranean", box: [27.0, 23.5, 41.0, 40.5] }
+    - id: ukraine
+      name: "Ukraine"
+      box: [22.5, 43.5, 40.5, 55.0]
+      # Said with every map of this region: the box is NASA's, and it is wider than Ukraine.
+      note: "NASA's box around Ukraine also takes in Moldova and parts of Belarus, Russia, Romania and Poland."
+    - { id: india, name: "India", box: [65.0, 7.5, 93.0, 32.5] }
+
 media:
   width: 2048                     # display images are true 2:1 equirectangular
   height: 1024

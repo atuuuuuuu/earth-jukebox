@@ -3,10 +3,12 @@
 // Lightning (settings.bed 'orchestra', settings.sweepPan) instead has a bowed bed, a storm wind,
 // and one panner that travels with the scan line: west = left ear, east = right ear.
 // Aerosols (settings.bed 'winds') is only winds, one per layer (winds.js): no notes, no hum.
+// Sea heat (settings.bed 'chords') is only a warm chord pad (chords.js): no notes, no hum.
 // Tone.js comes from the page's own bundle (global EJ), so both engines share one audio context.
 
 import { midiToNote, clamp } from './music.js';
 import { Winds } from './winds.js';
+import { Chords } from './chords.js';
 
 const T = window.EJ.Tone;
 
@@ -189,6 +191,8 @@ export class AudioEngine {
     }
     // The aerosol winds: no samples to load.
     if (this.settings.bed === 'winds') this.winds = new Winds({ keep: k, master: this.master, reverb: this.reverb, settings: this.settings });
+    // The sea's warm chords: pad samples, loaded below with the rest.
+    if (this.settings.bed === 'chords') this.chords = new Chords({ keep: k, master: this.master, reverb: this.reverb, settings: this.settings });
     // Heartbeat: a soft low double thump, dry and centred.
     this.beatGain = k(new T.Gain(1)).connect(this.master);
     this.beatSynth = k(new T.MembraneSynth({
@@ -197,7 +201,8 @@ export class AudioEngine {
     })).connect(this.beatGain);
 
     await Promise.all([
-      ...(this.winds ? [] : [this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'), this.setInstrument(this.settings.instrument)]),
+      ...(this.winds || this.chords ? [] : [this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'), this.setInstrument(this.settings.instrument)]),
+      ...(this.chords ? [this.chords.load()] : []),
       ...(this.orch ? [this._loadBowed('bass', this.orch.bassFilter), this._loadStrings(this.orch.stringsGain)] : []),
     ]);
     this.apply();
@@ -385,6 +390,7 @@ export class AudioEngine {
    */
   setLayers(layers, time, ramp) {
     if (layers.winds) this.winds?.set(layers.winds, time);
+    if (layers.chords) this.chords?.set(layers.chords, time);
     if (!this.sweepPan) return;
     const jump = this._panFresh || Math.abs(layers.from - (this._panTo ?? layers.from)) > 0.05;
     this.setPan(layers.to, time + ramp, jump ? { from: layers.from, at: time } : null);
@@ -477,6 +483,7 @@ export class AudioEngine {
       }
     }
     this.winds?.silence(t);
+    this.chords?.silence(t);
     if (this.sweepPan) {             // the next sound starts wherever its scan line is
       const p = this.sweepPan.pan;
       p.cancelScheduledValues(t);

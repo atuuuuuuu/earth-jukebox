@@ -45,12 +45,13 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 
 | Field | Meaning |
 | --- | --- |
-| `units`, `range` | `range` is fixed for the whole track: never rescale per map. `[0, 1]`, or `[-1, 1]` for the change map |
+| `units`, `range` | `range` is fixed for the whole track: never rescale per map. `[0, 1]`, or `[-1, 1]` for the change map, or real units where NASA's key has numbers (`[0, 32]`, degrees Celsius, for sea surface temperature) |
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`, or `still` for one map), `mapping` (`night-lights`, `co2`, `ocean`, `lightning` or `aerosols`), `instrument` for the ringing notes (`vibraphone`, `harp`, `kalimba`) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`, `still` for one map, or `sweeps` for equal sections of one movie), `mapping` (`night-lights`, `co2`, `ocean`, `lightning`, `aerosols` or `sea-heat`), `instrument` for the ringing notes (`vibraphone`, `harp`, `kalimba`) or the chords (`pad`), `scan` (optional: `"east"`, the default, a north-south line moving west to east; or `"south"`, a west-east line moving north to south, with west in the left ear and east in the right) |
 | `layers` | Optional. Separate things drawn on one map, each heard and chosen on its own (aerosols: black carbon, dust, sea salt, sulfate), in the order the page lists them: `id`, `name` (spoken), `key` (its one-letter shortcut in the player), `image` (the map with only this layer; optional). Tracks without it are unchanged |
+| `views` | Optional. Other ways to hear the same track, chosen with radios beside "Whole map" (see below). Tracks without it are unchanged |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
 | `frames` | The maps, in playing order |
@@ -70,6 +71,21 @@ Each frame:
 
 Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 
+### `views`: regions and stories
+
+`{"legend": "Region", "key": "R", "options": [...]}`. `legend` names the choice (the radio group's
+legend; the first radio is always "Whole map"); `key` (optional) is the letter that moves to the next
+option in the player. Each option replaces the track's list of maps while it is chosen:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `name` | The option, like `"india"`, `"India"`, or `"stories"`, `"NASA's stories"` |
+| `unit` | What one of its maps is called when spoken: `"map"` or `"story"` |
+| `frames` | Its maps, in playing order: `when` (spoken name), `text` (starts with `when`), `box` (`[west, south, east, north]`, the window the scan line crosses), `base` (index of the track's own map it is read from, for the picture and Explore one place), `focus` (optional: the layer brought forward), `view` and `frame` (where its fine grid is in the sweep data's `views.items`) |
+
+NASA's zoom regions on night lights (`legend` "Region") have one map per map of the track, inside the
+region. NASA's stories on the aerosol map (`legend` "Mode") are one option whose maps are the stories.
+
 ## Promises the backend keeps
 
 `python3 backend/validate_api.py public` checks before every deploy:
@@ -82,3 +98,7 @@ Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 - each score stays under 2 MB
 - with `layers`: every map has a grid for every layer; ids and keys are unique; keys are single letters the
   player doesn't already use; every layer image exists; the sweep data has a full-size array per layer
+- `sweep.scan`, when given, is `"east"` or `"south"`
+- with `views`: option ids are unique; the key is a letter neither the player nor a layer uses; every
+  map's text starts with its `when`, its box is a real window, its `base` is one of the track's maps, its
+  `focus` is a layer; the sweep data holds that view's map with full-size arrays and the same box

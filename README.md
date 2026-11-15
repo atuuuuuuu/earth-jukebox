@@ -20,13 +20,14 @@ Resource numbers are the order on the challenge's Resources tab.
 
 | # | Track | NASA resource |
 | --- | --- | --- |
-| 1 | **Earth at night**, one scan per year, 2012 to 2023 | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
-| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map | 1 and 3 |
+| 1 | **Earth at night**, one scan per year, 2012 to 2023; or the decade in one of NASA's four zoom regions | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
+| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map; or one of its regions: Western Europe, the Eastern Mediterranean, Ukraine, India | 1 and 3 |
 | 3 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
 | 4 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
 | 5 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
-| 7 | **Aerosols**, four winds over one moment of NASA's model, 19 August 2025 | [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/) |
+| 7 | **Aerosols**, four winds over one moment of NASA's model, 19 August 2025; or NASA's six stories on that map, one after another | [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/) |
+| 8 | **Warm and cold seas**, sea surface temperature in four seasons, March 2007 to March 2008: a level line moves from the Arctic to Antarctica and warm water adds chord voices | 2: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/) |
 
 ## Using it without sight
 
@@ -45,10 +46,11 @@ In the keyboard area (and on any player button):
 | D | Describe this map (pauses first) |
 | S | What the sounds mean |
 | H | Every key |
-| 1 to 7 | Choose a track |
+| 1 to 8 | Choose a track |
 | M | Mono on or off |
 | C | On Lightning: compare each part with the previous part |
 | A, B, U, T, L | On Aerosols: all four winds, or black carbon, dust, sea salt or sulfate alone (also the "Listen to" radios) |
+| R | On the night lights tracks: the next region (whole map, Western Europe, Eastern Mediterranean, Ukraine, India). On Aerosols: the whole map or NASA's stories (also the "Region" and "Mode" radios) |
 | Escape | Stop all sound and speech, from anywhere |
 
 Each key says its name before its answer ("Next map. 2014, map 3 of 12"), with a soft click; a key
@@ -133,6 +135,28 @@ cd backend/eic && python3 -m pipeline.validate --track 03   # known places, and 
    dust is grainy in the middle, sea salt is low and airy, sulfate is thin and high. More of an
    aerosol under the line makes its wind louder and brighter; its latitude sets the register (north
    higher) and the ear (north left). Listen to all four, or one alone.
+   **Regions and stories** zoom in. NASA's night lights video ends with pop-out views of four regions;
+   their outline boxes on NASA's map are read again from the same frames on a 0.5 degree grid, and the
+   year-by-year scans and the change map can play inside one of them. NASA's page for the aerosol map
+   describes six events (Hurricane Erin, the Saharan dust crossing the Atlantic, Kilauea's and Etna's
+   sulfate, smoke from southern Africa and Spain's wildfires); each gets a window read again from the
+   8K still on a 0.75 degree grid, and they play one after another, the aerosol NASA names brought
+   forward. Inside a window the scan is slower and pitch and ears stretch to fit it (its north edge is
+   highest, in the left ear). The windows are in the track YAMLs; the backend tests check that each
+   story's named aerosol is the strongest in its window, and that Kyiv dims and India brightens.
+   **Warm and cold seas** turns the scan line on its side. NASA's flat movie of the ocean's surface
+   currents colours every flow line by temperature; each colour is read back to degrees Celsius on
+   NASA's own key (0 to 32): a lookup table over every colour keeps only bright, strongly coloured
+   pixels close to a key colour (a fading line keeps its hue; grey land, white ice and the black sea
+   are left out), and each 3 degree cell takes the median of every reading in a quarter of the movie,
+   named by NASA's own per-frame dates. A level line then moves from the Arctic to Antarctica, once
+   per season, west in the left ear and east in the right. The sound is a warm pad after NASA's
+   reference (FluidR3 "Pad 2 (warm)", chosen by comparing each soundfont pad's spectrum with it): a
+   deep D root over any sea, and as the water under the line warms, more and higher voices join, at
+   6, 12, 18, 24 and 28 degrees, each leaning toward where that warm water is along the line. The
+   backend tests check the key (a cell coloured like 20 degrees reads 20) and the known places: the
+   warm pool, the cold Southern Ocean, the Gulf Stream's warm water reaching north-east, and the cold
+   tongue of the equatorial east Pacific (cooling through the La Niña of late 2007).
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ### The sound follows NASA's Caldwell 73 sonification
@@ -151,7 +175,16 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
   Lightning Imaging Sensor on the ISS, NASA GHRC DAAC. Air quality: NASA GEOS-CF. Ocean: Greg
   Shirah, Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL); ECCO2.
   Aerosols: [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/), NASA's GEOS model (Goddard Earth
-  Observing System).
+  Observing System); visualizers Joseph V. Ardizzone (NASA/GSFC) and Helen-Nicole Kostis (STC),
+  scientist Lesley Ott (NASA/GSFC). NASA's stories on the aerosol map come from the facts on that page,
+  told in our own words; the night lights regions are the four zooms NASA draws in
+  [its EIC video](https://svs.gsfc.nasa.gov/5313/), at NASA's own outline boxes. The Ukraine box is
+  NASA's and also takes in Moldova and parts of Belarus, Russia, Romania and Poland.
+- Sea surface temperature: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/),
+  NASA/Goddard Space Flight Center Scientific Visualization Studio; visualization by Greg Shirah;
+  scientists Hong Zhang (UCLA), Dimitris Menemenlis (NASA/JPL); data: ECCO2 High Resolution Ocean and
+  Sea Ice Model (NASA/JPL), GTOPO30 (USGS); dates from NASA's `flat_ecco2_dates.txt`. Its key starts
+  at 0 degrees, so colder water (under sea ice) reads as 0 to 2 degrees.
 - Values are read from the colours of NASA's videos and images, so they are relative levels, not
   satellite or model units. The lightning video has no date label and its speed is uneven, so it is
   split into 14 equal parts and no part claims a month or date. The aerosol key has no numbers: each

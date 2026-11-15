@@ -52,6 +52,64 @@ extraction:
   # 1 = the thickest few 3-degree squares of each type (each type has its own scale).
   top_percentile: 99.5
 
+# NASA's stories: the events NASA's page (SVS 5669) names on this map, in the page's order, told in
+# our own words from NASA's facts. box: the window the scan line crosses, [west, south, east, north],
+# chosen on the 8K still so it holds the event (edges on the 0.75 degree grid). focus: the aerosol
+# NASA names for the event; its wind is brought forward and the others stay, a little softer.
+# backend/tests checks that the focus is the strongest aerosol in its window.
+views:
+  legend: Mode                 # not "Map": the player's map slider already has that name
+  key: R                       # in the player, R switches between the whole map and the stories
+  mode: tour                   # the stories play one after another, like the maps of a track
+  name: "NASA's stories"
+  cell_deg: 0.75               # read again from the 8K still, finer than the whole map's 3 degrees
+  seconds_per_sweep: 14
+  items:
+    - id: hurricane-erin
+      name: Hurricane Erin
+      box: [-82.5, 19.5, -64.5, 37.5]
+      focus: sea-salt
+      about: >
+        The first Atlantic hurricane of 2025, off the east coast of the United States. Its strong
+        winds whip sea spray into a spiral of sea salt, and it pulls in desert dust from Africa.
+    - id: saharan-dust
+      name: Saharan dust
+      box: [-85.5, 7.5, 34.5, 36.0]
+      focus: dust
+      seconds: 24
+      about: >
+        Dust from the Sahara blows west across the whole Atlantic Ocean and makes the sky hazy in
+        the Caribbean, as far as the United States. The scan line starts at the Caribbean end and
+        follows the dust back to the desert.
+    - id: kilauea
+      name: Kilauea volcano, Hawaii
+      box: [-180.0, 12.0, -153.0, 28.5]
+      focus: sulfate
+      about: >
+        Hawaii's Kilauea volcano gives off a narrow stream of sulfate that drifts west over the
+        Pacific Ocean. The scan line starts at the far end of the stream and ends at the volcano.
+    - id: etna
+      name: Mount Etna, Italy
+      box: [10.5, 33.0, 27.0, 46.5]
+      focus: sulfate
+      about: >
+        Mount Etna, the volcano on the island of Sicily, sends streams of sulfate over southern
+        Europe.
+    - id: southern-africa
+      name: Smoke over southern Africa
+      box: [-15.0, -25.5, 40.5, 4.5]
+      focus: black-carbon
+      about: >
+        Farmers burn fields at this time of year in southern Africa, and the smoke drifts west over
+        the Atlantic Ocean.
+    - id: spain
+      name: Wildfires in Spain
+      box: [-10.5, 37.5, 4.5, 49.5]
+      focus: black-carbon
+      about: >
+        Wildfires burn in several parts of Spain, and their smoke is thickest over the north-west of
+        the country.
+
 media:
   width: 2048
   height: 1024

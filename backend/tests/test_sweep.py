@@ -279,5 +279,233 @@ class Build(unittest.TestCase):
             self.assertTrue(any("sweep chapter" in m for m in validate_api.check(public)))
 
 
+def view_grid(box, deg):
+    w, s, e, n = box
+    return {"cols": round((e - w) / deg), "rows": round((n - s) / deg), "lonWest": w, "latNorth": n, "cellDeg": deg}
+
+
+def view_at(g, lat, lon):
+    return int((g["latNorth"] - lat) // g["cellDeg"]) * g["cols"] + int((lon - g["lonWest"]) // g["cellDeg"])
+
+
+class Views(unittest.TestCase):
+    """Other ways to hear a track (score.views): NASA's zoom regions, NASA's stories."""
+
+    def regions_public(self, tmp):
+        public, cfg = Build().make_public(tmp)
+        data = json.loads((public / "data/nl.json").read_text())
+        box = [70.0, 20.0, 80.0, 30.0]                 # around Delhi
+        g = view_grid(box, 0.5)
+        n = g["cols"] * g["rows"]
+        years = []
+        for k in range(2):
+            glow = [0] * n
+            glow[view_at(g, 28.6, 77.2)] = 40 + 40 * k    # Delhi brightens
+            years.append({"core": glow, "glow": glow})
+        gain, loss = [0] * n, [0] * n
+        gain[view_at(g, 28.6, 77.2)] = 90
+        loss[view_at(g, 23.0, 72.6)] = 50              # Ahmedabad dims
+        data["views"] = {"legend": "Region", "key": "R", "mode": "choose", "items": [{
+            "id": "india", "name": "India", "box": box, "grid": g, "secondsPerSweep": 12,
+            "chapters": {"years": years, "change": [{"gain": gain, "loss": loss}]}}]}
+        (public / "data/nl.json").write_text(json.dumps(data))
+        return public, cfg
+
+    def test_regions_follow_the_contract_and_speak_the_region(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.regions_public(tmp)
+            bs.main(cfg)
+            self.assertEqual(validate_api.check(public), [])
+            b1 = json.loads((public / "api/scores/b1.json").read_text())
+            b2 = json.loads((public / "api/scores/b2.json").read_text())
+            self.assertEqual((b1["views"]["legend"], b1["views"]["key"]), ("Region", "R"))
+            india = b1["views"]["options"][0]
+            self.assertEqual((india["id"], india["name"], india["unit"]), ("india", "India", "map"))
+            self.assertEqual([f["when"] for f in india["frames"]], ["2012", "2013"])
+            self.assertEqual([f["base"] for f in india["frames"]], [0, 1])
+            self.assertTrue(india["frames"][0]["text"].startswith("2012. India. The first year of this region."))
+            self.assertIn("Total light: 100 percent more than in 2012", india["frames"][1]["text"])
+            self.assertIn("Brightest: around Delhi", india["frames"][1]["text"])
+            change = b2["views"]["options"][0]["frames"][0]
+            self.assertTrue(change["text"].startswith("Change from 2012 to 2013. India. Light grew in"))
+            self.assertIn("Most new light: around Delhi", change["text"])
+            self.assertIn("Most dimming: around Ahmedabad", change["text"])
+
+    def test_validator_catches_broken_views(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.regions_public(tmp)
+            bs.main(cfg)
+            p = public / "api/scores/b2.json"
+            s = json.loads(p.read_text())
+            s["views"]["key"] = "W"                      # the player's "where am I"
+            f = s["views"]["options"][0]["frames"][0]
+            f["box"] = [80, 20, 70, 30]                   # east of its own east edge
+            f["base"] = 5
+            f["text"] = "India changed."                  # does not start with its when
+            p.write_text(json.dumps(s))
+            problems = validate_api.check(public)
+            for words in ("views key", "box must be", "base must be", "text must start"):
+                self.assertTrue(any(words in m for m in problems), words)
+
+    def test_stories_play_one_after_another_and_name_the_loudest_winds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = Still().make_public(tmp)
+            data = json.loads((public / "data/aer.json").read_text())
+            box = [12.0, -9.0, 21.0, 0.0]                # around Kinshasa
+            g = view_grid(box, 0.75)
+            n = g["cols"] * g["rows"]
+            smoke, dust = [60] * n, [1] * n                # dust below 2 percent: not worth naming
+            data["views"] = {"legend": "Map", "key": "R", "mode": "tour", "name": "NASA's stories", "items": [{
+                "id": "smoke-africa", "name": "Smoke over Africa", "box": box, "grid": g, "focus": "smoke",
+                "about": "Fires burn.", "secondsPerSweep": 14,
+                "chapters": {"still": [{"layers": {"smoke": smoke, "dust": dust}}]}}]}
+            (public / "data/aer.json").write_text(json.dumps(data))
+            bs.main(cfg)
+            self.assertEqual(validate_api.check(public), [])
+            s = json.loads((public / "api/scores/aer.json").read_text())
+            opt = s["views"]["options"][0]
+            self.assertEqual((opt["id"], opt["name"], opt["unit"]), ("stories", "NASA's stories", "story"))
+            f = opt["frames"][0]
+            self.assertEqual((f["when"], f["focus"], f["base"]), ("Smoke over Africa", "smoke", 0))
+            self.assertEqual(f["text"], "Smoke over Africa. Fires burn. Loudest winds here: black carbon.")
+
+
+class SeaHeat(unittest.TestCase):
+    """Sea surface temperature: a map per section of the movie, in degrees C, read by a line moving south."""
+
+    def make_public(self, tmp):
+        public = Path(tmp)
+        (public / "data").mkdir()
+        (public / "media").mkdir()
+        frames = []
+        for k, (a, b) in enumerate((("2007-03-25", "2007-06-19"), ("2007-06-19", "2007-09-13"))):
+            temp = []
+            for r in range(G["rows"]):
+                lat = 90 - (r + 0.5) * 3
+                for c in range(G["cols"]):
+                    lon = -180 + (c + 0.5) * 3
+                    land = 70 <= lon <= 110 and 30 <= lat <= 60          # a block of land: no reading
+                    temp.append(None if land or lat < -75 else round(max(0.0, 30 - abs(lat) * 0.45) + k, 1))
+            img = f"media/sweep-{k + 1}.webp"
+            (public / img).write_bytes(b"x")
+            frames.append({"label": f"Part {k + 1}", "from": a, "to": b, "image": img, "alt": "", "temp": temp})
+        data = {"grid": G, "voices": [{"min": 0, "notes": ["D2"]}],
+                "source": {"svs_title": "T", "url": "https://svs.gsfc.nasa.gov/3912/", "credit": "NASA SVS", "visualizer": "V", "dataset": "ECCO2"},
+                "legend": {"summary": "S.", "method": "M.", "caveat": "C.", "items": [{"sound": "Deep base note", "meaning": "sea"}]},
+                "chapters": [{"id": "sweeps", "secondsPerSweep": 16, "frames": frames}]}
+        (public / "data/sea.json").write_text(json.dumps(data))
+        cfg = {"out": str(public), "tracks": [
+            {"id": "sea", "code": "8", "title": "Seas", "data": "data/sea.json", "chapter": "sweeps", "mapping": "sea-heat",
+             "instrument": "pad", "scan": "south", "units": "degrees Celsius", "range": [0, 32], "hotLine": 28,
+             "words": WORDS, "latRange": [-90, 90]}]}
+        cfg_path = public / "sweep.config.json"
+        cfg_path.write_text(json.dumps(cfg))
+        return public, cfg_path
+
+    def test_degrees_celsius_follow_the_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.make_public(tmp)
+            bs.main(cfg)
+            self.assertEqual(validate_api.check(public), [])
+            s = json.loads((public / "api/scores/sea.json").read_text())
+            self.assertEqual((s["range"], s["sweep"]["scan"]), ([0, 32], "south"))
+            f = s["frames"][0]
+            self.assertEqual((f["when"], f["date"]), ("Part 1", "2007-03-25"))
+            self.assertTrue(f["text"].startswith("Part 1. Where NASA draws currents, the sea surface averages"))
+            self.assertIn("Warmest: the ", f["text"])
+            self.assertIn("the Southern Ocean, 0 degrees", f["text"])
+            self.assertIsNone(f["grid"][4][26])                          # 40-50 N, 80-90 E: the land block
+            self.assertAlmostEqual(f["grid"][8][20], 30 - 5 * 0.45, delta=1.5)   # near the equator: about 28 C
+            entry = json.loads((public / "api/tracks.json").read_text())["tracks"][0]
+            self.assertEqual((entry["firstDate"], entry["lastDate"]), ("2007-03-25", "2007-06-19"))
+
+    def test_validator_catches_a_wrong_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public, cfg = self.make_public(tmp)
+            bs.main(cfg)
+            p = public / "api/scores/sea.json"
+            s = json.loads(p.read_text())
+            s["sweep"]["scan"] = "up"
+            p.write_text(json.dumps(s))
+            self.assertTrue(any("sweep.scan" in m for m in validate_api.check(public)))
+
+    def test_seas_are_named(self):
+        self.assertEqual(bs.sea_name(15, 88), "the Bay of Bengal")
+        self.assertEqual(bs.sea_name(5, 150), "the western Pacific, north of the equator")
+        self.assertEqual(bs.sea_name(0, -110), "the eastern Pacific, at the equator")
+        self.assertEqual(bs.sea_name(-60, 20), "the Southern Ocean")
+        self.assertEqual(bs.sea_name(35, -40), "the North Atlantic")
+        self.assertEqual(bs.sea_name(-20, 80), "the Indian Ocean")
+        self.assertEqual(bs.sea_name(25, -90), "the Gulf of Mexico")
+        self.assertEqual(bs.sea_name(58, 175), "the Bering Sea")
+
+
+PUBLIC = HERE.parent.parent / "public"
+
+
+def window_means(item):
+    """Area-weighted mean of each layer in a story's window, 0..1."""
+    g, vals = item["grid"], item["chapters"]["still"][0]["layers"]
+    w = [bs.math.cos(bs.math.radians(g["latNorth"] - (r + 0.5) * g["cellDeg"])) for r in range(g["rows"]) for _ in range(g["cols"])]
+    return {k: sum(a * b for a, b in zip(w, v)) / sum(w) / 100 for k, v in vals.items()}
+
+
+@unittest.skipUnless((PUBLIC / "data/03_aerosols.json").is_file(), "built aerosol data not present")
+class NasaStories(unittest.TestCase):
+    """The windows of NASA's stories hold what NASA says is there."""
+
+    def test_the_aerosol_nasa_names_is_the_strongest_in_its_window(self):
+        data = json.loads((PUBLIC / "data/03_aerosols.json").read_text(encoding="utf-8"))
+        items = data["views"]["items"]
+        self.assertEqual(len(items), 6)
+        for it in items:
+            m = window_means(it)
+            focus = m.pop(it["focus"])
+            self.assertGreater(focus, 1.5 * max(m.values()), f"{it['name']}: {it['focus']} {focus:.3f} vs {m}")
+
+    def test_windows_are_whole_cells_on_the_map(self):
+        data = json.loads((PUBLIC / "data/03_aerosols.json").read_text(encoding="utf-8"))
+        for it in data["views"]["items"]:
+            w, s, e, n = it["box"]
+            g = it["grid"]
+            self.assertTrue(-180 <= w < e <= 180 and -90 <= s < n <= 90)
+            self.assertAlmostEqual(g["cols"] * g["cellDeg"], e - w)
+            self.assertAlmostEqual(g["rows"] * g["cellDeg"], n - s)
+            self.assertTrue(all(len(v) == g["cols"] * g["rows"] for v in it["chapters"]["still"][0]["layers"].values()))
+
+
+@unittest.skipUnless((PUBLIC / "data/01_night_lights.json").is_file(), "built night-lights data not present")
+class NasaRegions(unittest.TestCase):
+    """NASA's zoom regions are read in the right place: known cities change the way NASA's map shows."""
+
+    def setUp(self):
+        data = json.loads((PUBLIC / "data/01_night_lights.json").read_text(encoding="utf-8"))
+        self.regions = {it["id"]: it for it in data["views"]["items"]}
+
+    def around(self, rid, lat, lon, key, chapter="change", frame=0):
+        it = self.regions[rid]
+        g = it["grid"]
+        r0, c0 = divmod(view_at(g, lat, lon), g["cols"])
+        v = it["chapters"][chapter][frame][key]
+        return max(v[r * g["cols"] + c] for r in range(r0 - 1, r0 + 2) for c in range(c0 - 1, c0 + 2)
+                   if 0 <= r < g["rows"] and 0 <= c < g["cols"])
+
+    def test_four_regions_with_twelve_years_and_the_change_map(self):
+        self.assertEqual(set(self.regions), {"western-europe", "eastern-mediterranean", "ukraine", "india"})
+        for it in self.regions.values():
+            self.assertEqual(len(it["chapters"]["years"]), 12)
+            self.assertEqual(len(it["chapters"]["change"]), 1)
+
+    def test_kyiv_dims_and_india_brightens(self):
+        self.assertGreater(self.around("ukraine", 50.45, 30.52, "loss"), 30)
+        self.assertEqual(self.around("ukraine", 50.45, 30.52, "gain"), 0)
+        # Kyiv's light in 2023 (the last year) is far below 2021's.
+        self.assertLess(self.around("ukraine", 50.45, 30.52, "glow", "years", 11),
+                        0.6 * self.around("ukraine", 50.45, 30.52, "glow", "years", 9))
+        india = self.regions["india"]["chapters"]["change"][0]
+        self.assertGreater(sum(india["gain"]), 10 * sum(india["loss"]))
+        self.assertGreater(self.around("india", 19.07, 72.88, "gain"), 50)       # Mumbai
+
+
 if __name__ == "__main__":
     unittest.main()

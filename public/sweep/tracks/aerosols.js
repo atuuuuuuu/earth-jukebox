@@ -13,9 +13,16 @@
 
 import { clamp } from '../music.js';
 
+// NASA's stories (a view, see sonifier.js): each story is a window with its own finer grid
+// (`frame.geo`), swept on its own. Inside a window the winds' register and stereo stretch to fit it
+// (its north edge is the top), and the aerosol NASA names for the story (`frame.focus`) is brought
+// forward: the other winds stay, a little softer.
+
 export const HUM_NOTES = [];         // no synth hum: the winds are the whole sound
 
-const SMOOTH_COLS = 3;              // columns each side (±9°, about ±0.9 s at normal speed)
+const SMOOTH_SECONDS = 0.9;         // each side: about ±0.9 s of the sweep at normal speed (±3 columns on the whole map)
+const FOCUS_DUCK = 0.55;            // the other winds in a story, beside the aerosol NASA names (about -5 dB)
+const LAT_SPAN = 60;                // winds.js plays -60 … 60 degrees as its whole register and stereo
 const LEVEL_PERCENTILE = 0.97;      // stretches this full of a layer, or fuller, blow its wind in full
 const GATE = 0.03;                  // below this share of full a wind is silent
 const LAT_EDGE = 80;                // rows beyond this latitude are not read (map stretching, ice)
@@ -40,30 +47,39 @@ export function configure(settings) {
   params.solo = settings.solo ?? null;
 }
 
-/** One segment per map; one step per 3° column. */
+const gridOf = (track, frame) => frame.geo ?? track.grid;
+
+/** One segment per map (or story); one step per column of its grid (3° on the whole map). */
 export function segments(track) {
-  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({ chapter, frame, steps: track.grid.cols })));
+  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({ chapter, frame, steps: gridOf(track, frame).cols })));
 }
 
+/** A story may be longer than the others (its own seconds); the speed setting scales them all. */
 export function segmentSeconds(track, seg, settings) {
-  return settings.yearSweep;
+  const own = seg.frame.secondsPerSweep, all = seg.chapter.secondsPerSweep;
+  return own && all ? (settings.yearSweep * own) / all : settings.yearSweep;
 }
 
 const rowLat = (g, r) => g.latNorth - (r + 0.5) * g.cellDeg;
 
 /**
  * Decode the layers once and plan every column: for each layer, its amount under the line
- * (area-weighted, smoothed across neighbouring columns, wrapping at the date line) and its
- * weighted mean latitude. Each layer gets one fixed scale over the whole track.
+ * (area-weighted mean over the column, smoothed across neighbouring columns, wrapping at the date
+ * line on a whole world map) and its weighted mean latitude. Each layer gets one fixed scale over
+ * the whole track (or over all the stories).
  */
 export function prepare(track) {
-  const g = track.grid, layers = track.layers ?? [];
-  const weight = Float32Array.from({ length: g.rows }, (_, r) => (Math.abs(rowLat(g, r)) > LAT_EDGE ? 0 : Math.cos((rowLat(g, r) * Math.PI) / 180)));
-  const kernel = Array.from({ length: 2 * SMOOTH_COLS + 1 }, (_, i) => SMOOTH_COLS + 1 - Math.abs(i - SMOOTH_COLS));
-  const ksum = kernel.reduce((a, b) => a + b, 0);
+  const layers = track.layers ?? [];
   const sums = Object.fromEntries(layers.map((L) => [L.id, []]));
   for (const ch of track.chapters) {
     for (const fr of ch.frames) {
+      const g = gridOf(track, fr);
+      const weight = Float32Array.from({ length: g.rows }, (_, r) => (Math.abs(rowLat(g, r)) > LAT_EDGE ? 0 : Math.cos((rowLat(g, r) * Math.PI) / 180)));
+      const wsum = weight.reduce((a, b) => a + b, 0) || 1;
+      const world = Math.abs(g.cols * g.cellDeg - 360) < 1e-6;
+      const seconds = fr.secondsPerSweep ?? ch.secondsPerSweep ?? 35;
+      const half = Math.max(1, Math.round((SMOOTH_SECONDS * g.cols) / seconds));
+      const kernel = Array.from({ length: 2 * half + 1 }, (_, i) => half + 1 - Math.abs(i - half));
       fr._layers = {};
       fr._winds = {};
       for (const L of layers) {
@@ -73,19 +89,22 @@ export function prepare(track) {
         for (let c = 0; c < g.cols; c++) {
           for (let r = 0; r < g.rows; r++) {
             const a = v[r * g.cols + c] * weight[r];
-            amount[c] += a;
-            moment[c] += a * rowLat(g, r);
+            amount[c] += a / wsum;              // a mean, so windows of any height share one scale
+            moment[c] += (a / wsum) * rowLat(g, r);
           }
         }
         const sum = new Float32Array(g.cols), lat = new Float32Array(g.cols);
         for (let c = 0; c < g.cols; c++) {
-          let s = 0, m = 0;
+          let s = 0, m = 0, ks = 0;
           kernel.forEach((k, i) => {
-            const cc = (c + i - SMOOTH_COLS + g.cols) % g.cols;
+            let cc = c + i - half;
+            if (world) cc = (cc + g.cols) % g.cols;
+            else if (cc < 0 || cc >= g.cols) return;      // a window has edges: nothing beyond them
             s += k * amount[cc];
             m += k * moment[cc];
+            ks += k;
           });
-          sum[c] = s / ksum;
+          sum[c] = s / ks;
           lat[c] = s > 0 ? m / s : 0;
           sums[L.id].push(sum[c]);
         }
@@ -113,7 +132,7 @@ const hash = (a, b, k) => {
 
 /** A soft crackle where the smoke is thickest in column c, now and then: at most one, at its latitude. */
 export function crackles(track, frame, layerId, c) {
-  const g = track.grid, v = frame._layers[layerId];
+  const g = gridOf(track, frame), v = frame._layers[layerId];
   let r = 0;
   for (let k = 1; k < g.rows; k++) if (v[k * g.cols + c] > v[r * g.cols + c]) r = k;
   const x = v[r * g.cols + c];
@@ -129,14 +148,18 @@ export function crackles(track, frame, layerId, c) {
 
 /**
  * Plan one scan step (one column).
- * @returns {{events, hum, layers: {winds: Array<{id, wind, level, open, lat, thick}>}}}
- *   level: loudness 0..1; open: how bright 0..1; lat: where it is (degrees); thick: the thickest
- *   cell of the layer right under the line (0..1), for the smoke's roughness.
+ * @returns {{events, hum, layers: {winds: Array<{id, wind, level, open, lat, tone, thick}>}}}
+ *   level: loudness 0..1; open: how bright 0..1; lat: where it is (degrees); tone: the latitude its
+ *   register and stereo follow (lat itself on the whole map, stretched inside a story's window);
+ *   thick: the thickest cell of the layer right under the line (0..1), for the smoke's roughness.
  */
 export function planStep(track, seg, c) {
   const { frame } = seg;
-  const g = track.grid;
+  const g = gridOf(track, frame);
   const events = [];
+  // Inside a window, its south edge plays as -60 degrees and its north edge as 60 (winds.js's span).
+  const south = g.latNorth - g.rows * g.cellDeg;
+  const tone = (lat) => (g.zoom ? -LAT_SPAN + (2 * LAT_SPAN * (lat - south)) / (g.latNorth - south) : lat);
   const winds = (track.layers ?? []).map((L) => {
     const w = frame._winds[L.id];
     const rel = clamp(w.sum[c] / track._windNorm[L.id], 0, 1);
@@ -144,7 +167,8 @@ export function planStep(track, seg, c) {
     const v = frame._layers[L.id];
     for (let r = 0; r < g.rows; r++) thick = Math.max(thick, v[r * g.cols + c]);
     if (L.wind === 'smoke' && (!params.solo || params.solo === L.id)) events.push(...crackles(track, frame, L.id, c));
-    return { id: L.id, wind: L.wind, level: windLevel(rel), open: rel, lat: w.lat[c], thick };
+    const duck = frame.focus && !params.solo && frame.focus !== L.id ? FOCUS_DUCK : 1;
+    return { id: L.id, wind: L.wind, level: windLevel(rel) * duck, open: rel, lat: w.lat[c], tone: tone(w.lat[c]), thick };
   });
   for (const ev of events) {           // where the crackle sits along the line (-1 = north … +1 = south)
     ev.x = (ev.col + 0.5) / g.cols;

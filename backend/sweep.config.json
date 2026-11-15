@@ -23,7 +23,8 @@
         "top": "brightest",
         "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
       },
-      "summary": "A slow scan line moves west to east across the Earth at night, once for each year from 2012 to 2023."
+      "summary": "A slow scan line moves west to east across the Earth at night, once for each year from 2012 to 2023.",
+      "viewsMethod": "Region: instead of the whole map, hear one of the four places NASA zooms in on in this video, year by year. The scan line then crosses only that region, more slowly, and the notes and the ears stretch to fit it: its north edge plays the highest notes, in your left ear. Zoomed in, dimmer towns ring notes too."
     },
     {
       "id": "night-change",
@@ -47,7 +48,8 @@
         "top": "strongest",
         "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
       },
-      "summary": "A slow scan line moves west to east once across NASA's map of how night lights changed from 2012 to 2023."
+      "summary": "A slow scan line moves west to east once across NASA's map of how night lights changed from 2012 to 2023.",
+      "viewsMethod": "Region: instead of the whole map, hear the change in one of the four places NASA zooms in on in this video. The scan line then crosses only that region, more slowly, and the notes and the ears stretch to fit it: its north edge plays the highest notes, in your left ear."
     },
     {
       "id": "air-quality",
@@ -174,6 +176,38 @@
         "top": "thickest",
         "missing": "not read."
       },
+      "latRange": [
+        -90,
+        90
+      ],
+      "viewsMethod": "NASA's stories: instead of the whole map, hear the six events NASA describes on this map, one after another. The scan line crosses only a window around each event, more slowly. The wind of the aerosol NASA names for it is brought forward, and the others stay, a little softer. Inside a window, high and low and the two ears stretch to fit it."
+    },
+    {
+      "id": "sea-heat",
+      "code": "8",
+      "title": "Warm and cold seas",
+      "subtitle": "Sea surface temperature, March 2007 to March 2008",
+      "description": "NASA's model of the ocean's surface currents, coloured by temperature, over one year. A level scan line moves down the map from the Arctic to Antarctica, once each season, with west in your left ear and east in your right. Cold sea is a deep base note; the warmer the water, the more and higher chord voices join it.",
+      "data": "data/02_sea_heat.json",
+      "chapter": "sweeps",
+      "mapping": "sea-heat",
+      "instrument": "pad",
+      "scan": "south",
+      "units": "degrees Celsius, read from NASA's colour key",
+      "range": [
+        0,
+        32
+      ],
+      "hotLine": 28,
+      "words": {
+        "subject": "ocean",
+        "map": "map of sea surface temperature",
+        "dates": "season",
+        "what": "warm water",
+        "top": "warmest",
+        "missing": "not read: NASA draws no current here, so it is land, sea ice or Antarctica."
+      },
+      "summary": "A level scan line moves down NASA's map of the ocean's surface, from the Arctic to Antarctica, once for each quarter of the year from March 2007 to March 2008.",
       "latRange": [
         -90,
         90

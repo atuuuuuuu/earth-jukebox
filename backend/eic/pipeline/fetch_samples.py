@@ -32,6 +32,10 @@ INSTRUMENTS = {
     "contrabass": ("contrabass", ["D1", "Eb1", "Bb1", "D2", "Eb2"]),
     # A flat and C too, so no chord note is pitched up: a pitched-up sample ends sooner than its bow stroke.
     "strings": ("string_ensemble_1", EB_SET[:8] + ["Ab3", "C4", "Ab4", "C5", "Ab5"]),
+    # Sea heat's warm chords: exactly the ten chord notes (backend/eic/tracks/02_sea_heat.yaml), so no
+    # voice is repitched; each 3 s note is looped from its steady middle (public/sweep/chords.js).
+    # Chosen against NASA's reference pad (instrument.mp3) for its soft harmonics and dark top end.
+    "pad": ("pad_2_warm", ["D2", "A2", "D3", "F3", "A3", "C4", "E4", "G4", "A4", "D5"]),
 }
 
 

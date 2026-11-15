@@ -38,9 +38,17 @@ def _save_display(world: np.ndarray, cfg: dict, name: str) -> str:
     return f"media/{cfg['id']}/{name}.webp"
 
 
-def _build_years(cfg: dict, path) -> list[dict]:
+def _regions(cfg: dict) -> tuple[list[dict], float]:
+    """NASA's zoom regions from the yaml (`views`), and their cell size in degrees."""
+    v = cfg.get("views") or {}
+    return v.get("items", []), v.get("cell_deg", 0.5)
+
+
+def _build_years(cfg: dict, path, regions: dict) -> list[dict]:
+    """The yearly maps. Fills `regions` ({id: [{core, glow} per year]}) on each region's fine grid."""
     geom, ex = cfg["geometry"], cfg["extraction"]
     rows, cols = ex["grid"]["rows"], ex["grid"]["cols"]
+    items, deg = _regions(cfg)
     ch = cfg["chapters"]["years"]
     bounds = ch["boundaries"]
     year_of: dict[int, int] = {}
@@ -56,8 +64,14 @@ def _build_years(cfg: dict, path) -> list[dict]:
     def finish(year, frames):
         world = geo.extract_world(video.median_stack(frames), geom)
         _, lum = _light_map(world, ex, warm_only=True)
-        core = grid.pool(cv2.GaussianBlur(lum, (0, 0), 2), rows, cols, "max") / 255.0
+        blur = cv2.GaussianBlur(lum, (0, 0), 2)
+        core = grid.pool(blur, rows, cols, "max") / 255.0
         glow = grid.pool(lum, rows, cols, "mean")
+        for R in items:
+            regions.setdefault(R["id"], []).append({
+                "core": grid.pool_box(blur, R["box"], deg, "max") / 255.0,
+                "glow": grid.pool_box(lum, R["box"], deg, "mean"),
+            })
         image = _save_display(world, cfg, str(year))
         results.append({"label": str(year), "image": image, "core": core,
                         "glow": glow, "total": float(lum.sum())})
@@ -87,12 +101,23 @@ def _build_years(cfg: dict, path) -> list[dict]:
             "core": grid.to_ints(r["core"]),
             "glow": grid.to_ints(np.clip(r["glow"] / glow_scale, 0, 1)),
         })
+    # The regions share one scale of their own (all regions, all years): a finer cell holds a
+    # brighter share of its city than a 3-degree cell, so the whole map's scale would not fit.
+    if regions:
+        fine = np.concatenate([y["glow"].ravel() for ys in regions.values() for y in ys])
+        fine_scale = float(np.percentile(fine[fine > 0], 99.5))
+        for ys in regions.values():
+            for y in ys:
+                y["core"] = grid.to_ints(np.clip(y["core"], 0, 1))
+                y["glow"] = grid.to_ints(np.clip(y["glow"] / fine_scale, 0, 1))
     return frames
 
 
-def _build_change(cfg: dict, path) -> dict:
+def _build_change(cfg: dict, path, regions: dict) -> dict:
+    """The change map. Fills `regions` ({id: {gain, loss}}) on each region's fine grid."""
     geom, ex = cfg["geometry"], cfg["extraction"]
     rows, cols = ex["grid"]["rows"], ex["grid"]["cols"]
+    items, deg = _regions(cfg)
     ch = cfg["chapters"]["change"]
     sx0, sy0, sx1, sy1 = ch["key_search_rect"]
     width = max(geom["map_x0"] + geom["map_width"], sx1)
@@ -117,10 +142,20 @@ def _build_change(cfg: dict, path) -> dict:
     tmap = np.zeros(lum.shape, np.float32)
     tmap[lit] = np.nan_to_num(t, nan=0.0)
     w = lum / 255.0
-    gain = grid.pool(w * np.clip(tmap, 0, None), rows, cols, "mean")
-    loss = grid.pool(w * np.clip(-tmap, 0, None), rows, cols, "mean")
+    up, down = w * np.clip(tmap, 0, None), w * np.clip(-tmap, 0, None)
+    gain = grid.pool(up, rows, cols, "mean")
+    loss = grid.pool(down, rows, cols, "mean")
     both = np.concatenate([gain.ravel(), loss.ravel()])
     scale = float(np.percentile(both[both > 0], 99.5))
+
+    # The regions, on their fine grids, with one scale of their own (as for the years).
+    fine = {R["id"]: (grid.pool_box(up, R["box"], deg), grid.pool_box(down, R["box"], deg)) for R in items}
+    if fine:
+        allf = np.concatenate([a.ravel() for pair in fine.values() for a in pair])
+        fine_scale = float(np.percentile(allf[allf > 0], 99.5))
+        for rid, (g_, l_) in fine.items():
+            regions[rid] = {"gain": grid.to_ints(np.clip(g_ / fine_scale, 0, 1)),
+                            "loss": grid.to_ints(np.clip(l_ / fine_scale, 0, 1))}
 
     return {
         "label": "Change 2012 to 2023",
@@ -140,9 +175,29 @@ def build(cfg: dict) -> dict:
     ex, pb = cfg["extraction"], cfg["playback"]
 
     print("Years chapter:")
-    years = _build_years(cfg, path)
+    region_years: dict = {}
+    years = _build_years(cfg, path, region_years)
     print("Change chapter:")
-    change = _build_change(cfg, path)
+    region_change: dict = {}
+    change = _build_change(cfg, path, region_change)
+
+    # NASA's zoom regions: each on its own fine grid, with both chapters, for the page's Region choice.
+    items, deg = _regions(cfg)
+    views = None
+    if items:
+        v = cfg["views"]
+        views = {
+            "legend": v["legend"], "key": v.get("key"), "mode": "choose",
+            "items": [{
+                "id": R["id"], "name": R["name"], "box": R["box"],
+                **({"note": R["note"]} if R.get("note") else {}),
+                "grid": grid.box_grid(R["box"], deg),
+                "secondsPerSweep": v["seconds_per_sweep"],
+                "chapters": {"years": region_years[R["id"]], "change": [region_change[R["id"]]]},
+            } for R in items],
+        }
+        for R in views["items"]:
+            print(f"  region {R['name']}: {R['grid']['cols']} x {R['grid']['rows']} cells of {deg} degrees")
 
     return {
         "id": cfg["id"],
@@ -159,6 +214,7 @@ def build(cfg: dict) -> dict:
             {"id": "change", "title": cfg["chapters"]["change"]["title"],
              "secondsPerSweep": pb["change_seconds_per_sweep"], "frames": [change]},
         ],
+        **({"views": views} if views else {}),
         "crossfade": pb["crossfade"],
         "legend": cfg["legend"],
     }

@@ -120,7 +120,8 @@ export class Winds {
   }
 
   /**
-   * The winds for one step: [{id, level 0..1, open 0..1, lat (degrees), thick 0..1}].
+   * The winds for one step: [{id, level 0..1, open 0..1, lat (degrees), tone (degrees, optional),
+   * thick 0..1}]. Register and stereo follow `tone` when given (a story's window, stretched), else `lat`.
    * Every value glides there, so the winds swell and turn slowly.
    */
   set(winds, time) {
@@ -129,7 +130,8 @@ export class Winds {
       const v = this.voices.get(w.id);
       if (!v) continue;
       const c = v.colour, open = clamp(w.open ?? w.level, 0, 1);
-      const north = clamp((w.lat + LAT_SPAN) / (2 * LAT_SPAN), 0, 1);
+      const lat = w.tone ?? w.lat;
+      const north = clamp((lat + LAT_SPAN) / (2 * LAT_SPAN), 0, 1);
       const centre = c.low * Math.pow(c.high / c.low, north) * (1 + 0.2 * open);
       v.level.gain.setTargetAtTime(w.level * GAIN, time, w.level > v.last ? RISE : FALL);
       v.last = w.level;
@@ -137,7 +139,7 @@ export class Winds {
       v.band.frequency.setTargetAtTime(centre, time, GLIDE);
       v.band.Q.setTargetAtTime(c.q * (1.2 - 0.5 * open), time, GLIDE);
       v.tone.frequency.setTargetAtTime(Math.min(TOP_HZ, centre * (1.25 + c.open * open)), time, GLIDE);
-      v.pan.pan.setTargetAtTime(clamp(-w.lat / LAT_SPAN, -1, 1) * width, time, GLIDE);
+      v.pan.pan.setTargetAtTime(clamp(-lat / LAT_SPAN, -1, 1) * width, time, GLIDE);
       if (v.rough) v.rough.amplitude.setTargetAtTime(clamp((w.thick - 0.3) / 0.7, 0, 1), time, GLIDE);
     }
   }
