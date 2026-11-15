@@ -1,0 +1,149 @@
+# Track 08 — A 3D View of an Atmospheric River from an Earth System Model (camera film, Oct-Dec 2010)
+id: 08_atmospheric_river
+title: "An Atmospheric River"
+short: "Atmospheric river"
+builder: atmospheric_river
+
+source:
+  video: 08_AtmosphericRiver/atmos_river_HD.webm               # the non-narrated film, 1920x1080, 59.94 fps
+  dates: 08_AtmosphericRiver/atmos_river_DATE_ONLY_HD.mp4      # NASA's date-only overlay of the same film
+  svs_id: 4960
+  url: https://svs.gsfc.nasa.gov/4960/
+  svs_title: "A 3D View of an Atmospheric River from an Earth System Model"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: "Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC), Cindy Starr (GST), Kel Elkins (USRA); scientists Allison Collow (UMBC), Natalie Thomas (UMBC), Michael Bosilovich (NASA/GSFC)"
+  dataset: "MERRA-2 reanalysis, hourly (NASA GMAO); GTOPO30 topography (USGS)"
+
+time:
+  frames_per_step: 3         # one step = 0.05 s of film
+
+dates:                       # NASA's clock, read from its date-only movie ("Oct 01 2010 00:00")
+  start: "2010-10-01T00:00"  # the first frame; MERRA-2 times are UTC
+  rows: [495, 586]           # the line of text, in 1080p pixels
+  ink: 80
+  min_glyph: 20              # narrower runs are the colon
+  fields: {mon: [0, 600], day: [600, 800], hour: [1150, 1345], min: [1375, 1600]}
+  known:                     # second of the movie -> its text, read by eye; they teach the digits 0-9
+    0: "Oct 01 00 00"
+    10: "Nov 05 10 24"
+    20: "Nov 29 18 29"
+    30: "Dec 09 00 14"
+    40: "Dec 12 17 50"
+    60: "Dec 13 23 15"
+    270: "Dec 05 03 26"
+  max_error: 0.08            # worst glyph mismatch allowed (all 17502 frames read at 0.035)
+  align_window: 30           # frames: where the clock jumps back, the film's picture jumps too
+
+extraction:
+  width: 480                 # the picture is read at a quarter size
+  height: 270
+  rows: 54                   # 5 px bands, top to bottom
+  vapour_hue: [80, 92, 122, 132]   # OpenCV hue: teal (some vapour) to deep blue (a lot)
+  vapour_sat: [0.35, 0.85]   # grey sea, wind streaks and clouds have no colour
+  min_value: 0.2
+  core: 0.75                 # the river's deep-blue core
+
+scenes:                      # seconds of NASA's film, read from contact sheets every 4 s
+  - title: "Clouds over the whole Earth"
+    place: "the whole Earth, with the Pacific in front"
+    from: 0
+    to: 27
+    alt: "The Earth seen from space, wrapped in swirling white clouds over the Pacific and the Americas."
+    story: >
+      Ten weeks of clouds from NASA's weather reanalysis, from the first of October, sped up so that
+      each soft pulse is a new day. The pulses race: time is flying. There is no blue vapour yet, so
+      the hum is quiet.
+  - title: "Moisture leaves the tropics"
+    place: "the central Pacific, north of the equator"
+    from: 27
+    to: 45.05                # scene edges sit on NASA's clock jumps (step 900 starts the new pass)
+    alt: "The clouds fade and the Pacific turns teal and blue with water vapour; a yellow arrow traces moist air leaving the tropics and curving north."
+    story: >
+      The clouds fade and the water vapour appears: teal where there is a little, deep blue where
+      there is a lot. Near the equator, the trade winds pile up warm, moist air. Some of it breaks
+      away and heads north. Listen for the hum growing.
+  - title: "An atmospheric river forms"
+    place: "the North Pacific, from Hawaii towards the United States"
+    from: 45.05
+    to: 76
+    alt: "A long, narrow band of deep blue vapour stretches from near Hawaii towards California, beside a large H for high pressure."
+    story: >
+      Moisture from the tropics joins other streams into one long, narrow band: an atmospheric
+      river. This one starts near Hawaii, so it is called a Pineapple Express, and it points at
+      California. Each kalimba note is the river's deep-blue core crossing the picture.
+  - title: "Along the river, in 3D"
+    place: "the river itself, flying low along it"
+    from: 76
+    to: 105
+    alt: "The camera drops low and flies along the river: a thick, glowing blue band of vapour with white wind streaks racing over it."
+    story: >
+      NASA stops the clock at 18:43 on 11 December 2010 and flies the camera low along the river.
+      The pulses stop. Look at the river from the side: most of its vapour stays close to the
+      ocean surface.
+  - title: "Steered by high and low pressure"
+    place: "the North Pacific, between a high off California and a low near Alaska"
+    from: 105
+    to: 151.8                # the clock jumps back to 11 December 08:09 here
+    alt: "From a low angle over the ocean, the blue river runs between a high-pressure H and a low-pressure L, towards the coast."
+    story: >
+      Two weather systems steer the river: a high off California and Mexico, and a low near Alaska.
+      Between them the winds squeeze the moisture into a narrow corridor. The stronger the difference
+      in pressure, the stronger the winds, and the heavier the rain that follows. The clock replays
+      the same days several times as the camera moves.
+  - title: "Orographic lift over the mountains"
+    place: "the coast and mountains of California, near Lake Tahoe"
+    from: 151.8
+    to: 196
+    alt: "The river meets California's coast; the moist air rises over steep, snowy mountains, with the label orographic lift."
+    story: >
+      The river reaches the coast and runs into the mountains. The air is forced up, cools, and its
+      water falls as rain, and as snow higher up, mostly on the slopes facing the ocean. This is
+      orographic lift. It fills reservoirs and snowpack, but a strong river can bring floods and
+      mudslides.
+  - title: "The river reaches the West Coast"
+    place: "the west coast of North America"
+    from: 196
+    to: 247
+    alt: "Looking down on the west coast of North America: a blue river of vapour reaches the coast between the H and the L."
+    story: >
+      From higher up, you can see the whole river land on the West Coast, again and again as the
+      clock replays 11 to 14 December. Every pass carries more moisture to the mountains.
+  - title: "Atmospheric rivers around the world"
+    place: "the whole Earth as it turns"
+    from: 247
+    alt: "The camera pulls back to the whole Earth; it turns past Asia, Africa and the Americas, with blue streaks of vapour over every ocean."
+    story: >
+      The camera pulls back and the Earth turns. Atmospheric rivers are not only a Pacific story:
+      they also reach Europe, New Zealand, the Middle East, Greenland and Antarctica. NASA's weather
+      record has hourly data like this for the whole Earth, back to 1980.
+
+media:
+  width: 640
+  height: 360
+  crf: 34
+
+legend:
+  summary: >
+    NASA's 3D film of an atmospheric river in December 2010, from MERRA-2, a weather model that
+    blends in satellite and weather station observations. A river of water vapour forms over the
+    tropical Pacific and flows to the mountains of California.
+  method: >
+    The picture is read in bands, top to bottom: the top sounds higher and in your left ear, the
+    bottom lower and in your right. The hum is all the water vapour in the picture: soft over dry
+    air, full where the vapour piles up. Where the river's deep-blue core crosses a band, a kalimba
+    note falls like a drop. A soft low pulse marks each midnight on NASA's clock, so you hear time
+    race, stop and repeat.
+  items:
+    - sound: "Kalimba notes"
+      meaning: "The river's core, the deepest blue and the most water vapour, crossing that height of the picture. Louder = more of it."
+    - sound: "Hum"
+      meaning: "All the water vapour in the picture. It is soft over dry air and grows where vapour piles up."
+    - sound: "Midnight pulse"
+      meaning: "One soft pulse each time NASA's clock passes midnight. Fast pulses: weeks flying by. No pulses: NASA has stopped the clock."
+  caveat: >
+    Values are read from the blue shading in NASA's picture, so they are relative, not tonnes of
+    water. Only water vapour is read. In this 3D film the rain is drawn under the see-through vapour,
+    which makes its colours look like sunlit land, so rain, snow and soil moisture are not read.
+    The camera moves, so the scenes say where it is. The dates are NASA's own, read from its date
+    overlay: the clock races through October and November, replays 10 to 14 December several times,
+    and stops at 11 December, 18:43 UTC, while the camera flies along the river.

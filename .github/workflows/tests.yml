@@ -26,3 +26,4 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run test:responsive
+      - run: npm run test:lesson

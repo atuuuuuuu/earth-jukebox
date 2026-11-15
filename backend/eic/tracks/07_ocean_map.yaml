@@ -1,0 +1,62 @@
+# Track 4 as a map: NASA's flat world map of the ocean's surface currents (ECCO2, March 2007 to
+# March 2008), averaged over the year so a scan line can cross it like every other map track.
+# See pipeline/tracks/globe_map.py (projection: flat). Reads the film from EJ_RESOURCES.
+id: 07_ocean_map
+title: "Global sea surface currents on a world map"
+short: "Ocean currents"
+builder: globe_map
+projection: flat             # the film is already a world map, -180 to 180 E, north up
+
+frames: {from: 0, to: 2000, every: 4}
+time:
+  start: "2007-03-25"        # NASA: "2007-03-25T12:00Z to 2008-03-03T12:00Z" over the film's 2001 frames
+  days_per_frame: 0.172
+chapter: currents
+label: "March 2007 to March 2008"
+
+min_corr: 0.9                # the film's land must line up with the Blue Marble (measured 0.95)
+min_share: 0.3               # a 3 degree cell needs this much sea, or it has no reading (land)
+lat_max: 80                  # the film's top rows smear at the pole
+note_floor_percentile: 60    # notes ring only where the flow lines are brighter than most of the ocean
+
+extraction:
+  sea_sat: 0.45              # sea: a coloured flow line crosses it at least once; land stays grey
+
+playback:
+  seconds_per_sweep: 40
+
+media: {width: 1080, height: 540, webp_quality: 85}
+
+alt: "World map of the ocean's surface currents, March 2007 to March 2008, from NASA's ECCO2 film: flow lines on dark sea around grey land, coloured by the water's temperature, blue near the poles, green and yellow in between, red in the tropics. The brightest streaks are the strong currents: the Gulf Stream off North America, the Kuroshio off Japan, the Agulhas off southern Africa, the currents along the equator, and the Southern Ocean."
+about: >
+  NASA's world map of the ocean's surface currents, averaged over a year. Brighter streaks are
+  stronger currents. On the globe, the colours are the water's temperature: blue is 0 degrees
+  Celsius, green 10 to 20, yellow about 25, red 32.
+
+source:
+  video: 07_ECCO2/ecco2_sst_flow.webmhd.webm   # under EJ_RESOURCES (data/eic): NASA's 1080 x 540 web movie
+  svs_id: 3912
+  url: https://svs.gsfc.nasa.gov/3912/
+  svs_title: "Global Sea Surface Currents and Temperature"
+  credit: "NASA/Goddard Space Flight Center Scientific Visualization Studio"
+  visualizer: "Greg Shirah, Horace Mitchell, Eric Sokolowsky; scientists Hong Zhang (UCLA), Dimitris Menemenlis (NASA/JPL)"
+  dataset: "ECCO2 high-resolution ocean and sea ice model (MIT/NASA JPL)"
+
+legend:
+  summary: >
+    A slow scan line moves west to east across NASA's world map of the ocean's surface currents,
+    March 2007 to March 2008.
+  method: >
+    Only what is under the scan line plays. A harp note rings where the line crosses a strong
+    current: north rings higher and in your left ear, south lower and in your right ear. A low hum
+    follows all the moving water under the line, and is silent over land.
+  items:
+    - sound: "Harp notes"
+      meaning: "A strong current crossing the line, such as the Gulf Stream or the Kuroshio. Louder = brighter, faster water."
+    - sound: "Hum"
+      meaning: "All the moving water under the line: quiet over calm sea, fuller over strong currents, silent over land. It is not the sound of waves."
+  caveat: >
+    The brightness of NASA's flow lines, averaged over the year: faster water draws longer,
+    brighter trails. Relative, not metres per second. NASA's film shows a computer model of the
+    ocean (ECCO2). Land has no reading. The colours on the globe show temperature, which you do
+    not hear.

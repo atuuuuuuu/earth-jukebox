@@ -51,6 +51,14 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
         arrays = [k for k in ("core", "glow", "gain", "loss") if k in fine]
         if not arrays or any(len(fine[k]) != cells for k in arrays):
             out.append(f"{where} frame {n}: sweep arrays must each hold {cells} cells")
+    if s.get("lesson"):
+        lesson = public / str(s["lesson"])
+        if not lesson.is_file():
+            out.append(f"{where}: lesson not found: {lesson}")
+        else:
+            steps = json.loads(lesson.read_text(encoding="utf-8")).get("steps") or []
+            if not steps or any(not st.get("title") or not st.get("text") for st in steps):
+                out.append(f"{where}: a lesson needs steps, each with a title and a text")
     if not (s.get("legend") or {}).get("items"):
         out.append(f"{where}: a sweep score needs a legend with items (the Key reads it)")
     return out

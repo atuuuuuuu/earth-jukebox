@@ -1,0 +1,78 @@
+# Track 5 as a map: NASA's DYAMOND film of carbon dioxide on a turning globe (14 Jan to 3 Mar 2020),
+# flattened into one world map so a scan line can cross it like every other map track.
+# See pipeline/tracks/globe_map.py. Reads the web copy of the film.
+id: 06_co2_map
+title: "Carbon Dioxide Around the Globe, Early 2020, on a world map"
+short: "Carbon Dioxide"
+builder: globe_map
+
+film: media/06_co2_dyamond/orbit.mp4    # under public/: the 1280 x 720 web copy of NASA's film
+frames: {from: 0, to: 1175, every: 2}
+time:
+  start: "2020-01-14"                    # NASA's date label: 14 Jan 2020 22:00 UTC at frame 0,
+  days_per_frame: 0.0416667              # one hour per frame
+chapter: plumes
+label: "14 January to 3 March 2020"
+value: co2
+land: grey
+
+geometry:                    # fitted by matching NASA's grey land to the Blue Marble
+  cx: 636.0
+  cy: 358.7
+  limb: 318.7
+  camera_distance: 4.5
+  tilt: 0
+  max_angle: 60              # NASA's globe glows at its rim: places farther out are left out
+turn:
+  turn: steady               # measured: 139 E at frame 0, then 0.2007 degrees west per frame
+  every: 49
+  start: 139
+  search: 15
+  min_corr: 0.55
+  max_miss: 3
+min_weight: 3
+min_share: 0.3
+note_floor_percentile: 80    # notes ring for plumes, not for the faint haze over the whole north
+smoke_lift: 2.0              # the picture only: the densest plumes up to 3 times lighter, never past full red or orange
+
+extraction:                  # the carbon dioxide track's own colour rule
+  sat_lo: 0.22
+  sat_hi: 0.40
+  gamma: 0.6
+
+playback:
+  seconds_per_sweep: 40
+
+media: {width: 1440, height: 720, webp_quality: 82}
+
+alt: "World map of carbon dioxide from NASA's film, 14 January to 3 March 2020: a dark Earth with orange and red where carbon dioxide is dense, brightest over eastern China, with fires across central Africa and South America and a faint tan haze over the northern hemisphere. The far north and south are dim grey: the film never showed them face-on."
+about: >
+  NASA's turning globe flattened into one map. Each place shows its carbon dioxide in the weeks
+  it faced the camera: East Asia in January, Africa in February, the Americas in early March.
+
+source:
+  video: media/06_co2_dyamond/orbit.mp4
+  svs_id: 5196
+  url: https://svs.gsfc.nasa.gov/5196/
+  svs_title: "DYAMOND Global Carbon Dioxide"
+  credit: "NASA's Scientific Visualization Studio"
+  visualizer: "AJ Christensen (SSAI), Greg Shirah (NASA/GSFC), Helen-Nicole Kostis (USRA), Mark SubbaRao (NASA/GSFC)"
+  dataset: "DYAMOND, the experimental coupled GEOS-MITgcm model (NASA GEOS)"
+
+legend:
+  summary: >
+    A slow scan line moves west to east across a world map of carbon dioxide, made from NASA's
+    film of the globe turning, 14 January to 3 March 2020.
+  method: >
+    Only what is under the scan line plays. A note rings where the line crosses dense carbon
+    dioxide: north rings higher and in your left ear, south lower and in your right ear. A deep
+    hum follows all the carbon dioxide under the line.
+  items:
+    - sound: "Ringing notes"
+      meaning: "Dense carbon dioxide crossing the line, from fires, cities and industry. Louder = denser."
+    - sound: "Deep hum"
+      meaning: "All the carbon dioxide under the line: quiet over clean air, fuller over plumes."
+  caveat: >
+    NASA's colour key has no numbers, so levels are relative: faint tan is the least carbon
+    dioxide shown, red the most. Each place is averaged over the weeks it faced the camera,
+    so East Asia is from January and the Americas from early March.

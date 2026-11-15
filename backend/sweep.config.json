@@ -77,13 +77,13 @@
       "id": "ocean-currents",
       "code": "4",
       "title": "Ocean currents",
-      "subtitle": "Perpetual Ocean, 2021 to 2023",
-      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
-      "data": "data/07_ocean_currents.json",
-      "chapter": "scenes",
-      "mapping": "ocean",
+      "subtitle": "Surface currents, 2007 to 2008",
+      "description": "Starts with a guided lesson: what a current is, then the Gulf Stream's direction, speed and changes, one idea at a time. Then a scan line crosses NASA's world map of the ocean's surface currents, March 2007 to March 2008: only what is under the line plays.",
+      "data": "data/07_ocean_map.json",
+      "lesson": "data/07_ocean_lesson.json",
+      "chapter": "currents",
       "instrument": "harp",
-      "units": "brightness of moving water on the line",
+      "units": "brightness of moving water, relative",
       "range": [
         0,
         1
@@ -91,11 +91,12 @@
       "hotLine": 0.5,
       "words": {
         "subject": "ocean",
-        "map": "scene",
-        "dates": "scene",
+        "map": "ocean currents map",
+        "dates": "map",
         "what": "moving water",
         "top": "brightest",
-        "missing": "not a place on a map. This track follows NASA's moving camera, so it has no map of places to explore. Try Air quality or Earth at night."
+        "busiest": "Strongest currents",
+        "missing": "land, or too far north, so there is no current reading here. Try a place at sea."
       }
     },
     {
@@ -103,10 +104,9 @@
       "code": "5",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
-      "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
-      "data": "data/06_co2_dyamond.json",
-      "chapter": "weeks",
-      "mapping": "co2",
+      "description": "NASA's model of carbon dioxide from 14 January to 3 March 2020, flattened from its turning globe into one world map. A scan line crosses it west to east: dense carbon dioxide rings a note, and a deep hum follows everything under the line.",
+      "data": "data/06_co2_map.json",
+      "chapter": "plumes",
       "units": "share of the densest carbon dioxide",
       "range": [
         0,
@@ -115,11 +115,12 @@
       "hotLine": 0.5,
       "words": {
         "subject": "planet",
-        "map": "carbon dioxide globe",
-        "dates": "week",
+        "map": "carbon dioxide map",
+        "dates": "map",
         "what": "carbon dioxide",
         "top": "densest",
-        "missing": "not crossed by the scan line this week, so there is no reading here. Try another week."
+        "busiest": "Densest carbon dioxide",
+        "missing": "too far north or south for NASA's turning globe, so there is no reading here."
       }
     },
     {
@@ -149,6 +150,35 @@
         -55,
         55
       ]
+    },
+    {
+      "id": "atmospheric-river",
+      "code": "7",
+      "title": "Atmospheric river",
+      "subtitle": "A river in the sky, December 2010",
+      "description": "NASA's 3D film of an atmospheric river: a long, narrow band of water vapour flowing from near Hawaii to the mountains of California in December 2010. The hum is the vapour in the picture, a kalimba note falls where the river's core crosses, and a soft pulse marks each midnight on NASA's clock, which is shown over the film.",
+      "data": "data/08_atmospheric_river.json",
+      "chapter": "scenes",
+      "mapping": "river",
+      "instrument": "kalimba",
+      "units": "water vapour in the picture, relative",
+      "range": [
+        0,
+        1
+      ],
+      "hotLine": 0.5,
+      "words": {
+        "subject": "atmosphere",
+        "map": "scene",
+        "dates": "scene",
+        "what": "water vapour",
+        "top": "most",
+        "missing": "not a place on a map. This track follows NASA's moving camera, so it has no map of places to explore. Try Air quality or Earth at night.",
+        "busy": "Water vapour in the picture",
+        "hum": "hum of water vapour",
+        "calm": "There is little water vapour in the picture.",
+        "note": "kalimba note"
+      }
     }
   ]
 }

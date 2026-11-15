@@ -131,15 +131,35 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     await page.evaluate("window.peak = -Infinity; window.framesSeen = 0");
     await page.waitForTimeout(2500);
     const tp = await page.evaluate("Math.round(window.peak * 10) / 10");
-    const extra = ids[k] === "carbon-dioxide"
+    const extra = ids[k] === "atmospheric-river"
       ? await page.evaluate("Math.abs(document.getElementById('video').currentTime - son.mediaTime()).toFixed(2)") : null;
     check(`${ids[k]}: plays`, tp > -40 && tp < 0, `peak ${tp} dB${extra !== null ? `, video off by ${extra} s` : ""}`);
     if (extra !== null) check(`${ids[k]}: NASA video in step with the sound`, Number(extra) < 0.4);
     await page.keyboard.press("w");
     const wk = await live();
     check(`${ids[k]}: where am I`, wk.includes(`Track ${k + 1} of`)
-      && (ids[k] !== "ocean-currents" || /The camera is over .+\d{4}|\d{4}\. The camera is over/.test(wk)), wk.slice(0, 140));
+      && (!["ocean-currents", "carbon-dioxide"].includes(ids[k]) || /The scan line is at/.test(wk))
+      && (ids[k] !== "atmospheric-river" || /2010, \d\d:\d\d UTC\. The camera is over/.test(wk)), wk.slice(0, 140));
+    if (["ocean-currents", "carbon-dioxide"].includes(ids[k])) {
+      // One world map from NASA's film: our globe shows it, and the scan line moves west to east.
+      const sweep = await page.evaluate(async () => {
+        const a = son.headLon(); await new Promise((r) => setTimeout(r, 700)); const b = son.headLon();
+        return { a, b, globe: !document.getElementById("globe").hidden, video: !document.getElementById("video-wrap").hidden };
+      });
+      check(`${ids[k]}: globe with a scan line moving west to east`, sweep.globe && !sweep.video && sweep.b > sweep.a,
+        `${sweep.a?.toFixed(1)} to ${sweep.b?.toFixed(1)} degrees`);
+    }
     await page.keyboard.press("Space");   // pause
+    if (ids[k] === "atmospheric-river") {
+      // NASA's clock over its paused film: exactly the date of the frame on screen, with hours and minutes.
+      const od = await page.evaluate(() => { const v = document.getElementById("video"), el = document.getElementById("video-date");
+        return { text: el.textContent, shown: !el.hidden && el.offsetWidth > 0, want: son.dateAtVideo(v.currentTime) }; });
+      check(`${ids[k]}: NASA's date over the film`, od.shown && /^\d{1,2} (Oct|Nov|Dec) 2010, \d\d:\d\d UTC$/.test(od.text)
+        && od.text === od.want, `${od.text} (frame says ${od.want})`);
+      // Known answers from NASA's own date-only overlay video at these frames: racing, held still, slow.
+      const known = await page.evaluate(() => [2.73, 78.71, 154.73].map((t) => son.dateAtVideo(t)));
+      check(`${ids[k]}: dates match NASA's overlay`, known.join(" | ") === "10 Oct 2010, 22:31 UTC | 11 Dec 2010, 18:43 UTC | 11 Dec 2010, 11:56 UTC", known.join(" | "));
+    }
     const axe = await page.evaluate(AXE);
     check(`${ids[k]}: axe`, axe.violations.length === 0, axe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", ") || `${axe.passes.length} rules passed`);
     // Hear an example, then its meaning is spoken.

@@ -109,6 +109,19 @@ class NewBuilders(unittest.TestCase):
         self.assertIsNone(out[0]["grid"][5][33])     # 40-50 N, 150-160 E: not read
         self.assertIsNone(out[0]["date"])
 
+    def test_globe_map_names_the_strongest_places_and_keeps_unread_cells_empty(self):
+        g = fine(0.0)
+        g[at(35, -65)] = 100                          # the Gulf Stream
+        g[at(85, 0)] = None                           # never shown face-on: no reading
+        out = bs.build_map({"grid": G}, {"frames": [{"label": "January to September 2021", "about": "One map.",
+                                                    "image": "m.webp", "alt": "", "glow": g}]},
+                           {"hotLine": 0.5, "words": {"busiest": "Strongest currents"}})
+        f = out[0]
+        self.assertTrue(f["text"].startswith("January to September 2021. One map. Strongest currents: around "), f["text"])
+        self.assertEqual(f["grid"][5][11], 1.0)       # 30-40 N, 70-60 W
+        self.assertEqual(f["when"], "January to September 2021")
+        self.assertIsNone(f["date"])
+
     def test_scenes_have_no_map_and_tell_the_story(self):
         out = bs.build_scenes({}, {"frames": [
             {"label": "Gulf Stream", "from": "1 May 2023", "to": "2 June 2023", "place": "the Gulf Stream",
@@ -118,6 +131,15 @@ class NewBuilders(unittest.TestCase):
                                     "Bright moving water in the picture: the busiest scene. It carries warmth to Europe.")
         self.assertTrue(all(c is None for row in f["grid"] for c in row))
         self.assertEqual((len(f["grid"]), len(f["grid"][0])), (18, 36))
+
+    def test_river_scenes_use_nasas_clock_and_their_own_words(self):
+        out = bs.build_scenes({}, {"frames": [
+            {"label": "Along the river, in 3D", "span": "11 December 2010 at 18:43 UTC, NASA's clock standing still",
+             "place": "the river itself, flying low along it", "image": "s.webp", "alt": "", "relative": 0.62, "story": "The pulses stop."}]},
+            {"hotLine": 0.5, "words": {"busy": "Water vapour in the picture"}})
+        self.assertEqual(out[0]["text"], "Along the river, in 3D, 11 December 2010 at 18:43 UTC, NASA's clock standing still. "
+                                         "The camera is over the river itself, flying low along it. Water vapour in the picture: "
+                                         "62 percent of the busiest scene. The pulses stop.")
 
 
 class Build(unittest.TestCase):

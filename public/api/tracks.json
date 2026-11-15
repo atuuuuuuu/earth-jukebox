@@ -64,19 +64,19 @@
       "id": "ocean-currents",
       "code": "4",
       "title": "Ocean currents",
-      "subtitle": "Perpetual Ocean, 2021 to 2023",
-      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
+      "subtitle": "Surface currents, 2007 to 2008",
+      "description": "Starts with a guided lesson: what a current is, then the Gulf Stream's direction, speed and changes, one idea at a time. Then a scan line crosses NASA's world map of the ocean's surface currents, March 2007 to March 2008: only what is under the line plays.",
       "score": "api/scores/ocean-currents.json",
-      "frames": 8,
+      "frames": 1,
       "firstDate": null,
       "lastDate": null,
-      "when": "The whole ocean to The whole ocean again",
-      "units": "brightness of moving water on the line",
+      "when": "March 2007 to March 2008",
+      "units": "brightness of moving water, relative",
       "engine": "sweep",
       "source": {
-        "title": "Perpetual Ocean 2: Western Boundary Currents",
-        "url": "https://svs.gsfc.nasa.gov/5425/",
-        "credit": "NASA's Scientific Visualization Studio, visualizer Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL). Data: ECCO2 high-resolution ocean and sea ice model (NASA/JPL); Blue Marble: Next Generation"
+        "title": "Global Sea Surface Currents and Temperature",
+        "url": "https://svs.gsfc.nasa.gov/3912/",
+        "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio, visualizer Greg Shirah, Horace Mitchell, Eric Sokolowsky; scientists Hong Zhang (UCLA), Dimitris Menemenlis (NASA/JPL). Data: ECCO2 high-resolution ocean and sea ice model (MIT/NASA JPL)"
       }
     },
     {
@@ -84,12 +84,12 @@
       "code": "5",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
-      "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
+      "description": "NASA's model of carbon dioxide from 14 January to 3 March 2020, flattened from its turning globe into one world map. A scan line crosses it west to east: dense carbon dioxide rings a note, and a deep hum follows everything under the line.",
       "score": "api/scores/carbon-dioxide.json",
-      "frames": 7,
-      "firstDate": "2020-01-14",
-      "lastDate": "2020-02-25",
-      "when": "Week from 14 January 2020 to Week from 25 February 2020",
+      "frames": 1,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "14 January to 3 March 2020",
       "units": "share of the densest carbon dioxide",
       "engine": "sweep",
       "source": {
@@ -115,6 +115,25 @@
         "title": "Lightning Events Detected from the International Space Station (ISS) 2017-2023",
         "url": "https://svs.gsfc.nasa.gov/5011/",
         "credit": "NASA's Scientific Visualization Studio. Data: Lightning Imaging Sensor (LIS) on the ISS, quality-controlled science data (NASA GHRC DAAC)"
+      }
+    },
+    {
+      "id": "atmospheric-river",
+      "code": "7",
+      "title": "Atmospheric river",
+      "subtitle": "A river in the sky, December 2010",
+      "description": "NASA's 3D film of an atmospheric river: a long, narrow band of water vapour flowing from near Hawaii to the mountains of California in December 2010. The hum is the vapour in the picture, a kalimba note falls where the river's core crosses, and a soft pulse marks each midnight on NASA's clock, which is shown over the film.",
+      "score": "api/scores/atmospheric-river.json",
+      "frames": 8,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "Clouds over the whole Earth to Atmospheric rivers around the world",
+      "units": "water vapour in the picture, relative",
+      "engine": "sweep",
+      "source": {
+        "title": "A 3D View of an Atmospheric River from an Earth System Model",
+        "url": "https://svs.gsfc.nasa.gov/4960/",
+        "credit": "NASA's Scientific Visualization Studio, visualizer Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC), Cindy Starr (GST), Kel Elkins (USRA); scientists Allison Collow (UMBC), Natalie Thomas (UMBC), Michael Bosilovich (NASA/GSFC). Data: MERRA-2 reanalysis, hourly (NASA GMAO); GTOPO30 topography (USGS)"
       }
     }
   ]

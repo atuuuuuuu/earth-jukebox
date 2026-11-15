@@ -1,5 +1,7 @@
 // Track 07 — Perpetual Ocean 2: a camera tour, read along a fixed vertical line through the middle
 // of NASA's picture. Pure planning logic (no Tone.js), modelled on tracks/co2.js.
+// The atmospheric river film (mapping "river") plays the same way: hum = water vapour, notes = the
+// river's deep-blue core, pulse = each midnight on NASA's clock.
 //
 //  * swell (the hum) = all the bright moving water on the line; calm sea is soft, never silent;
 //  * harp notes = a current or eddy crossing the line, rung once at its brightest moment;
@@ -53,7 +55,12 @@ export function prepare(track) {
   track._humLo = sums[Math.floor(sums.length * 0.08)];
   track._humHi = Math.max(track._humLo + 1e-6, sums[Math.floor(sums.length * 0.97)]);
   const start = Date.parse(`${track.startDate}T00:00:00Z`);
-  track._monthOf = (s) => { const d = new Date(start + s * track.daysPerStep * 864e5); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
+  // The date at step s (whole or fractional): NASA's own clock when the backend read one
+  // (atmospheric river: it races, stops and replays), else evenly spaced days (ocean tour).
+  track._ms = track.minutes ? (s) => start + Math.round(clockAt(track.minutes, s)) * 6e4 : (s) => start + s * track.daysPerStep * 864e5;
+  // The pulse: each midnight on a clock read from NASA, else the start of each month.
+  track._pulseOf = track.minutes ? (s) => Math.floor(track._ms(s) / 864e5)
+    : (s) => { const d = new Date(track._ms(s)); return d.getUTCFullYear() * 12 + d.getUTCMonth(); };
   return track;
 }
 
@@ -107,12 +114,20 @@ export function planStep(track, seg, step) {
       x: 0.5, y: (row + 0.5) / rows, pos: track._rowPos[row], vx: 0,
     };
   });
-  const beat = s > 0 && track._monthOf(s) !== track._monthOf(s - 1) ? 0.5 + 0.3 * level : 0;
+  const beat = s > 0 && track._pulseOf(s) !== track._pulseOf(s - 1) ? 0.5 + 0.3 * level : 0;
   return { events, hum: { level, pan: sum > 0 ? moment / sum : 0, tension: 0 }, beat };
 }
 
-/** The date shown at step s, like "3 Mar 2022". */
+// Minutes on NASA's clock between two read steps: the frames in between run evenly (at the start
+// the clock moves 87 minutes a frame), unless the clock jumps back or stands still there.
+function clockAt(m, s) {
+  const i = Math.floor(s), a = m[i], b = m[Math.min(i + 1, m.length - 1)];
+  return b > a && b - a < 600 ? a + (s - i) * (b - a) : a;
+}
+
+/** The date shown at step s, like "3 Mar 2022", or with NASA's clock "11 Dec 2010, 18:43 UTC". */
 export function dateAt(track, s) {
-  const d = new Date(Date.parse(`${track.startDate}T00:00:00Z`) + s * track.daysPerStep * 864e5);
-  return `${d.getUTCDate()} ${d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })} ${d.getUTCFullYear()}`;
+  const d = new Date(track._ms(clamp(s, 0, track.steps - 1)));
+  const day = `${d.getUTCDate()} ${d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' })} ${d.getUTCFullYear()}`;
+  return track.minutes ? `${day}, ${d.toISOString().slice(11, 16)} UTC` : day;
 }

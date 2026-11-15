@@ -352,16 +352,45 @@ def build_parts(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+def build_map(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """One world map flattened from NASA's turning globe (ocean currents, carbon dioxide)."""
+    g = data["grid"]
+    pooled = [pool([None if v is None else v / 100 for v in f["glow"]], g) for f in chapter["frames"]]
+    scale = percentile([v for grid in pooled for row in grid for v in row if v], 0.99) or 1.0
+    frames = []
+    for f, grid in zip(chapter["frames"], pooled):
+        grid = [[None if v is None else min(1.0, v / scale) for v in row] for row in grid]
+        busy = []                     # the strongest places at least 30 degrees apart, so each is a different current or plume
+        for q in ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.05):
+            if len(busy) < 3 and all(max(abs(q[0] - o[0]), abs(q[1] - o[1])) >= 3 for o in busy):
+                busy.append(q)
+        text = f"{f['label']}. {f['about']} " + (f"{t['words']['busiest']}: {listing(busy)}." if busy else "")
+        frames.append({
+            "date": None,
+            "when": f["label"],
+            "image": f["image"],
+            "alt": f.get("alt", ""),
+            **stats(grid, t["hotLine"]),
+            "relativeTotal": 1.0,
+            "grid": r3(grid),
+            "text": text.strip(),
+        })
+    return frames
+
+
 def build_scenes(data: dict, chapter: dict, t: dict) -> list[dict]:
-    """Ocean tour: a moving camera, so there is no map of places: every grid cell is None, and the
-    spoken text names where the camera is, the dates, and the scene's story."""
+    """NASA camera films (ocean tour, atmospheric river): a moving camera, so there is no map of
+    places: every grid cell is None, and the spoken text names where the camera is, the dates (a
+    ready-made `span` when NASA's clock jumps around), and the scene's story."""
     frames = []
     for f in chapter["frames"]:
         rel = f.get("relative") or 0
         grid = [[None] * GRID_COLS for _ in range(GRID_ROWS)]
         busiest = "the busiest scene" if rel == 1 else f"{round(rel * 100)} percent of the busiest scene"
-        text = (f"{f['label']}, {f['from']} to {f['to']}. The camera is over {f['place']}. "
-                f"Bright moving water in the picture: {busiest}. {f.get('story', '')}")
+        span = f.get("span") or f"{f['from']} to {f['to']}"
+        busy = (t.get("words") or {}).get("busy", "Bright moving water in the picture")
+        text = (f"{f['label']}, {span}. The camera is over {f['place']}. "
+                f"{busy}: {busiest}. {f.get('story', '')}")
         frames.append({
             "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""),
             **stats(grid, t["hotLine"]), "relativeTotal": rel,
@@ -396,7 +425,8 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
 
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
-BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants, "scenes": build_scenes}
+BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts, "pollutants": build_pollutants,
+            "scenes": build_scenes, "currents": build_map, "plumes": build_map}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 
@@ -417,6 +447,9 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
     legend = dict(data["legend"])
     if t.get("summary"):
         legend["summary"] = t["summary"]
+    legend.update(t.get("legend", {}))   # the config may reword the legend without rebuilding the data
+    if t.get("lesson") and not (public / t["lesson"]).is_file():
+        raise ConfigError(f"Track {t['id']}: lesson {t['lesson']} not found. Run the EIC pipeline first (backend/eic).")
     if t["chapter"] in LEGEND_KEEP:
         legend["items"] = [i for i in legend["items"] if i["sound"].startswith(LEGEND_KEEP[t["chapter"]])]
     score = {
@@ -431,6 +464,7 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
                   "instrument": t.get("instrument", "vibraphone")},
         "legend": legend,
+        **({"lesson": t["lesson"]} if t.get("lesson") else {}),
         # Names for 10-degree cells that hold a listed city, "row,col": name. Only for speech.
         "places": {f"{r},{c}": n for r in range(GRID_ROWS) for c in range(GRID_COLS) if (n := place_in(r, c))},
         "frames": frames,

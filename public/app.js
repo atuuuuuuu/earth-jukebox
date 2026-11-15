@@ -12,6 +12,8 @@
 
   // ---------- Speaking ----------
   // One polite live region. Clearing it first makes a repeated message speak again.
+  // "Read aloud" uses the device's voice, at the volume and speed set in the lesson's settings.
+  const voice = { vol: store.get("voiceVol", 100), rate: store.get("voiceRate", 100) };
   let sayTimer, echo = null;
   const say = (text) => {
     // Key echo: the name of the key or button just used, said once before its answer.
@@ -22,7 +24,8 @@
     if ($("speak").checked && "speechSynthesis" in window) {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = 1;
+      u.rate = voice.rate / 100;
+      u.volume = voice.vol / 100;
       speechSynthesis.speak(u);
     }
   };
@@ -159,7 +162,9 @@
 
   // ---------- Player state ----------
   let track = null, score = null, son = null, playing = false, gen = 0, sweepMod = null;
-  const usesVideo = () => !!score?.frames && ["co2", "ocean"].includes(score.sweep.mapping);
+  let lesson = null, lessonMod = null;   // the guided lesson before the player, for tracks that have one
+  window.lesson = null;                   // a global, not the <section id="lesson"> the browser would give
+  const usesVideo = () => !!score?.frames && ["co2", "ocean", "river"].includes(score.sweep.mapping);
   const n = () => score.frames.length;
   const pos = () => tracks.indexOf(track) + 1;
   const whenOf = (i) => score.frames[i].when;
@@ -188,7 +193,7 @@
     syncVideo(true);
   };
 
-  // Carbon dioxide is NASA's own turning-globe video: keep it in step with the sound.
+  // NASA's own videos (carbon dioxide, ocean, atmospheric river): keep them in step with the sound.
   const syncVideo = (jump = false) => {
     if (!usesVideo() || !son) return;
     const v = $("video"), t = son.mediaTime();
@@ -196,14 +201,16 @@
     // Never seek again while a seek is still loading, or the video never gets to play.
     if (jump || (!v.seeking && Math.abs(v.currentTime - t) > 0.3)) v.currentTime = t;
     if (playing) { v.playbackRate = son.mediaRate(); if (v.paused) v.play().catch(() => {}); } else v.pause();
+    // NASA's date over the picture, read at the video's own time so it always matches the frame shown.
+    const date = son.dateAtVideo(v.currentTime);
+    $("video-date").hidden = !date;
+    if (date && $("video-date").textContent !== date) $("video-date").textContent = date;
   };
 
   // While playing: the progress bar, the flat image's line, and the video.
   const tick = () => {
     if (!playing || !son) return;
     $("stage-fill").style.width = `${son.progress() * 100}%`;
-    const here = son.placeNow();
-    if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
     syncVideo();
     requestAnimationFrame(tick);
   };
@@ -234,6 +241,8 @@
   const loadTrack = async (t, { announce = true } = {}) => {
     const mine = ++gen;
     if (son) { son.dispose(); son = null; }
+    if (lesson) { lesson.dispose(); lesson = window.lesson = null; }
+    $("lesson").hidden = $("to-lesson").hidden = true;
     playing = false; setPlayButton();
     $("play").disabled = true;
     $("alert").hidden = true;
@@ -249,13 +258,26 @@
     } catch (e) {
       console.error(e);
       if (mine !== gen) return;
-      showError(`Track ${t.title} could not load. Check your connection, then try again.`, true);
+      showError(`Track ${t.title} could not load. Check your connection, then try again. (${e?.message || e})`, true);
       say(`Track ${t.title} could not load.`);
       return;
     }
     if (mine !== gen) { son.dispose(); son = null; return; }
     window.son = son;
     lastNote = null;
+
+    // A guided lesson comes before the player where the track has one (ocean currents).
+    if (score.lesson) {
+      try {
+        lessonMod ||= await import("./lesson.js");
+        const l = await lessonMod.createLesson(score.lesson, { $, say, run, store, onSound: () => pauseForSpeech() });
+        if (mine !== gen) { l.dispose(); return; }
+        lesson = window.lesson = l;
+        $("lesson").hidden = $("to-lesson").hidden = false;
+      } catch (e) {
+        console.error(e);   // the track still plays without its lesson
+      }
+    }
 
     // The picture: NASA's video for carbon dioxide, the globe for map tracks.
     const video = usesVideo();
@@ -284,8 +306,12 @@
     $("play").disabled = false;
     window.ready = true;
     if (announce) {
-      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. `
-        + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
+      const inPlayer = document.activeElement?.closest?.("#player");
+      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ` + (lesson
+        ? `It starts with a guided lesson, ${lesson.title}, in ${lesson.count} short steps. `
+          + (inPlayer ? "Press L to go to the lesson, or Space to play the full tour." : "Press Tab to reach the lesson. The full tour player comes after it.")
+        : `${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. `
+          + (inPlayer ? "Press Space to play." : "Press Tab to reach the player, then Space to play.")));
     }
   };
 
@@ -297,6 +323,7 @@
       say(`Paused at ${whenOf(son.index)}.`);
       return;
     }
+    lesson?.stop();   // one thing at a time
     if (!son.ready) say("Loading sounds.");
     playing = true; setPlayButton();
     son.started = false;
@@ -348,11 +375,13 @@
     if (playing) {
       const here = son.placeNow();
       if (here) {
+        // Words for the hum and the notes come from the track (atmospheric river: vapour and kalimba).
+        const w = score.words;
         s += `Playing. ${here.date}. The camera is over ${here.place}, ${Math.round(son.progress() * 100)} percent of the way through this scene.`;
-        if (son.info) s += son.info.light > 0.2 ? ` The swell is at ${Math.round(son.info.light * 100)} percent.` : " The water on the line is calm.";
+        if (son.info) s += son.info.light > 0.2 ? ` The ${w.hum || "swell"} is at ${Math.round(son.info.light * 100)} percent.` : ` ${w.calm || "The water on the line is calm."}`;
         if (lastNote && performance.now() - lastNote.at < 4000) {
           const p = lastNote.pos;
-          s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
+          s += ` The last ${w.note || "harp note"} came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
         }
       } else {
         s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across.`;
@@ -366,7 +395,8 @@
   };
 
   const HELP = "Player keys. Space: play or pause. Left and Right arrows: previous or next map. Home and End: first or last map. "
-    + `W: where am I. D: describe this map. S: what the sounds mean. 1 to ${tracks.length}: choose a track. M: mono on or off. Escape: stop. `
+    + `W: where am I. D: describe this map. S: what the sounds mean. 1 to ${tracks.length}: choose a track. M: mono on or off. `
+    + "L: go to the guided lesson, on a track that has one. Escape: stop. "
     + "Tab moves to the buttons. Below the player: examples of each sound, places to explore, and settings.";
 
   const soundsText = () => {
@@ -376,6 +406,7 @@
 
   const stopAll = () => {
     if (son) { if (playing) { son.pause(); playing = false; setPlayButton(); idle(); } son.hush(); }
+    lesson?.stop();
     clearTimeout(demoTimer);
     if ("speechSynthesis" in window) speechSynthesis.cancel();
     say("Stopped.");
@@ -425,6 +456,11 @@
       case "h": case "?": act(() => say(HELP)); break;
       case "s": act(() => say(soundsText()), "What the sounds mean"); break;
       case "m": act(() => { $("mono").click(); say(`Mono ${$("mono").checked ? "on" : "off"}.`); }); break;
+      case "l": act(() => {
+        if (!lesson) { say(`Track ${pos()}, ${track.title}, has no guided lesson.`); return; }
+        $("lesson-keys").focus();
+        lesson.where();
+      }, "Lesson"); break;
       default:
         // A letter or digit with no job: say so, so a key press is never met with silence.
         if (t === $("keys") && k.length === 1 && !(/^[1-9]$/.test(k) && tracks[Number(k) - 1])) {
@@ -528,6 +564,20 @@
   }));
   $("mono").addEventListener("change", (e) => { settings.mono = e.target.checked; store.set("mono", settings.mono); son?.setMono(settings.mono); });
   $("announce").addEventListener("change", (e) => store.set("announce", e.target.checked));
+  // Narration (Read aloud): the lesson's switch is the same setting as the one in Settings.
+  $("lesson-speak").checked = $("speak").checked;
+  $("lesson-speak").addEventListener("change", (e) => { $("speak").checked = e.target.checked; $("speak").dispatchEvent(new Event("change")); });
+  $("speak").addEventListener("change", (e) => { $("lesson-speak").checked = e.target.checked; });
+  for (const [id, key, unit] of [["voice-vol", "vol", "percent"], ["voice-rate", "rate", "percent of normal speed"]]) {
+    const el = $(id);
+    el.value = voice[key];
+    el.setAttribute("aria-valuetext", `${el.value} ${unit}`);
+    el.addEventListener("input", () => {
+      voice[key] = Number(el.value);
+      store.set(key === "vol" ? "voiceVol" : "voiceRate", voice[key]);
+      el.setAttribute("aria-valuetext", `${el.value} ${unit}`);
+    });
+  }
   $("speak").addEventListener("change", (e) => {
     store.set("speak", e.target.checked);
     if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel();

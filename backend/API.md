@@ -8,8 +8,8 @@ GitHub Pages. All paths are relative to `public/`.
 | --- | --- |
 | `api/tracks.json` | The list of tracks the jukebox shows |
 | `api/scores/<track id>.json` | One track's score: every number the page shows and says |
-| `data/<name>.json` | The fine grid the sound engine plays (3 degree cells, or one line per step for carbon dioxide and the ocean) |
-| `media/<name>/...` | Map images (and NASA's carbon dioxide and ocean videos) |
+| `data/<name>.json` | The fine grid the sound engine plays (3 degree cells, or one line per step for carbon dioxide, the ocean and the atmospheric river; the river's also holds NASA's clock, `minutes` after `startDate` for every step, read from NASA's date overlay) |
+| `media/<name>/...` | Map images (and NASA's carbon dioxide, ocean and atmospheric river videos) |
 
 Built in two stages:
 
@@ -35,7 +35,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `id`, `code`, `title`, `subtitle`, `description` | Names; `description` is read by screen readers with the track's radio button |
 | `score` | Path of the score |
 | `frames` | Number of maps |
-| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (air quality, ocean scenes, lightning parts) |
+| `firstDate`, `lastDate` | `YYYY-MM-DD`, or `null` for tracks with no single date per map (air quality, ocean and atmospheric river scenes, lightning parts) |
 | `when` | The span, spoken: `"2012 to 2023"`, `"Part 1 of 14 to Part 14 of 14"` |
 | `units` | What the values mean, like `"share of the brightest light"` |
 | `engine` | `"sweep"` |
@@ -48,9 +48,10 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `units`, `range` | `range` is fixed for the whole track: never rescale per map. `[0, 1]`, or `[-1, 1]` for the change map |
 | `hotLine` | Values at or above this count as "high" in `hot` |
 | `leftLon` | Longitude at the left edge of every map: -180 |
-| `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
-| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`), `mapping` (`night-lights`, `co2` or `ocean`), `instrument` (`vibraphone`, `harp`, `kalimba`) |
+| `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates`. Camera films may add `busy` (what a scene's share counts), `hum`, `calm` and `note` (the words W uses for the hum and the notes) |
+| `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`), `mapping` (`night-lights`, `co2`, `ocean` or `river`), `instrument` (`vibraphone`, `harp`, `kalimba`) |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
+| `lesson` | Optional. Path of a guided lesson in `data/` (ocean currents: `data/07_ocean_lesson.json`): `title`, `image`, `alt`, `cues` (example sounds: `label`, `text`), `steps` (`kind` `text`, `cue`, `point`, `line` or `series`; `title`, `text`, measured `dir`, `compass`, `speed`). The page shows it before the player |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
 | `frames` | The maps, in playing order |
 
@@ -62,7 +63,7 @@ Each frame:
 | `date` | `YYYY-MM-DD`, or `null` when `when` names something with no single date (a part of the lightning video) |
 | `image`, `alt` | The map image and its description |
 | `text` | The spoken description. Starts with `when`. Built from the same numbers |
-| `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, not crossed by carbon dioxide's line that week; every cell for ocean scenes, which follow a moving camera and have no map) |
+| `grid` | 18 rows (north first) of 36 cells (west first), 10 degrees each. `null` = no reading there (beyond the sensor, ice, not crossed by carbon dioxide's line that week; every cell for ocean and atmospheric river scenes, which follow a moving camera and have no map) |
 | `mean`, `spread`, `hot`, `clusters`, `valid` | Area-weighted average, spread, share of the map read at or above `hotLine`, number of separate high patches, share of the Earth with a reading |
 | `relativeTotal` | Total compared with the first map (night lights) or the busiest map (carbon dioxide, lightning) |
 
@@ -77,4 +78,5 @@ Cell longitude: `leftLon + (col + 0.5) * 10`; latitude: `90 - (row + 0.5) * 10`.
 - every `text` starts with its map's `when` (or date)
 - dated maps are in date order
 - `sweep.src` exists, its chapter has as many maps with the same images, and its arrays are full size
+- a `lesson`, if named, exists and every step has a title and a text
 - each score stays under 2 MB

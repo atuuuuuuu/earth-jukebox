@@ -121,6 +121,12 @@ input[type="radio"], input[type="checkbox"] { width: 22px; height: 22px; accent-
 .map-img { object-fit: contain; }
 .video-wrap { display: grid; place-items: center; background: #000; }
 .video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+/* NASA's date, over its own film (screen readers hear it from W instead) */
+.video-date {
+  position: absolute; top: 12px; left: 14px; margin: 0; padding: 4px 10px; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6); color: #fff; pointer-events: none;
+  font: 700 clamp(1rem, 2.6vw, 1.35rem) / 1.25 ui-monospace, Consolas, "Courier New", monospace; font-variant-numeric: tabular-nums;
+}
 .stage-over { position: absolute; left: 18px; right: 18px; bottom: 16px; pointer-events: none; }
 .stage-when { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 700; text-shadow: 0 2px 12px #000; }
 .stage-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
@@ -147,6 +153,29 @@ input[type="radio"], input[type="checkbox"] { width: 22px; height: 22px; accent-
 #live { margin: 0; }
 .alert { border: 2px solid var(--danger); border-radius: 12px; padding: 12px 14px; color: var(--text); background: #2a1513; }
 .alert .btn { margin-top: 8px; }
+
+/* Guided lesson (before the player) */
+#lesson-h { display: block; }
+.lesson-grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); align-items: start; }
+@media (max-width: 900px) { .lesson-grid { grid-template-columns: 1fr; } }
+.lesson-fig { margin: 0; }
+.lesson-pic { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: #000; }
+.lesson-pic img { display: block; width: 100%; height: auto; }
+.lesson-pic svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lesson-fig figcaption { margin-top: 8px; }
+.lesson-body { display: grid; gap: 14px; }
+.lesson-pos { margin: 0; color: var(--accent); font-weight: 700; }
+.lesson-body h3 { margin: 0; font-size: 1.4rem; }
+#lesson-text { margin: 0; font-size: 1.2rem; max-width: 62ch; }
+#lesson-try-h { margin: 0 0 8px; font-size: 1rem; }
+#lesson-try .demos { margin-bottom: 0; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.btn-row.four { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 480px) { .btn-row.four { grid-template-columns: 1fr 1fr; } }
+.lesson .btn-play { min-height: 48px; font-size: 1.05rem; gap: 8px; }
+#lesson-state { margin: 0; }
+.lesson-settings { margin: 20px 0 0; padding: 14px 18px 18px; border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.lesson-settings > legend { font-weight: 700; padding: 0 6px; }
+.btn-link { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
 
 /* Sounds */
 .legend { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }

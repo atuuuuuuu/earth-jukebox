@@ -56,15 +56,15 @@ function audit(touch) {
     page.on("pageerror", (e) => errors.push(String(e)));
     await page.goto("http://localhost:8124/");
     await page.waitForFunction("window.ready === true");
-    // Both kinds of stage must fit: NASA's video (carbon dioxide), then the globe (track 1).
-    const video = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === "carbon-dioxide")?.id);
+    // The guided lesson above the globe (ocean currents) must fit, then track 1 without it.
+    const video = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].find((r) => r.value === "ocean-currents")?.id);
     let flat = { cut: [], overflow: 0 };
     if (video) {
       await page.evaluate((id) => document.getElementById(id).click(), video);
-      await page.waitForFunction("window.son && window.son.score.id === 'carbon-dioxide'");
+      await page.waitForFunction("window.son && window.son.score.id === 'ocean-currents' && window.lesson");
       flat = await page.evaluate(audit, touch);
       await page.evaluate(() => document.querySelector('input[name="track"]').click());
-      await page.waitForFunction("window.son && window.son.score.id !== 'carbon-dioxide'");
+      await page.waitForFunction("window.son && window.son.score.id !== 'ocean-currents'");
     }
     const r = await page.evaluate(audit, touch);
     r.cut = [...new Set([...r.cut, ...flat.cut])];

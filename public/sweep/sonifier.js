@@ -13,7 +13,7 @@ import * as co2 from './tracks/co2.js';
 import * as ocean from './tracks/ocean.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, ocean };
+const MAPPINGS = { 'night-lights': nightLights, co2, ocean, river: ocean };   // the river film plays like the ocean tour
 const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
@@ -75,9 +75,25 @@ DEMOS.air = [
 ];
 DEMOS.ocean = [
   ['city', 'A current', 'One harp note', 'A current or eddy. When bright, fast water crosses the line, a harp note rings. Brighter water rings louder.'],
-  ['swell', 'The swell', 'Grows, then settles', 'The swell. It follows all the moving water on the line: soft over calm sea, full over strong currents.'],
+  ['swell', 'The hum', 'Grows, then settles', 'The hum. It follows all the moving water on the line: soft over calm sea, full over strong currents. It is not the sound of waves.'],
   ['beat', 'A new month', 'A soft low pulse', 'A new month. One soft low pulse at the start of each month of the tour.'],
   ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Water near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
+];
+DEMOS.river = [
+  ['city', 'The river', 'One drop-like note', "The river. When the atmospheric river's deep-blue core crosses the picture, a kalimba note falls like a drop. More vapour rings louder."],
+  ['swell', 'Water vapour', 'Grows, then settles', 'Water vapour. The hum follows all the vapour in the picture: soft over dry air, full where the river flows.'],
+  ['beat', 'Midnight', 'A soft low pulse', "Midnight. One soft low pulse each time NASA's clock passes midnight. When the pulses race, weeks are flying by; when they stop, NASA has stopped the clock."],
+  ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Vapour near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
+];
+DEMOS.currents = [
+  ['city', 'A strong current', 'One harp note', 'A strong current. When the scan line crosses fast, bright water such as the Gulf Stream, a harp note rings. Stronger rings louder.'],
+  DEMOS.light[1],
+  ['hum', 'The hum', 'Swells, then fades', 'The hum. It follows all the moving water under the scan line: quiet over calm sea, fuller over strong currents, silent over land. It is not the sound of waves.'],
+];
+DEMOS.plumes = [
+  ['city', 'Dense carbon dioxide', 'One ringing note', 'Dense carbon dioxide. When the scan line crosses a plume from fires, cities or industry, a note rings. Denser rings louder.'],
+  DEMOS.light[1],
+  ['hum', 'Deep hum', 'Swells, then fades', 'The deep hum. It follows all the carbon dioxide under the scan line: quiet over clean air, fuller over plumes.'],
 ];
 DEMOS.lightning = [
   ['city', 'Storms', 'One drop-like note', 'Storms. Each place with a lot of lightning plays one drop-like note as the line crosses it. More lightning rings louder.'],
@@ -91,8 +107,9 @@ class SweepSonifier {
     onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {}, onBeat = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
-    this.kind = score.sweep.mapping === 'co2' ? 'co2' : score.sweep.mapping === 'ocean' ? 'ocean'
-      : score.sweep.chapter === 'change' ? 'change' : score.sweep.chapter === 'pollutants' ? 'air'
+    this.kind = ['co2', 'ocean', 'river'].includes(score.sweep.mapping) ? score.sweep.mapping
+      : ['change', 'currents', 'plumes'].includes(score.sweep.chapter) ? score.sweep.chapter
+        : score.sweep.chapter === 'pollutants' ? 'air'
         : score.sweep.instrument === 'kalimba' ? 'lightning' : 'light';
     this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
     this.track = { ...data, chapters: [this.chapter] };
@@ -159,12 +176,19 @@ class SweepSonifier {
     return this.track.grid ? this.track.grid.lonWest + this.progress() * 360 : this.lonAt(seg, this.progress() * seg.steps);
   }
 
-  /** For the ocean tour: where the camera is and the date on screen, in words; else null. */
+  /** For NASA's camera films (ocean, atmospheric river): where the camera is and the date, in words; else null. */
   placeNow() {
-    if (this.kind !== 'ocean') return null;
+    if (this.kind !== 'ocean' && this.kind !== 'river') return null;
     const seg = this.player.segmentAt(this.player.currentPosition);
     const s = Math.floor(seg.frame.startStep + this.progress() * (seg.steps - 1));
     return { place: seg.frame.place, date: ocean.dateAt(this.track, s) };
+  }
+
+  /** The date on NASA's clock at `seconds` into the video, for the date over the picture; else null. */
+  dateAtVideo(seconds) {
+    if (this.kind !== 'ocean' && this.kind !== 'river') return null;
+    const t = this.track;
+    return ocean.dateAt(t, Math.floor(seconds * t.media.fps) / t.framesPerStep);   // the frame on screen
   }
 
   /** For tracks played from a NASA video: the video time that matches the sound, in seconds. */
@@ -263,7 +287,7 @@ class SweepSonifier {
         a.setHum(0, 0, t + 3.8, 0.3); return 4;
       case 'tense':
         a.setHum(0.6, 0, t, 0.3); a.setHum(0.8, 0, t + 0.4, 1.2, 1); a.setHum(0, 0, t + 2.6, 0.6, 0); return 3.4;
-      case 'beat': a.beat(t, 0.9); if (this.kind !== 'ocean') a.beat(t + 1.2, 0.9); return 2;
+      case 'beat': a.beat(t, 0.9); if (this.kind === 'co2') a.beat(t + 1.2, 0.9); return 2;
       case 'swell':
         a.setHum(0.1, 0, t, 0.2); a.setHum(0.85, 0, t + 0.2, 1.8); a.setHum(0.1, 0, t + 2.4, 1.6);
         a.setHum(0, 0, t + 4.2, 0.4); return 4.4;
@@ -278,7 +302,10 @@ class SweepSonifier {
   async earcon(kind = 'ok') {
     try { await this.ensureAudio(); } catch { return; }
     if (!this.click) this.click = new T.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.03 }, volume: -22 }).toDestination();
-    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, T.now() + 0.01);
+    // One synth: two quick key presses must not start at the same instant (Tone.js throws).
+    const at = Math.max(T.now() + 0.01, (this.clickAt ?? 0) + 0.03);
+    this.clickAt = at;
+    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, at);
   }
 
   /** Stop any example or one-spot sound at once. */

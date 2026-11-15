@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Earth Jukebox: hear NASA's views of Earth</title>
-<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, carbon dioxide and lightning, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
+<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, an atmospheric river, carbon dioxide and lightning, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
 <meta name="theme-color" content="#0a0d14">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0d14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffc861' stroke-width='2.5'/%3E%3Cpath d='M16 7v18' stroke='%23ffc861' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <a class="skip" href="#keys">Skip to the player</a>
@@ -48,6 +48,85 @@
     </fieldset>
   </section>
 
+  <section id="lesson" class="block lesson" aria-labelledby="lesson-h" hidden>
+    <h2 id="lesson-h">Learn first: <span id="lesson-title">a guided example</span></h2>
+    <p class="lede-sm">One idea at a time, at your own pace. Each step explains its sound before you hear it, and nothing plays until you press Play.</p>
+    <div class="lesson-grid">
+      <figure class="lesson-fig">
+        <div id="lesson-pic" class="lesson-pic" role="img" aria-label="NASA's picture of the Gulf Stream">
+          <img id="lesson-img" alt="">
+          <svg id="lesson-mark" viewBox="0 0 640 360" aria-hidden="true" focusable="false"></svg>
+        </div>
+        <figcaption id="lesson-caveat" class="muted small"></figcaption>
+      </figure>
+      <div class="lesson-body">
+        <div id="lesson-keys" class="keys" tabindex="0" role="application" aria-roledescription="keyboard area"
+             aria-label="Lesson keys" aria-describedby="lesson-keys-hint">
+          <p id="lesson-keys-hint">Lesson keyboard area. Right arrow: next step. Left arrow: back. Space: play or pause. R: replay. W: where am I. T: go to the full tour. H: every lesson key.</p>
+        </div>
+        <p id="lesson-pos" class="lesson-pos"></p>
+        <h3 id="lesson-step-h"></h3>
+        <p id="lesson-text"></p>
+        <div id="lesson-try" role="group" aria-labelledby="lesson-try-h" hidden>
+          <h4 id="lesson-try-h">Try each sound</h4>
+          <div id="lesson-previews" class="demos"></div>
+        </div>
+        <div class="btn-row four">
+          <button id="lesson-back" class="btn" type="button" aria-keyshortcuts="ArrowLeft">Back</button>
+          <button id="lesson-play" class="btn btn-play" type="button" data-state="paused" aria-keyshortcuts="Space"><span class="play-icon" aria-hidden="true"></span><span id="lesson-play-label">Play</span></button>
+          <button id="lesson-replay" class="btn" type="button" aria-keyshortcuts="R">Replay</button>
+          <button id="lesson-next" class="btn" type="button" aria-keyshortcuts="ArrowRight">Next</button>
+        </div>
+        <div class="btn-row">
+          <button id="lesson-where" class="btn" type="button" aria-keyshortcuts="W">Where am I?</button>
+          <a id="lesson-to-tour" class="btn btn-link" href="#keys" aria-keyshortcuts="T">Go to the full tour</a>
+        </div>
+        <div class="announce">
+          <p class="announce-h" aria-hidden="true">Now</p>
+          <p id="lesson-state"></p>
+        </div>
+      </div>
+    </div>
+    <fieldset class="lesson-settings">
+      <legend>Lesson sound</legend>
+      <div class="settings-grid">
+        <fieldset class="field">
+          <legend>Pace</legend>
+          <div class="seg">
+            <label><input type="radio" name="lesson-pace" value="1.5"> Slow</label>
+            <label><input type="radio" name="lesson-pace" value="1" checked> Normal</label>
+            <label><input type="radio" name="lesson-pace" value="0.7"> Fast</label>
+          </div>
+          <p class="muted small">How long each sound and each pause lasts. The speeds of the water never change.</p>
+        </fieldset>
+        <div class="field">
+          <label for="lesson-fx">Lesson sounds volume</label>
+          <input id="lesson-fx" type="range" min="0" max="100" value="80" step="5">
+        </div>
+        <div>
+          <label class="check"><input id="lesson-bg" type="checkbox" aria-describedby="lesson-bg-hint"> Ocean background sound</label>
+          <p id="lesson-bg-hint" class="muted small">Off unless you turn it on. Soft surf for atmosphere only: it carries no information, and it dips under every lesson sound.</p>
+          <div class="field">
+            <label for="lesson-bg-vol">Background volume</label>
+            <input id="lesson-bg-vol" type="range" min="0" max="100" value="30" step="5">
+          </div>
+        </div>
+        <div>
+          <label class="check"><input id="lesson-speak" type="checkbox" aria-describedby="lesson-speak-hint"> Read the lesson aloud</label>
+          <p id="lesson-speak-hint" class="muted small">With your device's voice, the same as Read aloud in Settings. With a screen reader, leave this off: it reads the lesson in its own voice, at its own speed.</p>
+          <div class="field">
+            <label for="voice-vol">Voice volume</label>
+            <input id="voice-vol" type="range" min="10" max="100" value="100" step="10">
+          </div>
+          <div class="field">
+            <label for="voice-rate">Voice speed</label>
+            <input id="voice-rate" type="range" min="50" max="200" value="100" step="10">
+          </div>
+        </div>
+      </div>
+    </fieldset>
+  </section>
+
   <section id="player" class="block player" aria-labelledby="player-h">
     <h2 id="player-h"><span class="step" aria-hidden="true">2</span>Listen: <span id="np-title">loading</span></h2>
     <div class="player-grid">
@@ -55,6 +134,7 @@
         <canvas id="globe" role="img" aria-label="3D globe"></canvas>
         <div id="video-wrap" class="video-wrap" role="img" aria-label="" hidden>
           <video id="video" muted playsinline preload="auto" aria-hidden="true" tabindex="-1"></video>
+          <p id="video-date" class="video-date" aria-hidden="true" hidden></p>
         </div>
         <img id="map-img" class="map-img" alt="" hidden>
         <div class="stage-over" aria-hidden="true">
@@ -89,6 +169,7 @@
           <button id="describe" class="btn" type="button" aria-keyshortcuts="D">Describe this map</button>
           <button id="help" class="btn" type="button" aria-keyshortcuts="H">Keys</button>
         </div>
+        <a id="to-lesson" class="btn btn-link" href="#lesson-keys" aria-keyshortcuts="L" hidden>Go to this track's guided lesson</a>
 
         <div class="announce">
           <p class="announce-h" aria-hidden="true">Spoken</p>
@@ -176,7 +257,7 @@
       </article>
       <article aria-labelledby="how-2">
         <h3 id="how-2">Reading NASA's pictures</h3>
-        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: a line through the middle of NASA's picture measures the bright white flow lines, ten times per second of video.</p>
+        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: a line through the middle of NASA's picture measures the bright white flow lines, ten times per second of video. Atmospheric river: every band of NASA's film is read for its blue water vapour, twenty times a second, and the date of every moment is read from NASA's own date overlay, digit by digit, because NASA's clock races, stops and replays.</p>
       </article>
       <article aria-labelledby="how-3">
         <h3 id="how-3">Turning numbers into sound</h3>
@@ -198,13 +279,13 @@
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality and ocean tracks by Earth Jukebox.</p>
+    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality, ocean and atmospheric river tracks by Earth Jukebox.</p>
     <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Built with help from an AI coding assistant; no data, images or audio are AI-generated.</p>
   </div>
 </footer>
 
 <script src="bundle.js?v=7"></script>
 <script src="globe.js?v=12"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

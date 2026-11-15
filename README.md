@@ -8,7 +8,7 @@ the picture) sounds higher and in your left ear, south lower and in your right.
 It is made for blind and low-vision listeners first. A first-time screen reader user can open it and
 use it alone: the page says what to press next, every key names itself as you press it, every
 action is a button, and the player answers "Where am I?" at any moment. On phones that can vibrate,
-the notes buzz. A 3D globe (or NASA's own video) shows what is playing, but you never need it.
+the notes buzz. A 3D globe (or, for the atmospheric river, NASA's own video) shows what is playing, but you never need it.
 
 Why it sounds the way it does, and how the NASA videos are read: [docs/PROCESS.md](docs/PROCESS.md).
 
@@ -23,9 +23,10 @@ Resource numbers are the order on the challenge's Resources tab.
 | 1 | **Earth at night**, one scan per year, 2012 to 2023 | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
 | 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map | 1 and 3 |
 | 3 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
-| 4 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
-| 5 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
+| 4 | **Ocean currents**, a guided lesson on the Gulf Stream (direction, then speed, then change), then NASA's world map of the ocean's surface currents, March 2007 to March 2008 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) (the lesson) and [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/) (the map) |
+| 5 | **Carbon dioxide**, a world map from NASA's turning globe, 14 January to 3 March 2020 | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
+| 7 | **Atmospheric river**, NASA's 3D film of a Pineapple Express, December 2010, with NASA's clock over the film | [A 3D View of an Atmospheric River from an Earth System Model](https://svs.gsfc.nasa.gov/4960/) |
 
 ## Using it without sight
 
@@ -54,8 +55,20 @@ with no job says so. The single-letter keys work only inside the player, so they
 by themselves. Every key is also a button. Below the player: **What the sounds mean** (each sound with
 an example button), **Explore one place** (city buttons and two sliders: hear one 10 degree square),
 and **Settings** (volume, speed, mono, say each new map, name each key, click on each key, vibrate,
-read aloud, save as audio file). Settings are remembered on the device. The ocean track follows a
-moving camera, so it has no map of places to explore.
+read aloud, save as audio file). Settings are remembered on the device. The atmospheric river follows
+NASA's moving camera, so it has no map of places to explore.
+
+**Ocean currents starts with a guided lesson** (`public/lesson.js`), placed before the player: Tab
+from the track list lands in it. Thirteen short steps teach one idea at a time: what a current is
+(and how it differs from a wave), then the Gulf Stream's direction at four places, then its speed
+across the stream, then how it changes over 12 snapshots 8 days apart. Every sound is explained before
+it plays and has its own example button. Direction is a tone that travels the way the water goes
+(rises = north, falls = south, left ear to right ear = east); speed is soft ticks in the middle
+(faster = faster water). Keys in the lesson's keyboard area: Right and Left (next step, back), Space
+(play or pause), R (replay), W (where am I), D (read the step again), T (go to the full tour),
+H (every key); L in the player comes back. The lesson's own settings: pace (slow, normal, fast),
+lesson volume, an ocean background that is off unless asked for and carries no information, and the
+read-aloud voice's on/off, volume and speed.
 
 ## Run it
 
@@ -78,6 +91,7 @@ npm run api                        # 3-degree grids -> public/api scores (standa
 npm run validate                   # check public/api against backend/API.md: prints "API OK"
 npm test                           # the real page, keyboard only: every key, speech, sound level, axe, no trap
 npm run test:responsive            # 320 to 1440 px: no sideways scroll, touch targets >= 44 px
+npm run test:lesson                # the ocean lesson by keyboard: explain, play, pause, go on, replay, axe
 npm run test:backend               # known-answer tests: score builder, validator, lightning correction
 ```
 
@@ -90,7 +104,7 @@ for the file and URL), then:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
-npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_dyamond, 07_ocean_currents, 07_lightning
+npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_map, 07_ocean_map, 07_ocean_lesson, 07_lightning
 npm run api && npm run validate
 ```
 
@@ -98,10 +112,18 @@ npm run api && npm run validate
 
 1. **Reading NASA's video** (`backend/eic/`, team RUSTMN's pipeline, numpy and OpenCV). Each track's
    YAML says how. Night lights: the 8K EIC video, calibrated against 10 cities, lights separated from
-   the base map. Carbon dioxide: a thin line through the centre of NASA's turning globe, read every 3
-   hours of model time. Air quality: four pollutants in strips that slide over one flat map; each
-   strip is found in every frame and its colours rebuilt into a full world map per pollutant. Ocean:
-   a line through the middle of NASA's moving camera view, ten readings per second of video.
+   the base map. Ocean currents: NASA's flat ECCO2 world map film (SVS 3912, its land matches the
+   Blue Marble with correlation 0.96), averaged over the year: brighter flow lines are faster water
+   (`globe_map.py`, `projection: flat`; put the film in `data/eic/07_ECCO2/`). Carbon dioxide: NASA's
+   film of the globe turning, flattened into one world map (`globe_map.py`). NASA's camera is close to
+   the globe (4.5 Earth radii, fitted), and the longitude facing it is measured in every 49th frame by
+   matching NASA's land to the Blue Marble (correlation 0.81); every frame is then projected onto a
+   0.25 degree map and each place averages the frames that show it face-on. Air quality: four pollutants in strips that slide over one flat map; each
+   strip is found in every frame and its colours rebuilt into a full world map per pollutant. Ocean
+   lesson: where NASA's camera holds still over the Gulf Stream (spring 2023), the optical flow of
+   NASA's white flow lines gives direction and relative speed; places are found with an affine fit to
+   nine coast points (worst 11 px), the camera's drift is subtracted, and the builder stops unless the
+   measured directions agree with known geography (north off Miami, east off the Carolinas).
    Lightning: NASA's Science On a Sphere movie is already a flat world map; yellow strike pixels are
    averaged over the frames of each of 14 equal parts, in order, then divided by how often the space
    station looks at each latitude (its orbit turns round near 50 degrees north and south, so it sees
@@ -113,8 +135,8 @@ npm run api && npm run validate
 3. **Sound** (`public/sweep/`, team RUSTMN's engine on Tone.js). The scan advances one 3 degree column
    at a time; notes ring as it crosses bright places (vibraphone for lights and air, harp for the
    ocean, kalimba for lightning), a drone follows everything under the line. The worst air turns the
-   drone sour and the notes minor; carbon dioxide adds tension over dense plumes and a heartbeat for
-   each day; the ocean adds a soft pulse for each month.
+   drone sour and the notes minor; the atmospheric river adds a soft pulse each time NASA's clock
+   passes midnight.
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ### The sound follows NASA's Caldwell 73 sonification

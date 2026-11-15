@@ -2,6 +2,8 @@
 
 Without this, a browser can keep an old index.html next to a new app.js after an update,
 and the page loads with no data. Usage: npm run serve (or python3 scripts/serve.py [port]).
+It also refuses a port that is already in use: on Windows a second server can otherwise start
+on the same port without an error, and the browser keeps talking to the old one.
 """
 import functools
 import http.server
@@ -16,12 +18,15 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
     """No browser cache, and byte ranges: Safari will not play a video from a server without them."""
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Accept-Ranges", "bytes")
         super().end_headers()
 
     def send_head(self):
         self.range_left = None   # the handler is reused across keep-alive requests
+        # Always send the file itself: a "not modified" answer can hand back a copy cached from another folder.
+        del self.headers["If-Modified-Since"]
+        del self.headers["If-None-Match"]
         m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
         path = pathlib.Path(self.translate_path(self.path))
         if not m or not path.is_file():
@@ -57,6 +62,12 @@ class NoCache(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     handler = functools.partial(NoCache, directory=str(PUBLIC))
-    with http.server.ThreadingHTTPServer(("", port), handler) as httpd:
+    http.server.ThreadingHTTPServer.allow_reuse_address = sys.platform != "win32"   # Windows would share a busy port
+    try:
+        httpd = http.server.ThreadingHTTPServer(("", port), handler)
+    except OSError:
+        sys.exit(f"Port {port} is already in use, maybe by an older Earth Jukebox server. Close that terminal, "
+                 f"or use another port: python3 scripts/serve.py {port + 1}")
+    with httpd:
         print(f"Serving {PUBLIC} at http://localhost:{port} (no browser cache)")
         httpd.serve_forever()
