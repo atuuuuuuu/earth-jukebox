@@ -93,7 +93,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   const w = await live();
   check("W: where am I", w.startsWith("You are in the player. Track 1 of") && w.includes("scan line is at"), w.slice(0, 120));
   await page.keyboard.press("ArrowRight");
-  check("Right arrow: next map, named first", (await live()).startsWith("Next map. 2013, map 2 of 12"), await live(0));
+  check("Right arrow: next map, named first", (await live()).startsWith("Next map. 2013, map 2 of 13"), await live(0));
   check("map slider follows", (await page.getAttribute("#map", "aria-valuetext")).startsWith("2013"));
   await page.keyboard.press("Home");
   check("Home: first map", (await live()).startsWith("First map. 2012, map 1"));
@@ -101,7 +101,15 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
   check("Left arrow at the start says so", (await live()).startsWith("Previous map. Already at the first map"));
   await page.evaluate(() => { document.getElementById("keyecho").click(); document.getElementById("keys").focus(); });
   await page.keyboard.press("End");
-  check("key names can be turned off", (await live()).startsWith("2023, map 12"), await live(0));
+  check("key names can be turned off", (await live()).startsWith("Change from 2012 to 2023, map 13"), await live(0));
+  // Night lights' last map is NASA's change map, heard as the decade on the flat map alone.
+  if (!(await page.evaluate("son.playing"))) await page.keyboard.press("Space");   // still playing from above, or start it
+  await page.waitForFunction("son.playing", null, { timeout: 15000, polling: 100 });
+  await page.waitForTimeout(1500);
+  await page.keyboard.press("w");
+  const dw = await live();
+  check("the change map plays the decade on the flat map alone", dw.includes("Playing the decade") && /\d{4}: /.test(dw)
+    && await page.evaluate("son.isDecade() && document.getElementById('stage').hidden && !document.getElementById('view-map').hidden"), dw.slice(0, 140));
   await page.evaluate(() => { document.getElementById("keyecho").click(); document.getElementById("keys").focus(); });
   await page.keyboard.press("Home");
   await page.keyboard.press("q");
@@ -131,8 +139,9 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     if (k > 0) {
       await page.keyboard.press(String(k + 1));
       await page.waitForFunction(`window.son && son.score.id === "${ids[k]}" && !document.getElementById('play').disabled`, null, { timeout: 45000, polling: 100 });
-      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 15000, polling: 50 }).catch(() => {});
-      check(`key ${k + 1}: track ${ids[k]} chosen and announced`, (await live(0)).startsWith(`Track ${k + 1} of ${ids.length}`), await live(0));
+      await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 45000, polling: 50 }).catch(() => {});
+      const announced = await live(0);   // one read: the live region is cleared for 60 ms before each message
+      check(`key ${k + 1}: track ${ids[k]} chosen and announced`, announced.startsWith(`Track ${k + 1} of ${ids.length}`), announced);
     }
     await page.keyboard.press("Space");
     await page.waitForFunction("son.playing", null, { timeout: 15000, polling: 100 });
@@ -154,6 +163,14 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
         headLat <= 90 && headLat >= -90 && /scan line is at \d+ degrees (north|south)|the equator/.test(wk)
         && wk.includes("degrees Celsius") && wk.includes("West is your left ear"), wk.slice(0, 220));
       check(`${ids[k]}: the globe draws a line of latitude`, await page.evaluate("!window.globe || window.globe.scanLat === true"));
+      const tune = await page.evaluate(() => {
+        const seg = son.player.segments[0], pitch = [];
+        for (let s = 0; s < seg.steps; s++) for (const e of son.mapping.planStep(son.track, seg, s).events.slice(0, 1)) pitch.push(e.midi);
+        const peak = pitch.indexOf(Math.max(...pitch));
+        const rises = pitch.slice(0, peak + 1).filter((m, i, a) => i && m > a[i - 1]).length, falls = pitch.slice(peak).filter((m, i, a) => i && m < a[i - 1]).length;
+        return { notes: pitch.length, low: Math.min(...pitch), high: Math.max(...pitch), first: pitch[0], rises, falls, at: peak / pitch.length };
+      });
+      check(`${ids[k]}: the temperature melody climbs to the tropics and falls again`, tune.notes >= 20 && tune.high - tune.low >= 12 && tune.rises >= 4 && tune.falls >= 4 && tune.at > 0.25 && tune.at < 0.75, JSON.stringify(tune));
     }
     await page.keyboard.press("Space");   // pause
     const axe = await page.evaluate(AXE);
@@ -176,6 +193,12 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       return { peakDb: +(20 * Math.log10(pk)).toFixed(1), rmsDb: +(10 * Math.log10(sum / l.length)).toFixed(1) };
     });
     check(`${ids[k]}: audio file render`, wav.peakDb < 0 && wav.rmsDb > -50, JSON.stringify(wav));
+    // About this track: what, who, when, where, why, how, and where it comes from. The numbers as CSV.
+    const about = await page.evaluate(() => ({ dt: document.querySelectorAll("#about-list dt").length, chain: document.querySelectorAll("#about-chain li").length, hidden: document.getElementById("about-sound").hidden }));
+    check(`${ids[k]}: About this track has the six answers and where it comes from`, !about.hidden && about.dt === 6 && about.chain >= 4, JSON.stringify(about));
+    const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#csv", { force: true })]);
+    const csv = require("fs").readFileSync(await dl.path(), "utf8");
+    check(`${ids[k]}: CSV has its source, units and rows`, dl.suggestedFilename() === `earth-jukebox-${ids[k]}.csv` && csv.startsWith("# ") && csv.includes("Units:") && (csv.split("\n").length > 100 || ids[k] === "ocean-currents"), `${dl.suggestedFilename()}, ${csv.split("\n").length} lines`);
     // Compare with previous part: only where the track has it (lightning), by key C and the checkbox.
     const canCompare = await page.evaluate("son.canCompare");
     check(`${ids[k]}: compare control shown only where it works`, (await page.isVisible("#compare")) === canCompare);
@@ -198,6 +221,15 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     // a letter for each in the player, never outside it.
     const lay = await page.evaluate(() => son.layers.map((L) => ({ id: L.id, name: L.name, key: L.key })));
     check(`${ids[k]}: Listen to shown only where it works`, (await page.isVisible("#listen-field")) === lay.length > 0);
+    // Continuous sound: offered only where the track plays notes, and it reaches the engine.
+    const notes = await page.evaluate("son.hasNotes");
+    check(`${ids[k]}: Continuous offered only on note tracks`, (await page.isVisible("#continuous")) === notes);
+    if (notes) {
+      await page.evaluate(() => document.getElementById("continuous").click());
+      const on = await page.evaluate("son.settings.continuous === true");
+      await page.evaluate(() => document.getElementById("continuous").click());
+      check(`${ids[k]}: Continuous turns on and off`, on && !(await page.evaluate("son.settings.continuous")));
+    }
     if (lay.length) {
       const radios = await page.evaluate(() => [...document.querySelectorAll("#listen-field input")].map((r) => ({ id: r.id, type: r.type, name: r.name, checked: r.checked })));
       check(`${ids[k]}: Listen to is one radio group, All first and chosen`,
@@ -293,6 +325,17 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
         await page.focus("#keys");
         await page.keyboard.press("Space");   // pause
         await page.keyboard.press(vw.key.toLowerCase());   // back to the whole map
+        await live(500);                                    // let its answer be spoken before the next check
+      }
+      check(`${ids[k]}: Mystery place only where there is a decade`, (await page.isVisible("#mystery")) === (await page.evaluate("son.whole.chapters.some((c) => c.frames.some((f) => f.decade))")));
+      if (await page.isVisible("#mystery")) {
+        await page.click("#mystery-play", { force: true });
+        const asked = await spoken();
+        check(`${ids[k]}: a mystery place names nothing, then asks`, /^Play a mystery place\. A mystery place: twelve notes/.test(asked) && await page.isVisible("#mystery-guess"), asked.slice(0, 90));
+        await page.evaluate(() => document.querySelector("#mystery-options input").click());
+        await page.waitForTimeout(300);
+        const res = await page.evaluate(() => document.getElementById("mystery-result").textContent);
+        check(`${ids[k]}: the guess is answered and the place revealed`, /^(Yes!|Not quite: you chose .+\.) It was .+\. .*light/.test(res), res.slice(0, 120));
       }
       check(`${ids[k]}: the flat map shows every window`, await page.evaluate(() => document.getElementById("view-map").hidden || document.querySelectorAll("#view-map-boxes .view-box").length >= 1));
       await page.focus("#title");
@@ -302,10 +345,29 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
     }
   }
 
+  // ---- Guide me: the page one part at a time. Never plays sound; Escape closes it and gives focus back.
+  await page.click("#guide-start", { force: true });
+  const g1 = await page.evaluate(() => ({ open: !document.getElementById("guide").hidden, count: document.getElementById("guide-count").textContent, focus: document.activeElement.id, ring: !!document.querySelector(".guide-ring"), playing: !!(window.son && son.playing) }));
+  check("Guide me opens at step 1, rings the real part and takes focus into the panel", g1.open && /^Step 1 of \d+/.test(g1.count) && g1.focus === "guide-next" && g1.ring && !g1.playing, JSON.stringify(g1));
+  await page.keyboard.press("Enter");
+  check("Guide me: Next goes to step 2", (await page.textContent("#guide-count")).startsWith("Step 2 of"));
+  await page.keyboard.press("Escape");
+  const g2 = await page.evaluate(() => ({ hidden: document.getElementById("guide").hidden, focus: document.activeElement.id, ring: !!document.querySelector(".guide-ring") }));
+  check("Escape closes the guide and returns focus to its button", g2.hidden && g2.focus === "guide-start" && !g2.ring, JSON.stringify(g2));
+
+  // ---- Play the whole jukebox: names track 1, then Escape stops it and it never moves on.
+  await page.click("#show", { force: true });
+  await page.waitForFunction("document.getElementById('live').textContent.startsWith('Track 1 of')", null, { timeout: 30000, polling: 100 });
+  check("the whole jukebox names each track first", (await live(0)).includes("NASA's source:"), (await live(0)).slice(0, 100));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(8000);
+  check("Escape stops the whole jukebox for good", (await page.evaluate("window.son.score.id")) === ids[0] && !(await page.evaluate("son.playing")));
+
   // ---- Sliders keep their own arrow keys and speak each spot.
   await page.focus("#lon");
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(400);
+  await page.waitForFunction(() => /degrees/.test(document.getElementById("live").textContent), null, { timeout: 15000, polling: 100 }).catch(() => {});
   check("west-east slider: arrow key plays a spot", /degrees/.test(await live(0)), (await live(0)).slice(0, 90));
 
   // ---- Escape stops everything, from anywhere.

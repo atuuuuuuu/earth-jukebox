@@ -80,9 +80,41 @@ export function configure(settings) {
  */
 const gridOf = (track, frame) => frame.geo ?? track.grid;
 
-/** One segment per map; one step per column of its grid (3° on the whole map). */
+/** One segment per map; one step per column of its grid (3° on the whole map), or per year of the decade. */
 export function segments(track) {
-  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({ chapter, frame, steps: gridOf(track, frame).cols })));
+  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({
+    chapter, frame, steps: frame.decade ? frame.decade.length + DECADE.tail : gridOf(track, frame).cols,
+  })));
+}
+
+// The change map is heard as "the decade": one soft note per year for the place (the whole map or
+// a region), from its light above the dark land (frame.decade). Every place starts on A3; twice its
+// light is one octave (five steps of A major pentatonic) higher, half its light one lower. Then
+// NASA's change map for the place (frame.figure): a rising pair, a falling cello pair, or one note.
+const DECADE_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];   // from A2 (MIDI 45)
+const DECADE = { root: 45, start: 5, perDoubling: 5, tail: 2, ring: 0.9 };
+
+/** The note of one year: `light` against the place's first year with any light, or null (a rest). */
+export function decadeMidi(light, start) {
+  if (!(light > 0) || !(start > 0)) return null;
+  const step = clamp(DECADE.start + Math.round(DECADE.perDoubling * Math.log2(light / start)), 0, DECADE_SCALE.length - 1);
+  return DECADE.root + DECADE_SCALE[step];
+}
+
+/** One step of the decade: a year's note, then the change map's figure, then quiet. */
+export function decadeStep(frame, s) {
+  const D = frame.decade, start = D.find((v) => v > 0) ?? 0, hum = { level: 0.18, pan: 0 };
+  const note = (midi, offset, voice = 'notes', velocity = 0.55, duration = DECADE.ring) => ({ voice, kind: 'year', midi, velocity, offset, duration, pos: 0 });
+  if (s < D.length) {
+    const midi = decadeMidi(D[s], start);
+    return { events: midi ? [note(midi, 0)] : [], hum, decade: { year: s, ratio: start ? D[s] / start : 0 } };
+  }
+  const last = decadeMidi(D[D.length - 1], start) ?? DECADE.root + 12;
+  if (s > D.length) return { events: [], hum: { level: 0, pan: 0 }, decade: { year: D.length - 1, ratio: start ? D[D.length - 1] / start : 0, done: true } };
+  const events = frame.figure === 'more' ? [note(last, 0, 'notes', 0.6, 1.4), note(last + 4, 0.18, 'notes', 0.5, 1.6)]
+    : frame.figure === 'less' ? [note(last - 12, 0, 'cello', 0.6, 1.4), note(last - 15, 0.3, 'cello', 0.45, 1.6)]
+      : [note(last, 0, 'notes', 0.5, 1.6)];
+  return { events, hum, decade: { year: D.length - 1, ratio: start ? D[D.length - 1] / start : 0, figure: frame.figure } };
 }
 
 export function segmentSeconds(track, seg, settings) {
@@ -197,6 +229,7 @@ function peaks(arr, g, c, min) {
  */
 export function planStep(track, seg, c) {
   const { chapter, frame } = seg;
+  if (frame.decade) return decadeStep(frame, c);
   const g = gridOf(track, frame);
   const events = [];
   const ring = params.ring;

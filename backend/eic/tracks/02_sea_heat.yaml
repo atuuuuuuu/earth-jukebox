@@ -67,11 +67,14 @@ legend:
     Antarctica, once for each quarter of the year.
   method: >
     On this track the scan line lies on its side: it runs from west to east and moves from north to
-    south. So here your left ear is west and your right ear is east. The colour of every current is
+    south. So here your left ear is west and your right ear is east. The sound is a warm pad, after
+    NASA's reference instrument, with a soft melody on top: its notes climb as the water warms. The colour of every current is
     read back to degrees Celsius on NASA's own key, from 0 to 32. Each sweep takes about 16 seconds.
   items:
     - sound: "Deep base note"
       meaning: "Sea under the scan line. It is there over any water, alone over cold seas, and almost silent where the line crosses only land or ice. It is louder when more of the line is sea."
+    - sound: "Temperature notes"
+      meaning: "A soft swelling note every few degrees of latitude: its pitch is the temperature of the water under the line, one step of the scale higher for every two degrees. Warmer water sounds higher, colder water lower. Where part of the line is much warmer than the rest, it adds a second note in its own ear."
     - sound: "Chord voices"
       meaning: "Warm water under the line. The warmer it is, the more voices join on top, each one higher: a fifth from 6 degrees, more voices from 12, 18 and 24 degrees, and the highest from 28 degrees, the warmest seas on Earth."
     - sound: "Left and right"

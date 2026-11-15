@@ -1,6 +1,6 @@
-# Earth Jukebox
+# Hearth
 
-**Hear NASA's views of Earth.** Earth Jukebox turns visualizations from NASA's Earth Information
+**Hear NASA's views of Earth.** Hearth (hear + Earth) turns visualizations from NASA's Earth Information
 Center into sound: city lights at night, the air we breathe, the ocean's great currents, carbon
 dioxide, lightning, and the aerosols in the air. A line crosses the picture, and whatever it crosses
 plays. North (or the top of the picture) sounds higher and in your left ear, south lower and in your right.
@@ -20,14 +20,13 @@ Resource numbers are the order on the challenge's Resources tab.
 
 | # | Track | NASA resource |
 | --- | --- | --- |
-| 1 | **Earth at night**, one scan per year, 2012 to 2023; or the decade in one of NASA's four zoom regions | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
-| 2 | **Night lights: what changed**, NASA's 2012 to 2023 change map; or one of its regions: Western Europe, the Eastern Mediterranean, Ukraine, India | 1 and 3 |
-| 3 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
-| 4 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
-| 5 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
-| 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
-| 7 | **Aerosols**, four winds over one moment of NASA's model, 19 August 2025; or NASA's six stories on that map, one after another | [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/) |
-| 8 | **Warm and cold seas**, sea surface temperature in four seasons, March 2007 to March 2008: a level line moves from the Arctic to Antarctica and warm water adds chord voices | 2: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/) |
+| 1 | **Earth at night**, one scan per year, 2012 to 2023, then NASA's change map heard as the decade (one note per year); for the whole map or one of NASA's four zoom regions | 1 and 3: [EIC content](https://svs.gsfc.nasa.gov/gallery/earth-information-center/), [Change in Night Lights between 2012 and 2023, EIC version](https://svs.gsfc.nasa.gov/5313/) |
+| 2 | **Air quality**, four pollutants, July and August 2024 | 6: [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/) |
+| 3 | **Ocean currents**, NASA's tour of the Kuroshio, Agulhas and Gulf Stream, 2021 to 2023 | 7: [Perpetual Ocean 2: Western Boundary Currents](https://svs.gsfc.nasa.gov/5425/) |
+| 4 | **Carbon dioxide**, seven weeks of early 2020 on a turning globe | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
+| 5 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
+| 6 | **Aerosols**, four winds over one moment of NASA's model, 19 August 2025; or NASA's six stories on that map, one after another | [GEOS Aerosols (2025)](https://svs.gsfc.nasa.gov/5669/) |
+| 7 | **Warm and cold seas**, sea surface temperature in four seasons, March 2007 to March 2008: a level line moves from the Arctic to Antarctica and warm water adds chord voices | 2: [Global Sea Surface Currents and Temperature](https://svs.gsfc.nasa.gov/3912/) |
 
 ## Using it without sight
 
@@ -46,11 +45,11 @@ In the keyboard area (and on any player button):
 | D | Describe this map (pauses first) |
 | S | What the sounds mean |
 | H | Every key |
-| 1 to 8 | Choose a track |
+| 1 to 7 | Choose a track |
 | M | Mono on or off |
 | C | On Lightning: compare each part with the previous part |
 | A, B, U, T, L | On Aerosols: all four winds, or black carbon, dust, sea salt or sulfate alone (also the "Listen to" radios) |
-| R | On the night lights tracks: the next region (whole map, Western Europe, Eastern Mediterranean, Ukraine, India). On Aerosols: the whole map or NASA's stories (also the "Region" and "Mode" radios) |
+| R | On Earth at night: the next region (whole map, Western Europe, Eastern Mediterranean, Ukraine, India). On Aerosols: the whole map or NASA's stories (also the "Region" and "Mode" radios) |
 | Escape | Stop all sound and speech, from anywhere |
 
 Each key says its name before its answer ("Next map. 2014, map 3 of 12"), with a soft click; a key
@@ -58,7 +57,7 @@ with no job says so. The single-letter keys work only inside the player, so they
 (WCAG 2.1.4). The keyboard area is `role="application"`, so NVDA and JAWS switch to focus mode there
 by themselves. Every key is also a button. Below the player: **What the sounds mean** (each sound with
 an example button), **Explore one place** (city buttons and two sliders: hear one 10 degree square),
-and **Settings** (volume, speed, mono, say each new map, name each key, click on each key, vibrate,
+and **Settings** (volume, speed, mono, continuous sound, say each new map, name each key, click on each key, vibrate,
 read aloud, save as audio file). Settings are remembered on the device. The ocean track follows a
 moving camera, so it has no map of places to explore.
 
@@ -150,20 +149,31 @@ cd backend/eic && python3 -m pipeline.validate --track 03   # known places, and 
    pixels close to a key colour (a fading line keeps its hue; grey land, white ice and the black sea
    are left out), and each 3 degree cell takes the median of every reading in a quarter of the movie,
    named by NASA's own per-frame dates. A level line then moves from the Arctic to Antarctica, once
-   per season, west in the left ear and east in the right. The sound is a warm pad after NASA's
-   reference (FluidR3 "Pad 2 (warm)", chosen by comparing each soundfont pad's spectrum with it): a
-   deep D root over any sea, and as the water under the line warms, more and higher voices join, at
-   6, 12, 18, 24 and 28 degrees, each leaning toward where that warm water is along the line. The
+   per season, west in the left ear and east in the right. The sound is built from the measured timbre
+   of NASA's reference pad (instrument.mp3), not from a soundfont: a harmonic fit of the reference gave
+   a nearly pure tone (second partial 19 dB down, third 23 dB), a swell of 1 to 2 seconds and a slow
+   tremolo of about 20 percent, and the page synthesises exactly that. A deep D root plays over any sea,
+   and as the water under the line warms more and higher chord voices join, at 6, 12, 18, 24 and 28
+   degrees, each leaning toward where that warm water is along the line. On top, a soft melody makes the
+   temperature itself audible: its pitch climbs one step of the scale for every two degrees, so warming
+   is heard as rising notes and cooling as falling notes, and a stretch of the line much warmer than
+   the rest adds a note in its own ear. The
    backend tests check the key (a cell coloured like 20 degrees reads 20) and the known places: the
    warm pool, the cold Southern Ocean, the Gulf Stream's warm water reaching north-east, and the cold
    tongue of the equatorial east Pacific (cooling through the La Niña of late 2007).
-4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
+   **The decade** (Earth at night's last map, after TerraJuke's idea): NASA's change map is shown flat
+   (NASA's own EIC print with its four zooms) and heard as one note per year for the whole map or the
+   region chosen. A place's light is its brightness above the dark land (each pixel's luma above its
+   7 x 7 median, summed, no "lit" threshold, at the EIC print's scale); it starts on A3, and twice the
+   light is an octave higher. Then NASA's change-map figure: a rising pair, a falling pair or one note.
+   The world grows 24 percent from 2012 to 2023, India 86 percent, Western Europe dims a little.
+4. **Page** (`public/app.js`, `globe.js`). Every map track shows the flat map beside the globe. Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ### The sound follows NASA's Caldwell 73 sonification
 
 The challenge lists NASA's [Data Sonification: Caldwell 73](https://svs.gsfc.nasa.gov/13786/) as its
 model. There, a radar line sweeps round a star cluster, a star's place on the line sets its pitch, the
-whole image sounds as a choir, and bright stars ring as marimba and glockenspiel notes. Earth Jukebox
+whole image sounds as a choir, and bright stars ring as marimba and glockenspiel notes. Hearth
 keeps that grammar for Earth maps: a scan line sweeps the world, a place's latitude on the line sets its
 pitch (and its ear), the whole line sounds as a deep hum, and bright places ring as single notes.
 
@@ -197,10 +207,26 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
 - Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via
   [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts). Sound: [Tone.js](https://tonejs.github.io/).
 
-## AI assistance
+## Use of AI
 
-Built with help from an AI coding assistant, Claude Code (Anthropic). It wrote and reviewed much of
-the code, tests and documentation; `AGENTS.md` holds the rules it worked under. The team decided what
-to build, chose the data, and reviewed and tested the changes. No data, images or audio are AI-generated.
+NASA Space Apps asks every project to say where AI was used. Hearth was built with help from an AI
+coding assistant, Claude Code (Anthropic), working under the rules in `AGENTS.md` and the team's specs:
 
-Earth Jukebox is not an official NASA product.
+- **Code written with Claude Code (AI-assisted):** much of the web page (`public/app.js`,
+  `public/globe.js`, `public/index.html`, `public/styles.css`), the sound engine in `public/sweep/`
+  (the track mappings, the winds, the sea temperature chords and the views: regions and stories), the
+  score builder and its validator (`backend/build_sweep.py`, `backend/validate_api.py`) and the
+  browser and backend tests.
+- **Data processing written with Claude Code (AI-assisted):** the Python pipeline in `backend/eic/`
+  that reads NASA's videos and images (colour keys, grids, the aerosol unmixing, the sea temperature
+  reading, the night-lights decade and regions). It is ordinary, repeatable code: no AI model runs on
+  the data, and running the pipeline again gives the same numbers.
+- **Text written with Claude Code (AI-assisted):** much of the spoken text, the legends, "About this
+  track" (written from NASA's own pages) and this documentation.
+- **Not AI-generated:** the data, images and video (all NASA's), the instrument samples (FluidR3_GM),
+  and the sound itself, which the page computes from NASA's data as you listen.
+
+The team chose the challenge, the NASA resources and the sound design, decided what to build, and
+reviewed, listened to and tested every change.
+
+Hearth is not an official NASA product.

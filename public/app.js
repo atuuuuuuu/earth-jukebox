@@ -44,15 +44,19 @@
   const wrapLon = (l) => ((((l + 180) % 360) + 360) % 360) - 180;
   const lonWords = (l) => { l = wrapLon(l); const a = Math.round(Math.abs(l)); return a === 0 || a === 180 ? `${a} degrees` : `${a} degrees ${l < 0 ? "west" : "east"}`; };
   const latWords = (l) => (Math.abs(l) < 0.5 ? "the equator" : `${Math.round(Math.abs(l))} degrees ${l < 0 ? "south" : "north"}`);
+  const NOTE_NAMES = ["C", "C sharp", "D", "D sharp", "E", "F", "F sharp", "G", "G sharp", "A", "A sharp", "B"];
+  const noteName = (m) => `${NOTE_NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`;
+  const hertz = (m) => Math.round(440 * 2 ** ((m - 69) / 12));
   const sentences = (t) => t.split(/(?<=\.)\s+(?=[A-Z])/);
   const earOf = (pos) => ($("mono").checked || Math.abs(pos) < 0.33 ? "in the centre" : pos < 0 ? "in your left ear" : "in your right ear");
 
   // ---------- Settings, remembered on this device ----------
   const settings = {
-    volume: store.get("volume", 80), bpm: store.get("bpm", 84), mono: store.get("mono", false),
+    volume: store.get("volume", 80), bpm: store.get("bpm", 84), mono: store.get("mono", false), continuous: store.get("continuous", false),
   };
   $("volume").value = settings.volume;
   $("mono").checked = settings.mono;
+  $("continuous").checked = settings.continuous;
   $("announce").checked = store.get("announce", true);
   $("speak").checked = store.get("speak", false);
   for (const id of ["keyecho", "clicks", "vibrate"]) {
@@ -231,6 +235,10 @@
     if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
     syncVideo();
     moveNeedle();
+    const sea = son.info?.sea;
+    if (sea && Number.isFinite(sea.temp)) $("readout").textContent = `${Math.round(sea.temp)} °C · note ${noteName(son.mapping.melodyMidi(sea.temp))} · ${son.mapping.chordFor(son.track, sea.temp, sea.share).levels.filter((l) => l > 0.02).length} chord voices · ${latWords(sea.lat)}`;
+    const d = son.info?.decade;
+    if (d && son.isDecade() && $("view-map-note")) $("view-map-note").textContent = decadeText(d);
     requestAnimationFrame(tick);
   };
 
@@ -247,6 +255,7 @@
   const onStep = (i, info) => { son.info = info; };
   const onNote = (note) => {
     lastNote = note;
+    if (note.midi) $("readout").textContent = `${noteName(note.midi)} · ${hertz(note.midi)} Hz · ${latWords(note.lat)}`;
     buzz(Math.round(12 + 30 * (note.velocity ?? 0.5)));
     if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
   };
@@ -260,7 +269,8 @@
     moveNeedle();
   };
 
-  const loadTrack = async (t, { announce = true } = {}) => {
+  const loadTrack = async (t, { announce = true, fromShow = false } = {}) => {
+    if (!fromShow) showing = false;       // choosing a track ends the show
     const mine = ++gen;
     if (son) { son.dispose(); son = null; }
     playing = false; setPlayButton();
@@ -285,6 +295,7 @@
     if (mine !== gen) { son.dispose(); son = null; return; }
     window.son = son;
     lastNote = null;
+    $("continuous-row").hidden = $("continuous-hint").hidden = !son.hasNotes;
 
     // The picture: NASA's video for carbon dioxide, the globe for map tracks.
     const video = usesVideo();
@@ -315,6 +326,9 @@
     $("compare-field").hidden = !son.canCompare;
     renderListen();
     renderViews();
+    renderDecadeButton();
+    renderAbout();
+    renderMystery();
     renderStories();
     renderViewMap();
     renderSounds();
@@ -328,7 +342,7 @@
       const choose = L.length
         ? `${listenText(null)} play together. Press ${orList(L.map((x) => x.key.toUpperCase()))} for ${orList(L.map((x) => x.name.toLowerCase()))} alone. `
         : "";
-      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}${viewTip()}${sidewaysTip()}`
+      say(`Track ${pos()} of ${tracks.length}, ${t.title}. ${n()} ${n() === 1 ? "map" : "maps"}, about ${Math.round(son.passSeconds())} seconds. ${choose}${viewTip()}${sidewaysTip()}${decadeIndex() >= 0 ? "The last map is the change over the decade: press End, or the Hear the change over the decade button. " : ""}`
         + (document.activeElement?.closest?.("#player") ? "Press Space to play." : "Press Tab to reach the player, then Space to play."));
     }
   };
@@ -336,6 +350,21 @@
   // A line moving south (sea heat) turns the ears round: say so whenever the track comes up.
   const sideways = () => son?.scan === "south";
   const sidewaysTip = () => (sideways() ? "On this track the scan line moves from north to south, so west is your left ear and east your right ear. " : "");
+  // "2016: 12 percent more light than 2012" (the decade, from the year's light against the first year)
+  const decadeText = (d) => {
+    const pct = Math.round((d.ratio - 1) * 100), first = frames()[0].when;
+    const how = Math.abs(pct) < 3 ? `about the same light as ${first}` : `${Math.abs(pct)} percent ${pct > 0 ? "more" : "less"} light than ${first}`;
+    return `${frames()[d.year].when}: ${how}${d.figure ? `. Then NASA's change map: ${d.figure === "more" ? "more light" : d.figure === "less" ? "less light" : "little change"}` : ""}`;
+  };
+  // Night lights' last map is the change over the decade: a button that goes there and plays it, so nobody has to find it.
+  const decadeIndex = () => frames().findIndex((_, i) => son.isDecade(i));
+  const renderDecadeButton = () => { $("decade-go").hidden = !son || decadeIndex() < 0; };
+  $("decade-go").addEventListener("click", () => run("Change over the decade", () => {
+    const i = decadeIndex();
+    if (i < 0) return;
+    goTo(i, false);
+    if (!playing) play(); else say(`Playing ${whenOf(i)}.`);
+  }));
   const lowerFirst = (s) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 
   // ---------- Region or stories: other ways to hear the track (score.views) ----------
@@ -370,6 +399,8 @@
   const viewText = () => {
     const name = viewName();
     if (unit() === "story") return `${name}: ${n()} stories, one after another. First: ${whenOf(0)}`;
+    // Night lights: the years, then the decade (its last map), said as such.
+    if (n() > 1 && son.isDecade(n() - 1)) return `${name}: ${n() - 1} years, ${whenOf(0)} to ${whenOf(n() - 2)}, then the decade`;
     return n() > 1 ? `${name}: ${n()} maps, ${whenOf(0)} to ${whenOf(n() - 1)}` : `${name}, ${lowerFirst(whenOf(0))}`;
   };
   const setView = (id, { quiet = false } = {}) => {
@@ -383,6 +414,7 @@
     $("prev").disabled = $("next").disabled = n() < 2;
     son.started = false;
     lastNote = null;
+    renderDecadeButton();
     showFrame(0);
     idle();
     if (!quiet) say(`${viewText()}. About ${Math.round(son.passSeconds())} seconds. Press Space to play.`);
@@ -428,10 +460,10 @@
   };
   const pct = (box) => ({ left: ((box[0] + 180) / 360) * 100, top: ((90 - box[3]) / 180) * 100, width: ((box[2] - box[0]) / 360) * 100, height: ((box[3] - box[1]) / 180) * 100 });
   const renderViewMap = () => {
-    const has = views().length > 0 && !usesVideo();
-    $("view-map").hidden = !has;
+    // Every track drawn on a flat world map gets it beside the globe (not NASA's videos: no flat map).
+    $("view-map").hidden = usesVideo();
     $("view-map-boxes").innerHTML = "";
-    if (!has) return;
+    if (usesVideo() || !views().length) return;
     for (const v of viewBoxes()) {
       const p = pct(v.box), el = document.createElement("span");
       el.className = "view-box";
@@ -442,7 +474,11 @@
     }
   };
   const showViewMap = (i) => {
+    // Night lights' change map is NASA's own flat EIC picture, heard as the decade: the flat map alone.
+    const decade = !$("view-map").hidden && !!son?.isDecade(i);
+    $("stage").hidden = decade;
     if ($("view-map").hidden) return;
+    $("view-map-boxes").hidden = decade;
     const f = frames()[i], box = son?.boxOf(i);
     const src = imageOf(i);
     if (!$("view-map-img").src.endsWith(src)) $("view-map-img").src = src;
@@ -450,9 +486,12 @@
     const L = unit() === "story" ? layerOf(f.focus) : null;
     $("view-map-caption").innerHTML = "";
     if (L?.colour) { const s = document.createElement("span"); s.className = "swatch"; s.style.setProperty("--c", L.colour); $("view-map-caption").append(s); }
-    $("view-map-caption").append(son?.view ? (unit() === "story" ? f.when : son.view.name) : "Whole map");
+    $("view-map-caption").append(son?.view ? (unit() === "story" ? f.when : son.view.name) : views().length ? "Whole map" : f.when);
     const small = document.createElement("small");
-    small.textContent = son?.view ? (L ? `${L.name.toLowerCase()}, ${unit()} ${i + 1} of ${n()}` : f.when) : `${viewBoxes().length} ${unit() === "story" || storyOption() ? "stories" : "regions"}: press ${viewKey()?.toUpperCase() ?? "a button"} to choose`;
+    small.id = "view-map-note";
+    small.textContent = decade ? "The decade: one note per year, then the change"
+      : son?.view ? (L ? `${L.name.toLowerCase()}, ${unit()} ${i + 1} of ${n()}` : f.when)
+        : views().length ? `${viewBoxes().length} ${storyOption() ? "stories" : "regions"}: press ${viewKey()?.toUpperCase() ?? "a button"} to choose` : "Flat map";
     $("view-map-caption").append(small);
     for (const b of $("story-buttons").children) b.setAttribute("aria-pressed", String(unit() === "story" && Number(b.dataset.story) === i));
     moveNeedle();
@@ -460,11 +499,16 @@
   // The scan line on the flat map: inside the window heard, or from top to bottom on the whole map.
   const moveNeedle = () => {
     const needle = $("view-map-needle");
-    const lon = son?.headLon?.(true);
-    if ($("view-map").hidden || lon === null || lon === undefined || son?.scan === "south" || (!playing && !son.started && son.progress() === 0)) { needle.hidden = true; return; }
-    const box = son.boxOf(son.index) ?? [-180, -90, 180, 90];
-    const p = pct(box);
-    Object.assign(needle.style, { left: `${((lon + 180) / 360) * 100}%`, top: `${p.top}%`, height: `${p.height}%` });
+    if (!son || $("view-map").hidden || son.isDecade() || (!playing && !son.started && son.progress() === 0)) { needle.hidden = true; return; }
+    const d = son.info?.decade;
+    if (playing && d && son.isDecade()) return;
+    if (son.scan === "south") {
+      const lat = son.headLat(true);
+      Object.assign(needle.style, { left: "0%", width: "100%", height: "2px", top: `${((90 - lat) / 180) * 100}%`, marginLeft: "0" });
+    } else {
+      const lon = son.headLon(true), p = pct(son.boxOf(son.index) ?? [-180, -90, 180, 90]);
+      Object.assign(needle.style, { left: `${((lon + 180) / 360) * 100}%`, top: `${p.top}%`, height: `${p.height}%`, width: "", marginLeft: "" });
+    }
     needle.hidden = false;
   };
   $("view-options").addEventListener("change", (e) => { if (e.target.name === "view") setView(e.target.value); });
@@ -618,13 +662,15 @@
           const p = lastNote.pos;
           s += ` The last harp note came from the ${p < -0.33 ? "top" : p > 0.33 ? "bottom" : "middle"} of the picture, ${earOf(p)}.`;
         }
+      } else if (son.isDecade() && son.info?.decade) {
+        s += `Playing the decade, one note per year. ${decadeText(son.info.decade)}.`;
       } else {
         s += `Playing. The scan line is at ${lonWords(son.headLon())}, ${Math.round(son.progress() * 100)} percent of the way across${across}.`;
         if (son.info?.change !== undefined) {
           const c = son.info.change;
           s += c > 0.05 ? " Under it: more lightning than in the previous part." : c < -0.05 ? " Under it: less lightning than in the previous part." : " Under it: about the same as the previous part.";
         } else if (son.info) s += son.info.light > 0.05 ? ` Under it: ${Math.round(son.info.light * 100)} percent of the loudest ${son.bedWord}.` : " It is crossing a quiet stretch.";
-        if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
+        if (lastNote && performance.now() - lastNote.at < 4000) s += ` The last note was ${noteName(lastNote.midi)}, ${hertz(lastNote.midi)} hertz, at ${latWords(lastNote.lat)}, ${earOf(lastNote.pos)}.`;
       }
     } else {
       s += "Paused. Press Space to play.";
@@ -647,6 +693,7 @@
   };
 
   const stopAll = () => {
+    showing = false;
     if (son) { if (playing) { son.pause(); playing = false; setPlayButton(); idle(); } son.hush(); }
     clearTimeout(demoTimer);
     if ("speechSynthesis" in window) speechSynthesis.cancel();
@@ -720,7 +767,7 @@
     }
   });
   // Escape stops sound and speech anywhere (it is not a character key, so it cannot clash).
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopAll(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { showing = false; closeGuide(false); stopAll(); } });
   $("keys").addEventListener("click", () => $("keys").focus());
 
   // ---------- What the sounds mean, and examples ----------
@@ -753,6 +800,166 @@
       $("demos").append(b);
     }
   };
+
+  // ---------- About this track ----------
+  const renderAbout = () => {
+    const a = score.about;
+    $("about-sound").hidden = !a;
+    $("about-sound").open = false;
+    $("about-list").innerHTML = "";
+    $("about-chain").innerHTML = "";
+    if (!a) return;
+    for (const [k, label] of [["what", "What"], ["who", "Who"], ["when", "When"], ["where", "Where"], ["why", "Why"], ["how", "How"]]) {
+      const dt = document.createElement("dt"), dd = document.createElement("dd");
+      dt.textContent = label; dd.textContent = a[k];
+      $("about-list").append(dt, dd);
+    }
+    for (const j of a.journey) {
+      const li = document.createElement("li"), b = document.createElement("b");
+      b.textContent = j.title;
+      li.append(b, ` ${j.detail}`);
+      $("about-chain").append(li);
+    }
+  };
+
+  // ---------- The numbers, as a CSV file ----------
+  $("csv").addEventListener("click", () => {
+    if (!score) return;
+    const q = (x) => `"${String(x).replace(/"/g, '""')}"`;
+    const L = layers(), rows = [
+      `# ${track.title}: ${track.source.title} (${track.source.url})`,
+      `# Units: ${score.units}. Range: ${score.range[0]} to ${score.range[1]}. Credit: ${track.source.credit}.`,
+      "# Each row is one 10 degree square (its centre) of one map, the same numbers Describe and Explore one place use; the sound plays a finer 3 degree grid. Empty = no reading.",
+      ["map", "latitude", "longitude", "value", ...L.map((x) => x.id)].join(","),
+    ];
+    score.frames.forEach((f) => f.grid.forEach((row, r) => row.forEach((v, c) => {
+      if (v === null && !L.some((x) => f.layers?.[x.id]?.[r]?.[c] != null)) return;
+      rows.push([q(f.when), 90 - (r + 0.5) * 10, score.leftLon + (c + 0.5) * 10, v ?? "", ...L.map((x) => f.layers?.[x.id]?.[r]?.[c] ?? "")].join(","));
+    })));
+    run("Save the numbers", () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+      a.download = `earth-jukebox-${track.id}.csv`;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      say(`Saved ${a.download} to your downloads: ${rows.length - 4} rows.`);
+    });
+  });
+
+  // ---------- Mystery place ----------
+  // The decade of one region, played with no name; then the listener guesses. Only where the track has
+  // regions whose last map is the decade (Earth at night).
+  let mystery = null;
+  const mysteryRegions = () => (son && son.whole.chapters.some((c) => c.frames.some((f) => f.decade)) ? views() : []);
+  const renderMystery = () => {
+    const opts = mysteryRegions();
+    $("mystery").hidden = !opts.length;
+    $("mystery-guess").hidden = true;
+    $("mystery-result").textContent = "";
+    mystery = null;
+    $("mystery-options").innerHTML = "";
+    for (const o of opts) {
+      const label = document.createElement("label"), input = document.createElement("input");
+      input.type = "radio"; input.name = "mystery"; input.value = o.id; input.id = `mystery-${o.id}`;
+      label.append(input, o.name);
+      $("mystery-options").append(label);
+    }
+  };
+  const playMystery = async (again = false) => {
+    const opts = mysteryRegions();
+    if (!opts.length || !son) return;
+    pauseForSpeech();
+    if (!again) {
+      const rest = opts.filter((o) => o.id !== mystery);
+      mystery = rest[Math.floor(Math.random() * rest.length)].id;
+      for (const r of $("mystery-options").querySelectorAll("input")) r.checked = false;
+      $("mystery-result").textContent = "";
+    }
+    $("mystery-guess").hidden = false;
+    // Said first, in the same breath as the key's name; the sound follows.
+    say(again ? "Playing it again. Which place was it?" : `A mystery place: twelve notes, one for each year from 2012 to 2023, then what NASA's change map shows. Which place was it? Choose one of ${opts.length}.`);
+    return son.mysteryDecade(mystery);
+  };
+  $("mystery-play").addEventListener("click", () => run("Play a mystery place", () => playMystery(false)));
+  $("mystery-again").addEventListener("click", () => run("Hear it again", () => playMystery(true)));
+  $("mystery-options").addEventListener("change", (e) => {
+    if (e.target.name !== "mystery" || !mystery) return;
+    const o = views().find((x) => x.id === mystery), last = o.frames[o.frames.length - 1];
+    const right = e.target.value === mystery;
+    $("mystery-result").textContent = `${right ? "Yes!" : `Not quite: you chose ${views().find((x) => x.id === e.target.value).name}.`} It was ${o.name}. ${last.text.replace(`${last.when}. ${o.name}. `, "")}`;
+    say($("mystery-result").textContent);
+  });
+
+  // ---------- Guide me: the page, one part at a time ----------
+  // A ring on the real part and its explanation in the guide panel and the live region. It never plays
+  // sound and never moves focus on its own: focus goes into the panel when the listener opens it.
+  const GUIDE = [
+    ["#tracks", "Choose a track here with the arrow keys. Inside the player, the number keys 1 to 7 choose a track too."],
+    ["#keys", "This is the keyboard area. Press Tab to reach it. Inside it single keys work: Space plays or pauses, W says where you are, D describes the map, H lists every key."],
+    ["#play", "Play or pause. No sound starts until you press this, or Space."],
+    ["#view-field", "This track has more than one way to listen: its regions, or NASA's stories. R moves to the next one."],
+    ["#listen-field", "Hear each part of the picture alone, or all together. Each has its own letter."],
+    ["#where", "Where am I, Describe this map and Keys answer out loud. Each also has a key: W, D and H."],
+    ["#sounds", "What the sounds mean. Each sound has an example button that plays it, then explains it."],
+    ["#about-sound", "About this track: what it is, who made it and where it comes from."],
+    ["#explore", "Explore one place: choose a city, or move the two sliders, to hear one square of the map."],
+    ["#settings", "Settings: volume, speed, mono, and what is said or clicked when you press keys."],
+  ];
+  let guideSteps = [], guideAt = 0;
+  const guideShow = (i) => {
+    document.querySelector(".guide-ring")?.classList.remove("guide-ring");
+    guideAt = clamp(i, 0, guideSteps.length - 1);
+    const [sel, text] = guideSteps[guideAt], el = document.querySelector(sel);
+    el.classList.add("guide-ring");
+    el.scrollIntoView({ block: "center", behavior: reduced.matches ? "instant" : "smooth" });
+    $("guide-count").textContent = `Step ${guideAt + 1} of ${guideSteps.length}`;
+    $("guide-text").textContent = text;
+    $("guide-back").disabled = guideAt === 0;
+    $("guide-next").textContent = guideAt === guideSteps.length - 1 ? "Finish" : "Next";
+    say(`Step ${guideAt + 1} of ${guideSteps.length}. ${text}`);
+  };
+  const closeGuide = (say_ = true) => {
+    if ($("guide").hidden) return;
+    document.querySelector(".guide-ring")?.classList.remove("guide-ring");
+    $("guide").hidden = true;
+    $("guide-start").focus();
+    if (say_) say("Guide closed.");
+  };
+  $("guide-start").addEventListener("click", () => {
+    guideSteps = GUIDE.filter(([sel]) => { const el = document.querySelector(sel); return el && el.getClientRects().length; });
+    $("guide").hidden = false;
+    guideShow(0);
+    $("guide-next").focus();
+  });
+  $("guide-next").addEventListener("click", () => (guideAt === guideSteps.length - 1 ? closeGuide() : guideShow(guideAt + 1)));
+  $("guide-back").addEventListener("click", () => guideShow(guideAt - 1));
+  $("guide-close").addEventListener("click", () => closeGuide());
+
+  // ---------- Play the whole jukebox ----------
+  // About 30 seconds of every track in turn, each named first. Choosing a track, or Escape, ends it.
+  const SHOW_SECONDS = 30;
+  let showing = false;
+  const wait = async (ms) => { const end = performance.now() + ms; while (showing && performance.now() < end) await new Promise((r) => setTimeout(r, 200)); };
+  $("show").addEventListener("click", () => run("Play the whole jukebox", async () => {
+    if (son && playing) { son.pause(); playing = false; setPlayButton(); }
+    showing = true;
+    say(`The whole jukebox: about ${SHOW_SECONDS} seconds of every track, ${tracks.length} in all. Escape stops it.`);   // with the key's name, before the async work
+    await wait(3500);
+    for (let k = 0; k < tracks.length && showing; k++) {
+      const t = tracks[k];
+      $(`track-${t.id}`).checked = true;
+      await loadTrack(t, { announce: false, fromShow: true });
+      if (!showing) return;
+      say(`Track ${k + 1} of ${tracks.length}, ${t.title}. ${t.subtitle}. NASA's source: ${t.source.title}.`);
+      await wait(6000);
+      if (!showing) return;
+      await play();
+      await wait(SHOW_SECONDS * 1000);
+      if (!showing) return;
+      if (playing) { son.pause(); playing = false; setPlayButton(); idle(); }
+    }
+    if (showing) { showing = false; say(`That was all ${tracks.length} tracks. Choose any track to hear it in full.`); }
+  }));
 
   // ---------- Explore one place ----------
   const PLACES = [
@@ -807,6 +1014,7 @@
     son?.setTempo(settings.bpm);
   }));
   $("mono").addEventListener("change", (e) => { settings.mono = e.target.checked; store.set("mono", settings.mono); son?.setMono(settings.mono); });
+  $("continuous").addEventListener("change", (e) => { settings.continuous = e.target.checked; store.set("continuous", settings.continuous); son?.setContinuous(settings.continuous); });
   $("announce").addEventListener("change", (e) => store.set("announce", e.target.checked));
   $("speak").addEventListener("change", (e) => {
     store.set("speak", e.target.checked);

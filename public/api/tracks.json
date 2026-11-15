@@ -7,33 +7,14 @@
       "id": "night-lights",
       "code": "1",
       "title": "Earth at night",
-      "subtitle": "City lights, 2012 to 2023",
-      "description": "One slow scan across the Earth at night for each year from 2012 to 2023. Bright cities ring notes; a deep hum follows all the light.",
+      "subtitle": "City lights 2012 to 2023, then what changed",
+      "description": "One slow scan across the Earth at night for each year from 2012 to 2023: bright cities ring notes, a deep hum follows all the light. Then NASA's map of what changed, heard as the decade: one note per year, higher as the light grows.",
       "score": "api/scores/night-lights.json",
-      "frames": 12,
+      "frames": 13,
       "firstDate": "2012-07-01",
       "lastDate": "2023-07-01",
-      "when": "2012 to 2023",
-      "units": "share of the brightest light",
-      "engine": "sweep",
-      "source": {
-        "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
-        "url": "https://svs.gsfc.nasa.gov/5313/",
-        "credit": "NASA's Scientific Visualization Studio, visualizer Kel Elkins (USRA). Data: Black Marble: Next Generation (Suomi NPP VIIRS, NASA/NOAA)"
-      }
-    },
-    {
-      "id": "night-change",
-      "code": "2",
-      "title": "Night lights: what changed",
-      "subtitle": "2012 compared with 2023",
-      "description": "NASA's map of how night lights changed from 2012 to 2023, scanned once, slowly. A rising pair of notes is new light; a low falling cello is light that dimmed.",
-      "score": "api/scores/night-change.json",
-      "frames": 1,
-      "firstDate": "2023-07-01",
-      "lastDate": "2023-07-01",
-      "when": "Change from 2012 to 2023",
-      "units": "change in light",
+      "when": "2012 to Change from 2012 to 2023",
+      "units": "share of the brightest light (years); change in light (the change map)",
       "engine": "sweep",
       "source": {
         "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
@@ -43,7 +24,7 @@
     },
     {
       "id": "air-quality",
-      "code": "3",
+      "code": "2",
       "title": "Air quality",
       "subtitle": "Four pollutants, summer 2024",
       "description": "NASA's model of the air we breathe in July and August 2024, a summer of huge wildfires. One scan for each pollutant: fine particles, carbon monoxide, nitrogen oxides and ozone. Clean air is a calm drone; dirty air rings notes and turns the drone sour.",
@@ -62,7 +43,7 @@
     },
     {
       "id": "ocean-currents",
-      "code": "4",
+      "code": "3",
       "title": "Ocean currents",
       "subtitle": "Perpetual Ocean, 2021 to 2023",
       "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
@@ -81,7 +62,7 @@
     },
     {
       "id": "carbon-dioxide",
-      "code": "5",
+      "code": "4",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
       "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
@@ -100,7 +81,7 @@
     },
     {
       "id": "lightning",
-      "code": "6",
+      "code": "5",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
       "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
@@ -119,7 +100,7 @@
     },
     {
       "id": "aerosols",
-      "code": "7",
+      "code": "6",
       "title": "Aerosols",
       "subtitle": "Four winds, 19 August 2025",
       "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
@@ -138,7 +119,7 @@
     },
     {
       "id": "sea-heat",
-      "code": "8",
+      "code": "7",
       "title": "Warm and cold seas",
       "subtitle": "Sea surface temperature, March 2007 to March 2008",
       "description": "NASA's model of the ocean's surface currents, coloured by temperature, over one year. A level scan line moves down the map from the Arctic to Antarctica, once each season, with west in your left ear and east in your right. Cold sea is a deep base note; the warmer the water, the more and higher chord voices join it.",

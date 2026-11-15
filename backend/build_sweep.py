@@ -233,6 +233,18 @@ def build_years(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+def decade_words(decade: list | None, figure: str | None) -> str:
+    """How the change map sounds for a place: its light year by year (one note each), then NASA's figure."""
+    if not decade or not decade[0]:
+        return ""
+    pct = round((decade[-1] / decade[0] - 1) * 100)
+    trend = "about the same light" if abs(pct) < 3 else f"{abs(pct)} percent {'more' if pct > 0 else 'less'} light"
+    fig = {"more": "a rising pair, as NASA's change map shows more light",
+           "less": "a falling pair, as NASA's change map shows less light"}.get(figure, "a single note, as NASA's change map shows little change")
+    return (f" Heard as the decade, one note per year from the same starting note, an octave higher for twice the light: "
+            f"2023 has {trend} than 2012 above the dark land. Then {fig}.")
+
+
 def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
     g = data["grid"]
     frames = []
@@ -253,7 +265,8 @@ def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
         text = (f"{when}. Light grew in {round(more * 100, 1)} percent of the map read "
                 f"and dimmed in {round(less * 100, 1)} percent. "
                 + (f"Most new light: {listing(gains)}. " if gains else "")
-                + (f"Most dimming: {listing(losses)}." if losses else "No square dimmed overall."))
+                + (f"Most dimming: {listing(losses)}." if losses else "No square dimmed overall.")
+                + decade_words(f.get("decade"), f.get("figure")))
         frames.append({
             "date": f"{int(end):04d}-07-01",
             "when": when,
@@ -522,7 +535,8 @@ def region_frames(item: dict, chapter: str, frames: list[dict]) -> list[dict]:
             text = (f"{when}. {name}. Light grew in {round(more * 100, 1)} percent of the region and dimmed in "
                     f"{round(less * 100, 1)} percent. "
                     + (f"Most new light: {gains}. " if gains else "No place grew brighter overall. ")
-                    + (f"Most dimming: {losses}." if losses else "No place dimmed overall."))
+                    + (f"Most dimming: {losses}." if losses else "No place dimmed overall.")
+                    + decade_words(f.get("decade"), f.get("figure")))
         out.append({"when": when, "text": text.strip(), "box": item["box"], "base": i, "view": item["id"], "frame": i})
     return out
 
@@ -548,10 +562,17 @@ def build_views(data: dict, t: dict, frames: list[dict]) -> dict | None:
         options = [{"id": v.get("id") or "stories", "name": v.get("name") or v["legend"], "unit": "story",
                     "frames": [story_frame(it, data.get("layers") or []) for it in v["items"]]}]
     else:
-        if any(t["chapter"] not in it["chapters"] for it in v["items"]):
+        chapters = t.get("chapters") or [t["chapter"]]
+        if any(c not in it["chapters"] for it in v["items"] for c in chapters):
             return None
-        options = [{"id": it["id"], "name": it["name"], "unit": "map", "frames": region_frames(it, t["chapter"], frames)}
-                   for it in v["items"]]
+        options = []
+        for it in v["items"]:
+            out, offset = [], 0
+            for c in chapters:
+                n = len(it["chapters"][c])
+                out += [{**f, "base": offset + f["base"], "chapter": c} for f in region_frames(it, c, frames[offset:offset + n])]
+                offset += n
+            options.append({"id": it["id"], "name": it["name"], "unit": "map", "frames": out})
     return {"legend": v["legend"], **({"key": v["key"]} if v.get("key") else {}), "options": options}
 
 
@@ -656,15 +677,17 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
     if not src.is_file():
         raise ConfigError(f"Track {t['id']}: {src} not found. Run the EIC pipeline first (backend/eic).")
     data = json.loads(src.read_text(encoding="utf-8"))
-    chapter = next((c for c in data["chapters"] if c["id"] == t["chapter"]), None)
-    if chapter is None:
-        raise ConfigError(f"Track {t['id']}: no chapter '{t['chapter']}' in {src}")
-    frames = BUILDERS[t["chapter"]](data, chapter, {**t, "_public": public})
+    frames = []
+    for cid in t.get("chapters") or [t["chapter"]]:
+        chapter = next((c for c in data["chapters"] if c["id"] == cid), None)
+        if chapter is None:
+            raise ConfigError(f"Track {t['id']}: no chapter '{cid}' in {src}")
+        frames += BUILDERS[cid](data, chapter, {**t, "_public": public})
     s = data["source"]
     legend = dict(data["legend"])
     if t.get("summary"):
         legend["summary"] = t["summary"]
-    if t["chapter"] in LEGEND_KEEP:
+    if t["chapter"] in LEGEND_KEEP and not t.get("chapters"):
         legend["items"] = [i for i in legend["items"] if i["sound"].startswith(LEGEND_KEEP[t["chapter"]])]
     views = build_views(data, t, frames)
     if views and t.get("viewsMethod"):
@@ -680,6 +703,7 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "words": t["words"],
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
                   "instrument": t.get("instrument", "vibraphone"),
+                  **({"chapters": t["chapters"]} if t.get("chapters") else {}),
                   # Which way the scan line moves: only said when it is not the usual west to east.
                   **({"scan": t["scan"]} if t.get("scan") else {})},
         "legend": legend,
@@ -689,6 +713,8 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
                         **({"colour": "#{:02x}{:02x}{:02x}".format(*L["rgb"])} if L.get("rgb") else {})}
                        for L in data["layers"]]}
            if data.get("layers") else {}),
+        # "About this track": what, who, when, where, why, how, and where it comes from (config).
+        **({"about": t["about"]} if t.get("about") else {}),
         # Other ways to hear this track (NASA's zoom regions, NASA's stories): see build_views.
         **({"views": views} if views else {}),
         # Names for 10-degree cells that hold a listed city, "row,col": name. Only for speech.
@@ -724,7 +750,7 @@ def main(config_path: Path) -> None:
     index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {
         "api": API_VERSION, "generated": date.today().isoformat(), "sample": False, "tracks": []}
     ours = {t["id"] for t in cfg["tracks"]}
-    index["tracks"] = [t for t in index["tracks"] if t["id"] not in ours]
+    index["tracks"] = [t for t in index["tracks"] if t["id"] not in ours and t.get("engine") != "sweep"]
     (public / "api" / "scores").mkdir(parents=True, exist_ok=True)
     for t in cfg["tracks"]:
         entry, score = build_track(t, public)

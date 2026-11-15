@@ -4,6 +4,8 @@
 // and one panner that travels with the scan line: west = left ear, east = right ear.
 // Aerosols (settings.bed 'winds') is only winds, one per layer (winds.js): no notes, no hum.
 // Sea heat (settings.bed 'chords') is only a warm chord pad (chords.js): no notes, no hum.
+// Continuous (settings.continuous, note tracks only): the notes layer becomes one held voice that
+// glides to the loudest note of each moment, at its loudness and in its ear, and fades where nothing plays.
 // Tone.js comes from the page's own bundle (global EJ), so both engines share one audio context.
 
 import { midiToNote, clamp } from './music.js';
@@ -47,6 +49,9 @@ const WIND = { trim: -4, gain: 0.5, rise: 0.5, fall: 1.0, low: 260, high: 620 };
 // little, so its rising and falling figures are clear.
 const NOTE_TONE = { marks: 1700, compare: 3200 };
 
+// The continuous voice: a soft, nearly pure tone. glide, rise and fall are time constants (s); hold is
+// how long it sounds after a note with no new one; trim (dB) matches the sampled notes (offline render).
+const GLIDE = { partials: [1, 0.3, 0.12, 0.05, 0.02], top: 1800, glide: 0.06, rise: 0.08, fall: 0.35, hold: 0.6, trim: -15 };
 const BASE_MASTER_DB = 5;
 const PAN_SLOTS = 9;          // notes are placed in the nearest of 9 positions along the line
 const HUM_GAIN = 0.25;        // hum at full light, before its level trim (set by offline render)
@@ -135,6 +140,14 @@ export class AudioEngine {
     // level -> tone -> pan, and the send leaves after the tone, so the hall hears the muted note too
     this.notes = { ...(this.sweepPan ? bus(this.noteTone, this.noteTone) : bus()), samplers: [], trim: 0 };
     this.notes.panners = slots(this.notes.level);
+    if (!this.settings.bed) {
+      this.glide = { ...bus(), at: -Infinity, vel: 0 };
+      this.glide.pan = k(new T.Panner(0)).connect(this.glide.level);
+      this.glide.amp = k(new T.Gain(0)).connect(this.glide.pan);
+      const tone = k(new T.Filter({ type: 'lowpass', frequency: GLIDE.top, rolloff: -12, Q: 0.4 })).connect(this.glide.amp);
+      this.glide.osc = k(new T.Oscillator({ type: 'custom', partials: GLIDE.partials, frequency: 220 })).connect(tone);
+      this.glide.osc.start();
+    }
     this.cello = { ...bus(), samplers: [], trim: CELLO.trim };
     this.cello.panners = slots(this.cello.level);
 
@@ -300,6 +313,10 @@ export class AudioEngine {
     this.humBus.level.gain.value = on('hum') * dbToGain(s.hum);
     this.notes.send.gain.value = s.notesReverb;
     this.cello.send.gain.value = s.notesReverb;
+    if (this.glide) {
+      this.glide.level.gain.value = on('notes') * dbToGain(GLIDE.trim + s.notes);
+      this.glide.send.gain.value = s.notesReverb;
+    }
     this.humBus.send.gain.value = s.humReverb;
     this.beatGain.gain.value = on('beat') * dbToGain(BEAT_TRIM_DB + (s.beat ?? 0));
     if (this.orch) {   // the bed takes the hum's place in the mix: same level setting, same mute
@@ -338,10 +355,24 @@ export class AudioEngine {
   play(ev, time, pos) {
     if (ev.bed) { this._bow(ev, time); return; }
     if (ev.voice === 'crackle') { this.winds?.crackle(ev, time); return; }
+    if (ev.voice === 'sea') { this.chords?.note(ev, time); return; }
     const voice = ev.voice === 'cello' ? this.cello : ev.voice === 'story' ? (this.story?.[ev.instrument] ?? this.notes) : this.notes;
+    if (voice === this.notes && this.glide && this.settings.continuous) { this._glideTo(ev, time, pos); return; }
     const slot = this.sweepPan ? (PAN_SLOTS - 1) / 2 : Math.round(((clamp(pos, -1, 1) + 1) / 2) * (PAN_SLOTS - 1));
     const smp = voice.samplers[slot] ?? voice.samplers[(PAN_SLOTS - 1) / 2];
     smp?.triggerAttackRelease(midiToNote(ev.midi), ev.duration, time, ev.velocity);
+  }
+
+  /** Continuous: the held voice moves to this note, unless a louder one already leads this moment. */
+  _glideTo(ev, time, pos) {
+    const g = this.glide, vel = clamp(ev.velocity ?? 0.6, 0, 1);
+    if (Math.abs(time - g.at) < 0.06 && vel <= g.vel) return;
+    g.at = time; g.vel = vel;
+    const f = g.osc.frequency, a = g.amp.gain;
+    f.cancelScheduledValues(time); f.setTargetAtTime(midiHz(ev.midi), time, GLIDE.glide);
+    a.cancelScheduledValues(time); a.setTargetAtTime(vel, time, GLIDE.rise);
+    a.setTargetAtTime(0, time + Math.max(ev.duration ?? 0, GLIDE.hold), GLIDE.fall);
+    g.pan.pan.setTargetAtTime(clamp(pos ?? 0, -1, 1) * (this.settings.width ?? 1), time, 0.15);
   }
 
   /**
@@ -496,6 +527,11 @@ export class AudioEngine {
     }
     this.winds?.silence(t);
     this.chords?.silence(t);
+    if (this.glide) {
+      const a = this.glide.amp.gain;
+      a.cancelScheduledValues(t); a.setValueAtTime(a.value, t); a.linearRampToValueAtTime(0, t + 0.25);
+      this.glide.at = -Infinity;
+    }
     if (this.sweepPan) {             // the next sound starts wherever its scan line is
       const p = this.sweepPan.pan;
       p.cancelScheduledValues(t);

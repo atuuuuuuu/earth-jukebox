@@ -44,8 +44,28 @@ def _regions(cfg: dict) -> tuple[list[dict], float]:
     return v.get("items", []), v.get("cell_deg", 0.5)
 
 
-def _build_years(cfg: dict, path, regions: dict) -> list[dict]:
-    """The yearly maps. Fills `regions` ({id: [{core, glow} per year]}) on each region's fine grid."""
+def _decade_light(world: np.ndarray, items: list[dict]) -> dict:
+    """A place's light for "the decade": its brightness above the dark base map, with no "lit"
+    threshold (a threshold lets dim lights cross it as they brighten and exaggerates growth).
+    Per pixel: luma above the 7 x 7 median around it, summed over the place, at 512 x 288 per world,
+    the scale of NASA's EIC print (1024 x 288 for its 1.8 worlds). {"whole": sum, region id: sum}."""
+    small = cv2.resize(world, (512, 288), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    y = 0.2126 * small[..., 2] + 0.7152 * small[..., 1] + 0.0722 * small[..., 0]
+    base = cv2.medianBlur(np.rint(y * 255).astype(np.uint8), 7).astype(np.float32) / 255
+    ex = y - base
+    ex[(y < 0.06) | (ex < 0.01)] = 0          # the dark base map, and compression noise
+    out = {"whole": float(ex.sum())}
+    for R in items:
+        w, s_, e, n = R["box"]
+        x0, x1 = round((w + 180) / 360 * 512), round((e + 180) / 360 * 512)
+        y0, y1 = round((90 - n) / 180 * 288), round((90 - s_) / 180 * 288)
+        out[R["id"]] = float(ex[y0:y1, x0:x1].sum())
+    return out
+
+
+def _build_years(cfg: dict, path, regions: dict, decade: dict) -> list[dict]:
+    """The yearly maps. Fills `regions` ({id: [{core, glow} per year]}) on each region's fine grid,
+    and `decade` ({place: [light per year]}, see _decade_light)."""
     geom, ex = cfg["geometry"], cfg["extraction"]
     rows, cols = ex["grid"]["rows"], ex["grid"]["cols"]
     items, deg = _regions(cfg)
@@ -72,6 +92,8 @@ def _build_years(cfg: dict, path, regions: dict) -> list[dict]:
                 "core": grid.pool_box(blur, R["box"], deg, "max") / 255.0,
                 "glow": grid.pool_box(lum, R["box"], deg, "mean"),
             })
+        for place, v in _decade_light(world, items).items():
+            decade.setdefault(place, []).append(round(v, 3))
         image = _save_display(world, cfg, str(year))
         results.append({"label": str(year), "image": image, "core": core,
                         "glow": glow, "total": float(lum.sum())})
@@ -176,10 +198,28 @@ def build(cfg: dict) -> dict:
 
     print("Years chapter:")
     region_years: dict = {}
-    years = _build_years(cfg, path, region_years)
+    decade: dict = {}
+    years = _build_years(cfg, path, region_years, decade)
     print("Change chapter:")
     region_change: dict = {}
     change = _build_change(cfg, path, region_change)
+
+    # The change map is heard as "the decade": each place's light year by year (decade), then
+    # NASA's change map for it (figure: more, less or steady light), shown on NASA's own EIC print.
+    def figure(gain: list, loss: list) -> str:
+        g, l = sum(gain), sum(loss)
+        net = (g - l) / (g + l) if g + l else 0
+        return "more" if net > 0.1 else "less" if net < -0.1 else "steady"
+    change.update(decade=decade["whole"], figure=figure(change["gain"], change["loss"]))
+    for rid, ch in region_change.items():
+        ch.update(decade=decade[rid], figure=figure(ch["gain"], ch["loss"]))
+    print_src = source_path(cfg, "print")
+    change["image"] = f"media/{cfg['id']}/change-eic.webp"
+    cv2.imwrite(str(MEDIA_DIR / cfg["id"] / "change-eic.webp"), cv2.imread(str(print_src)), [cv2.IMWRITE_WEBP_QUALITY, 92])
+    change["alt"] = ("NASA's map of how night lights changed from 2012 to 2023: purple where lights grew, orange where "
+                     "they dimmed, with zoomed views of Western Europe, the Eastern Mediterranean, Ukraine and India.")
+    for place, v in decade.items():
+        print(f"  decade {place:<22} 2023 / 2012 = {v[-1] / v[0]:.2f}" if v[0] else f"  decade {place}: no light in 2012")
 
     # NASA's zoom regions: each on its own fine grid, with both chapters, for the page's Region choice.
     items, deg = _regions(cfg)

@@ -7,7 +7,7 @@
 import { AudioEngine } from './audio.js';
 import { Player } from './player.js';
 import { renderBuffer } from './render.js';
-import { clamp } from './music.js';
+import { clamp, midiToNote } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
 import * as ocean from './tracks/ocean.js';
@@ -109,7 +109,7 @@ const about = (n) => {
 
 class SweepSonifier {
   constructor(score, data, mapping, {
-    bpm = 84, volume = 100, mono = false, startIndex = 0, muted = [],
+    bpm = 84, volume = 100, mono = false, continuous = false, startIndex = 0, muted = [],
     onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {}, onBeat = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
@@ -121,9 +121,11 @@ class SweepSonifier {
     // "south" (a west-east line moving down the map: west is then the left ear).
     this.scan = score.sweep.scan ?? 'east';
     this.data = data;
-    this.whole = { ...data, chapters: [data.chapters.find((c) => c.id === score.sweep.chapter)] };
+    // One chapter of the data, or several played in a row (score.sweep.chapters: night lights' years, then the decade).
+    this.whole = { ...data, chapters: (score.sweep.chapters ?? [score.sweep.chapter]).map((id) => data.chapters.find((c) => c.id === id)) };
     this.view = null;              // the view heard now (score.views option), or null for the whole map
     this.settings = { ...SOUND, ...mapping.defaults(data), instrument: score.sweep.instrument || SOUND.instrument, width: mono ? 0 : SOUND.width };
+    this.settings.continuous = continuous && !this.settings.bed;
     this.useTrack(this.whole, data);
     this.audio = new AudioEngine({ humNotes: mapping.HUM_NOTES, settings: this.settings });
     this.audio.muted = new Set(muted);
@@ -137,7 +139,7 @@ class SweepSonifier {
   /** Play `track` from now on: its chapter, and the sweep speeds it asks for (scaled by the speed setting). */
   useTrack(track, defaultsFrom = track) {
     this.track = track;
-    this.chapter = track.chapters[0];
+    this.chapter = { ...track.chapters[0], frames: track.chapters.flatMap((c) => c.frames) };   // every map, in order
     const d = this.mapping.defaults(defaultsFrom);
     this.base = Object.fromEntries(SPEED_KEYS.filter((k) => k in d).map((k) => [k, d[k]]));
     this.applyTempo();
@@ -189,20 +191,31 @@ class SweepSonifier {
     this._viewTracks ??= new Map();
     if (!this._viewTracks.has(opt.id)) {
       const items = new Map((this.data.views?.items ?? []).map((it) => [it.id, it]));
-      const ch = this.whole.chapters[0];
-      const frames = opt.frames.map((f) => {
+      const flat = this.whole.chapters.flatMap((c) => c.frames), chapters = [];
+      for (const f of opt.frames) {
+        const wc = this.whole.chapters.find((c) => c.id === f.chapter) ?? this.whole.chapters[0];
+        let ch = chapters.find((c) => c.id === wc.id);
+        // The decade keeps its own pace; a region's sweeps and the stories keep theirs.
+        if (!ch) chapters.push(ch = { id: wc.id, title: wc.title, secondsPerSweep: wc.id === 'change' ? wc.secondsPerSweep : null, frames: [] });
         const it = items.get(f.view);
-        const fine = (it.chapters[ch.id] ?? Object.values(it.chapters)[0])[f.frame];
-        const own = ch.frames[f.base] ?? ch.frames[0];
-        return {
+        const fine = (it.chapters[wc.id] ?? Object.values(it.chapters)[0])[f.frame];
+        const own = flat[f.base] ?? flat[0];
+        ch.frames.push({
           label: own.label, image: own.image, ...fine, geo: { ...it.grid, zoom: true }, box: it.box,
           focus: f.focus ?? null, secondsPerSweep: it.secondsPerSweep,
-        };
-      });
-      const chapter = { id: ch.id, title: ch.title, secondsPerSweep: frames[0].secondsPerSweep, frames };
-      this._viewTracks.set(opt.id, this.mapping.prepare({ ...this.data, chapters: [chapter] }));
+        });
+      }
+      for (const ch of chapters) ch.secondsPerSweep ??= ch.frames[0].secondsPerSweep;
+      this._viewTracks.set(opt.id, this.mapping.prepare({ ...this.data, chapters }));
     }
     return this._viewTracks.get(opt.id);
+  }
+
+  /** Whether map i is night lights' change map, heard as the decade (one note per year). */
+  isDecade(i = this.index) {
+    let k = i;
+    for (const c of this.track.chapters) { if (k < c.frames.length) return c.id === 'change' && !!c.frames[k].decade; k -= c.frames.length; }
+    return false;
   }
 
   /** The window of map i ([west, south, east, north]) while a view is heard, else null. */
@@ -225,7 +238,7 @@ class SweepSonifier {
     // `sea`: the line's latitude and the water under it (sea heat), for "Where am I?".
     this.onStep(i, {
       lon: this.lonAt(seg, step), light: plan.hum.under ?? plan.hum.level, change: plan.hum.change,
-      notes: plan.events.filter((e) => !e.bed).length, winds: plan.layers?.winds, sea: plan.sea,
+      notes: plan.events.filter((e) => !e.bed).length, winds: plan.layers?.winds, sea: plan.sea, decade: plan.decade,
     });
   }
 
@@ -321,6 +334,10 @@ class SweepSonifier {
   setTempo(bpm) { this.bpm = bpm; this.applyTempo(); this.player.retime(); }
   setVolume(volume) { this.volume = volume; this.audio.setVolume(dbFor(volume)); }
   setMono(mono) { this.settings.width = mono ? 0 : SOUND.width; if (this.audio.ready) this.audio.apply(); }
+  /** True when the track plays notes, so they can be heard one by one or as one gliding voice. */
+  get hasNotes() { return !this.settings.bed; }
+  /** Continuous: the notes as one held voice that glides from note to note (note tracks only). */
+  setContinuous(on) { this.settings.continuous = !!on && this.hasNotes; this.hush(); }
 
   // ---- layers heard alone (aerosols) ----
 
@@ -458,7 +475,7 @@ class SweepSonifier {
     if (this.kind === 'sea') return this.probeSea(c, v, t);
     const midi = this.noteForLat(lat), pos = this.posForLat(lat);
     const pct = Math.round(Math.abs(v) * 100);
-    if (this.kind === 'change') {
+    if (this.kind === 'change' || this.isDecade(i)) {
       if (v >= 0.05) {
         a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * v, duration: 1.5 }, t, pos);
         a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * v, duration: 1.5 }, t + 0.11, pos);
@@ -559,10 +576,11 @@ class SweepSonifier {
     const x = clamp((-180 + (c + 0.5) * 10) / 180, -1, 1);
     const chord = seaHeat.chordFor(this.track, v, 1, () => x);
     ch?.set(chord, t);
+    ch?.note({ midi: seaHeat.melodyMidi(v), velocity: 0.7, duration: 1.4, pan: x }, t + 0.05);
     ch?.set({ levels: chord.levels.map(() => 0), pans: chord.pans }, t + 2.2);
     const voices = chord.levels.filter((l) => l > 0.05).length;
     const feel = v >= 28 ? 'among the warmest seas on Earth' : v >= 24 ? 'warm' : v >= 18 ? 'mild' : v >= 12 ? 'cool' : v >= 6 ? 'cold' : 'very cold';
-    return `${Math.round(v * 10) / 10} degrees Celsius on NASA's key, ${feel}: ${voices === 1 ? 'the deep base note alone' : `${voices} chord voices`}.`;
+    return `${Math.round(v * 10) / 10} degrees Celsius on NASA's key, ${feel}: note ${midiToNote(seaHeat.melodyMidi(v))}, ${voices === 1 ? 'over the deep base note alone' : `over ${voices} chord voices`}.`;
   }
 
   /** Sea heat's examples: cold sea, warm sea, and west and east. */
@@ -571,7 +589,8 @@ class SweepSonifier {
     const say = (start) => items.find((it) => it.sound.startsWith(start));
     return [
       { id: 'cold', label: 'Cold sea', hint: 'Deep base note only', text: `Cold sea, near the poles: the deep base note alone. ${say('Deep base')?.meaning ?? ''}`.trim() },
-      { id: 'warm', label: 'Warm sea', hint: 'The full chord, voice by voice', text: `From cold to warm sea: the voices join one by one, from 0 to 30 degrees, until the full chord of the tropics. ${say('Chord voices')?.meaning ?? ''}`.trim() },
+      { id: 'warm', label: 'Warm sea', hint: 'Rising notes, voice by voice', text: `From cold to warm sea, 0 to 30 degrees: a soft note climbs one step for every two degrees, and the chord voices join one by one until the full chord of the tropics. ${say('Chord voices')?.meaning ?? ''}`.trim() },
+      { id: 'cooling', label: 'Warm to cold', hint: 'Falling notes, voices leave', text: 'From warm to cold sea, 30 degrees down to 0: the soft notes fall one step for every two degrees, and the chord voices leave, highest first, until only the deep base note is left.' },
       { id: 'sides', label: 'West and east', hint: 'Left ear, then right ear', text: `West and east. On this track the scan line lies on its side, so warm water in the west sounds in your left ear and warm water in the east in your right ear. In this example warm water moves from the far west to the far east.` },
     ];
   }
@@ -584,9 +603,15 @@ class SweepSonifier {
     const off = (time) => ch.set({ levels: this.track._voices.map(() => 0), pans: null }, time);
     switch (id) {
       case 'cold': at(2, t); off(t + 3.2); return 4.5;
-      case 'warm':
-        for (let k = 0; k <= 30; k++) at(k, t + k * 0.25);
-        off(t + 9.5); return 11;
+      case 'warm': case 'cooling': {
+        const up = id === 'warm';
+        for (let k = 0; k <= 30; k++) {
+          const temp = up ? k : 30 - k, time = t + k * 0.3;
+          at(temp, time);
+          if (k % 2 === 0) ch.note({ midi: seaHeat.melodyMidi(temp), velocity: 0.7, duration: 0.9, pan: 0 }, time);
+        }
+        off(t + 11); return 12.5;
+      }
       case 'sides':
         for (let k = 0; k <= 16; k++) at(29, t + k * 0.3, -1 + k / 8);
         off(t + 5.5); return 7;
@@ -594,10 +619,31 @@ class SweepSonifier {
     }
   }
 
+  /** Play a decade (light per year, then NASA's figure) exactly as the last map does. Returns its length in seconds. */
+  playDecade(decade, figure, t) {
+    const frame = { decade, figure };
+    for (let s = 0; s <= decade.length; s++) {
+      for (const ev of nightLights.decadeStep(frame, s).events) this.audio.play(ev, t + s * 0.5 + ev.offset, 0);
+    }
+    return decade.length * 0.5 + 2;
+  }
+
+  /** Mystery place: the decade of one region (an id of score.views), played with no name. Returns seconds. */
+  async mysteryDecade(id) {
+    try { await this.ensureAudio(); } catch { return 0; }
+    const ch = this.data.views?.items.find((x) => x.id === id)?.chapters.change?.[0];
+    return ch ? this.playDecade(ch.decade, ch.figure, T.now() + 0.05) : 0;
+  }
+
   /** The example sounds for this track: [{id, label, hint, text}]. */
   demos() {
     if (this.kind === 'aerosols') return this.layerDemos();
     if (this.kind === 'sea') return this.seaDemos();
+    // Night lights' last map, the decade: its own example after the sweep's.
+    if (this.whole.chapters.some((c) => c.frames.some((f) => f.decade))) {
+      return [...DEMOS.light, ['decade', 'The decade', 'A note per year, then a pair', "The decade, on the last map. One soft note per year from 2012 to 2023: every place starts on the same note, and twice its light is one octave higher. In this example the light grows by half, then the rising pair says NASA's change map shows more light."]]
+        .map(([id, label, hint, text]) => ({ id, label, hint, text }));
+    }
     return (DEMOS[this.kind] ?? []).map(([id, label, hint, text]) => ({ id, label, hint, text }));
   }
 
@@ -703,6 +749,8 @@ class SweepSonifier {
         }
         return 2.2;
       }
+      // A place whose light grows by half over the decade, then NASA's rising pair.
+      case 'decade': return this.playDecade(Array.from({ length: 12 }, (_, y) => 1 + y / 22), 'more', t);
       case 'city': note(mid, 0, 0, 0.7); return 2.2;
       case 'north': note(N[18], 0, -1, 0.6); note(N[2], 1.2, 1, 0.6); return 3.2;
       case 'hum':

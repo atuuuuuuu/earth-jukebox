@@ -20,3 +20,9 @@
 
 # Track 03 Aerosols (current task)
 @CLAUDE-aerosols.md
+
+# NASA stories (aerosols) + night-lights regions (current task)
+@CLAUDE-stories-regions.md
+
+# Sea surface temperature track (current task)
+@CLAUDE-sea-heat.md

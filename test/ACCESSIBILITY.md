@@ -1,4 +1,4 @@
-# Earth Jukebox: 10-minute listener test
+# Hearth: 10-minute listener test
 
 For a blind or low-vision tester. Use NVDA with Chrome (Windows) or VoiceOver with
 Safari (Mac or iPhone). Headphones on, both ears if possible. Open the site link,
@@ -7,7 +7,7 @@ not a file. The tester drives; the observer only writes down what happens.
 ## Setup (1 minute)
 
 - [ ] Volume on the computer at a comfortable level
-- [ ] Screen reader running, browser on the Earth Jukebox page
+- [ ] Screen reader running, browser on the Hearth page
 - [ ] Observer has this sheet and a timer
 
 ## What the page should say (2 minutes)

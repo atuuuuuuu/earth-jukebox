@@ -496,6 +496,19 @@ class NasaRegions(unittest.TestCase):
             self.assertEqual(len(it["chapters"]["years"]), 12)
             self.assertEqual(len(it["chapters"]["change"]), 1)
 
+    def test_the_decade_grows_as_nasas_own_annual_stills(self):
+        """The decade's light, brightness above the dark land with no threshold, against NASA's
+        independent annual stills (SVS 5276): the world grew by about a fifth, India by most."""
+        data = json.loads((PUBLIC / "data/01_night_lights.json").read_text(encoding="utf-8"))
+        change = next(c for c in data["chapters"] if c["id"] == "change")["frames"][0]
+        world = change["decade"][-1] / change["decade"][0]
+        self.assertEqual(len(change["decade"]), 12)
+        self.assertTrue(1.1 < world < 1.35, world)
+        ratio = {rid: it["chapters"]["change"][0]["decade"][-1] / it["chapters"]["change"][0]["decade"][0] for rid, it in self.regions.items()}
+        self.assertEqual(max(ratio, key=ratio.get), "india")
+        self.assertLess(ratio["western-europe"], 1.05)                  # Europe did not brighten
+        self.assertEqual(change["figure"], "more")
+
     def test_kyiv_dims_and_india_brightens(self):
         self.assertGreater(self.around("ukraine", 50.45, 30.52, "loss"), 30)
         self.assertEqual(self.around("ukraine", 50.45, 30.52, "gain"), 0)

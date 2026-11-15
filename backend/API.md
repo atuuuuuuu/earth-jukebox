@@ -1,4 +1,4 @@
-# Earth Jukebox API
+# Hearth API
 
 The backend publishes plain JSON files next to the website, and the page reads them with `fetch()`.
 There is no server and no database, so nothing can go down during the demo, and the site works on
@@ -51,6 +51,7 @@ const son = await (await import("./sweep/sonifier.js")).createSweep(score, { onF
 | `words` | How the page talks about the track: `map`, `what` ("light"), `top` ("brightest"), `missing` (said for a square with no reading), `dates` |
 | `sweep` | `src` (the fine grid in `data/`), `chapter` (`years`, `change`, `pollutants`, `scenes`, `weeks`, `parts`, `still` for one map, or `sweeps` for equal sections of one movie), `mapping` (`night-lights`, `co2`, `ocean`, `lightning`, `aerosols` or `sea-heat`), `instrument` for the ringing notes (`vibraphone`, `harp`, `kalimba`) or the chords (`pad`), `scan` (optional: `"east"`, the default, a north-south line moving west to east; or `"south"`, a west-east line moving north to south, with west in the left ear and east in the right) |
 | `layers` | Optional. Separate things drawn on one map, each heard and chosen on its own (aerosols: black carbon, dust, sea salt, sulfate), in the order the page lists them: `id`, `name` (spoken), `key` (its one-letter shortcut in the player), `image` (the map with only this layer; optional), `colour` (its swatch on NASA's key, `#rrggbb`; optional). Tracks without it are unchanged |
+| `about` | Optional. "About this track": `what`, `who`, `when`, `where`, `why`, `how` (a sentence or two each) and `journey`, the chain from instrument to listener: a list of `title`, `detail` |
 | `views` | Optional. Other ways to hear the same track, chosen with radios beside "Whole map" (see below). Tracks without it are unchanged |
 | `legend` | `summary`, `method`, `items` (`sound`, `meaning`), `caveat`: "What the sounds mean" |
 | `places` | `{"row,col": "Tokyo"}`: a listed city inside that 10 degree square. Only used to name a spot in speech |
@@ -98,6 +99,7 @@ region. NASA's stories on the aerosol map (`legend` "Mode") are one option whose
 - each score stays under 2 MB
 - with `layers`: every map has a grid for every layer; ids and keys are unique; keys are single letters the
   player doesn't already use; every layer image exists; the sweep data has a full-size array per layer
+- `about`, when given, has all six sentences and a journey of title and detail
 - `sweep.scan`, when given, is `"east"` or `"south"`
 - with `views`: option ids are unique; the key is a letter neither the player nor a layer uses; every
   map's text starts with its `when`, its box is a real window, its `base` is one of the track's maps, its

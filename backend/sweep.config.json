@@ -5,13 +5,13 @@
       "id": "night-lights",
       "code": "1",
       "title": "Earth at night",
-      "subtitle": "City lights, 2012 to 2023",
-      "description": "One slow scan across the Earth at night for each year from 2012 to 2023. Bright cities ring notes; a deep hum follows all the light.",
+      "subtitle": "City lights 2012 to 2023, then what changed",
+      "description": "One slow scan across the Earth at night for each year from 2012 to 2023: bright cities ring notes, a deep hum follows all the light. Then NASA's map of what changed, heard as the decade: one note per year, higher as the light grows.",
       "data": "data/01_night_lights.json",
       "chapter": "years",
-      "units": "share of the brightest light",
+      "units": "share of the brightest light (years); change in light (the change map)",
       "range": [
-        0,
+        -1,
         1
       ],
       "hotLine": 0.5,
@@ -23,37 +23,46 @@
         "top": "brightest",
         "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
       },
-      "summary": "A slow scan line moves west to east across the Earth at night, once for each year from 2012 to 2023.",
-      "viewsMethod": "Region: instead of the whole map, hear one of the four places NASA zooms in on in this video, year by year. The scan line then crosses only that region, more slowly, and the notes and the ears stretch to fit it: its north edge plays the highest notes, in your left ear. Zoomed in, dimmer towns ring notes too."
-    },
-    {
-      "id": "night-change",
-      "code": "2",
-      "title": "Night lights: what changed",
-      "subtitle": "2012 compared with 2023",
-      "description": "NASA's map of how night lights changed from 2012 to 2023, scanned once, slowly. A rising pair of notes is new light; a low falling cello is light that dimmed.",
-      "data": "data/01_night_lights.json",
-      "chapter": "change",
-      "units": "change in light",
-      "range": [
-        -1,
-        1
+      "summary": "A slow scan line moves west to east across the Earth at night, once for each year from 2012 to 2023. Then NASA's map of how the lights changed is heard as the decade, one note per year.",
+      "viewsMethod": "Region: instead of the whole map, hear one of the four places NASA zooms in on in this video, year by year and then its decade. The scan line then crosses only that region, more slowly, and the notes and the ears stretch to fit it: its north edge plays the highest notes, in your left ear. Zoomed in, dimmer towns ring notes too.",
+      "chapters": [
+        "years",
+        "change"
       ],
-      "hotLine": 0.3,
-      "words": {
-        "subject": "planet",
-        "map": "map of change in night lights",
-        "dates": "year",
-        "what": "change",
-        "top": "strongest",
-        "missing": "not read. The far north and Antarctica are left out, because ice and snow there look like light."
-      },
-      "summary": "A slow scan line moves west to east once across NASA's map of how night lights changed from 2012 to 2023.",
-      "viewsMethod": "Region: instead of the whole map, hear the change in one of the four places NASA zooms in on in this video. The scan line then crosses only that region, more slowly, and the notes and the ears stretch to fit it: its north edge plays the highest notes, in your left ear."
+      "about": {
+        "what": "Earth's city lights, one scan for each year from 2012 to 2023, and then how they changed: lights that grew and lights that dimmed.",
+        "who": "NASA's Black Marble team, with the VIIRS instrument on the Suomi NPP satellite (NASA and NOAA). Kel Elkins made the Earth Information Center version at NASA's Scientific Visualization Studio.",
+        "when": "Yearly averages, 2012 to 2023.",
+        "where": "The whole world, and the four close-ups NASA draws: Western Europe, the Eastern Mediterranean, Ukraine and India.",
+        "why": "To hear where people's light grew or faded over a decade, and by how much.",
+        "how": "A scan line crosses the map from west to east once for each year, and bright cities ring notes. The last map is the decade: one note per year, an octave higher for twice the light, then a rising, falling or single note for what NASA's change map shows.",
+        "journey": [
+          {
+            "title": "Suomi NPP satellite, VIIRS",
+            "detail": "A NASA and NOAA instrument that sees city lights from orbit."
+          },
+          {
+            "title": "Black Marble",
+            "detail": "NASA's yearly night-light averages."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5313, the Earth Information Center version."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
+      }
     },
     {
       "id": "air-quality",
-      "code": "3",
+      "code": "2",
       "title": "Air quality",
       "subtitle": "Four pollutants, summer 2024",
       "description": "NASA's model of the air we breathe in July and August 2024, a summer of huge wildfires. One scan for each pollutant: fine particles, carbon monoxide, nitrogen oxides and ozone. Clean air is a calm drone; dirty air rings notes and turns the drone sour.",
@@ -73,11 +82,41 @@
         "what": "pollution",
         "top": "thickest",
         "missing": "not read. NASA's model has no reading here."
+      },
+      "about": {
+        "what": "Four pollutants in the air over the whole world: fine particles (PM2.5), carbon monoxide, nitrogen oxides and ozone, in a summer of huge wildfires.",
+        "who": "NASA's Global Modeling and Assimilation Office runs the GEOS-CF system that models them. NASA's Scientific Visualization Studio made the maps.",
+        "when": "July and August 2024.",
+        "where": "The whole world, one map for each pollutant.",
+        "why": "To hear that the air we breathe is shared, and how smoke and pollution spread.",
+        "how": "Clean air is a calm drone. Where a pollutant is thickest, notes ring and the drone turns a little sour.",
+        "journey": [
+          {
+            "title": "Satellites, ground stations and weather observations",
+            "detail": "Millions of measurements feed the model."
+          },
+          {
+            "title": "GEOS-CF model",
+            "detail": "NASA's Goddard system that models gases and particles in the air."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5533, Air Quality Model Runs."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
       }
     },
     {
       "id": "ocean-currents",
-      "code": "4",
+      "code": "3",
       "title": "Ocean currents",
       "subtitle": "Perpetual Ocean, 2021 to 2023",
       "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
@@ -98,11 +137,41 @@
         "what": "moving water",
         "top": "brightest",
         "missing": "not a place on a map. This track follows NASA's moving camera, so it has no map of places to explore. Try Air quality or Earth at night."
+      },
+      "about": {
+        "what": "NASA's tour of the ocean's great currents: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream.",
+        "who": "Greg Shirah and Horace Mitchell at NASA's Scientific Visualization Studio, with scientists Atousa Saberi and Josh Willis. The currents come from the ECCO2 ocean model (NASA and JPL).",
+        "when": "January 2021 to December 2023.",
+        "where": "The global ocean and three western boundary currents.",
+        "why": "To hear how fast, narrow currents carry heat across the planet.",
+        "how": "A harp rings where bright, fast water crosses a line through NASA's moving camera view, and a soft pulse marks each month.",
+        "journey": [
+          {
+            "title": "Satellites and ocean floats",
+            "detail": "Measure sea height, temperature and currents."
+          },
+          {
+            "title": "ECCO2 ocean model",
+            "detail": "NASA and JPL's reconstruction of the ocean's motion."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5425, Perpetual Ocean 2: Western Boundary Currents."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
       }
     },
     {
       "id": "carbon-dioxide",
-      "code": "5",
+      "code": "4",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
       "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
@@ -122,11 +191,41 @@
         "what": "carbon dioxide",
         "top": "densest",
         "missing": "not crossed by the scan line this week, so there is no reading here. Try another week."
+      },
+      "about": {
+        "what": "Carbon dioxide spreading round the planet on a turning globe, with dense plumes over cities, fires and forests.",
+        "who": "AJ Christensen and the team at NASA's Scientific Visualization Studio, with scientific consulting by Lesley Ott. The data is a global model run in the DYAMOND project.",
+        "when": "Seven weeks of early 2020.",
+        "where": "The whole globe, seen as it turns.",
+        "why": "To hear how carbon dioxide builds up and travels, and where it is densest.",
+        "how": "A scan line runs pole to pole on the turning globe. The hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
+        "journey": [
+          {
+            "title": "Emissions and a global model",
+            "detail": "Fires, cities and plants feed a high-resolution atmosphere model."
+          },
+          {
+            "title": "DYAMOND model run",
+            "detail": "A model that follows carbon dioxide across the globe."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5196, DYAMOND Global Carbon Dioxide."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
       }
     },
     {
       "id": "lightning",
-      "code": "6",
+      "code": "5",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
       "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
@@ -151,11 +250,41 @@
       "latRange": [
         -55,
         55
-      ]
+      ],
+      "about": {
+        "what": "Lightning seen from the International Space Station, in 14 equal parts of NASA's movie, in order.",
+        "who": "The Lightning Imaging Sensor on the space station. Michala Garrison made the visualization at NASA's Scientific Visualization Studio.",
+        "when": "March 2017 to July 2023.",
+        "where": "Everywhere the sensor can see, about 55 degrees north to 55 degrees south.",
+        "why": "To hear where the storms are, and how the busiest regions swing north and south through the seasons.",
+        "how": "A deep bass swells with how much lightning is under the scan line, strings rise as storms move north, and a harp plucks the strongest storms.",
+        "journey": [
+          {
+            "title": "Lightning Imaging Sensor, International Space Station",
+            "detail": "Detects flashes of lightning from orbit."
+          },
+          {
+            "title": "NASA science data",
+            "detail": "Quality-controlled lightning events."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5011, Lightning Events Detected from the ISS."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
+      }
     },
     {
       "id": "aerosols",
-      "code": "7",
+      "code": "6",
       "title": "Aerosols",
       "subtitle": "Four winds, 19 August 2025",
       "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
@@ -180,11 +309,41 @@
         -90,
         90
       ],
-      "viewsMethod": "NASA's stories: instead of the whole map, hear the six events NASA describes on this map, one after another. The scan line crosses only a window around each event, more slowly. The wind of the aerosol NASA names for it is brought forward, and the others stay, a little softer. Inside a window, high and low and the two ears stretch to fit it."
+      "viewsMethod": "NASA's stories: instead of the whole map, hear the six events NASA describes on this map, one after another. The scan line crosses only a window around each event, more slowly. The wind of the aerosol NASA names for it is brought forward, and the others stay, a little softer. Inside a window, high and low and the two ears stretch to fit it.",
+      "about": {
+        "what": "Four kinds of tiny particles in the air at one moment: smoke (black carbon), dust, sea salt and sulfate, and six stories NASA tells about them.",
+        "who": "NASA's Global Modeling and Assimilation Office ran the GEOS model. Joseph V. Ardizzone and Helen-Nicole Kostis made the visualization, with scientist Lesley Ott.",
+        "when": "19 August 2025, 20:00 UTC: one moment, not an average.",
+        "where": "The whole world. NASA's stories are Hurricane Erin, dust from the Sahara, Kilauea, Etna, smoke over southern Africa and wildfires in Spain.",
+        "why": "To hear that the air is shared: smoke, dust and salt cross oceans and borders.",
+        "how": "Each aerosol is its own wind, louder where there is more of it. In NASA's stories the aerosol NASA names also plays its own instrument.",
+        "journey": [
+          {
+            "title": "Satellites, ground stations and weather balloons",
+            "detail": "About a million observations an hour feed the model."
+          },
+          {
+            "title": "GEOS model",
+            "detail": "NASA's Goddard Earth Observing System."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 5669, GEOS Aerosols."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
+      }
     },
     {
       "id": "sea-heat",
-      "code": "8",
+      "code": "7",
       "title": "Warm and cold seas",
       "subtitle": "Sea surface temperature, March 2007 to March 2008",
       "description": "NASA's model of the ocean's surface currents, coloured by temperature, over one year. A level scan line moves down the map from the Arctic to Antarctica, once each season, with west in your left ear and east in your right. Cold sea is a deep base note; the warmer the water, the more and higher chord voices join it.",
@@ -211,7 +370,37 @@
       "latRange": [
         -90,
         90
-      ]
+      ],
+      "about": {
+        "what": "How warm the ocean's surface is, as NASA's flow lines show it, from the Arctic to Antarctica, in four seasons.",
+        "who": "Greg Shirah and colleagues at NASA's Scientific Visualization Studio, with scientists Hong Zhang and Dimitris Menemenlis. The currents and temperatures come from the ECCO2 ocean model (NASA and JPL).",
+        "when": "25 March 2007 to 3 March 2008.",
+        "where": "The global ocean. Land and sea ice have no flow lines, so no reading.",
+        "why": "To hear the shape of the ocean's warmth: the hot tropics, the cold poles, the Gulf Stream's warm tongue.",
+        "how": "A level scan line moves down the map. Each stretch plays a bell note whose pitch is the water's temperature: warmer sounds higher. Cold sea is a deep base note, and the warmer the water, the more chord voices join it.",
+        "journey": [
+          {
+            "title": "Satellites and ocean floats",
+            "detail": "Measure the sea's temperature and motion."
+          },
+          {
+            "title": "ECCO2 ocean model",
+            "detail": "NASA and JPL's reconstruction of the ocean."
+          },
+          {
+            "title": "NASA Scientific Visualization Studio",
+            "detail": "SVS 3912, Global Sea Surface Currents and Temperature."
+          },
+          {
+            "title": "NASA Earth Information Center",
+            "detail": "The NASA exhibit and website whose videos and images this challenge starts from."
+          },
+          {
+            "title": "Hearth",
+            "detail": "Reads NASA's pictures and plays them as sound in your browser. Nothing is uploaded."
+          }
+        ]
+      }
     }
   ]
 }

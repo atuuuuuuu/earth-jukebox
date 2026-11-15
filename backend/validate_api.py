@@ -38,9 +38,11 @@ def check_sweep(public: Path, s: dict, where: str) -> list[str]:
     data = json.loads(src.read_text(encoding="utf-8"))
     g = data.get("grid") or {}
     cells = g.get("cols", 0) * g.get("rows", 0)
-    chapter = next((c for c in data.get("chapters", []) if c.get("id") == sw.get("chapter")), None)
-    if chapter is None:
-        return [f"{where}: sweep chapter '{sw.get('chapter')}' not in {src.name}"]
+    # A track plays one chapter of its data, or several in a row (`chapters`).
+    found = [next((c for c in data.get("chapters", []) if c.get("id") == i), None) for i in sw.get("chapters") or [sw.get("chapter")]]
+    if None in found:
+        return [f"{where}: sweep chapter '{sw.get('chapters') or sw.get('chapter')}' not in {src.name}"]
+    chapter = {"frames": [f for c in found for f in c["frames"]]}
     if not g and len(data.get("line") or []) != data.get("steps", -1) * data.get("rows", -1):
         out.append(f"{where}: spin sweep data must hold steps x rows values in 'line'")
     if len(chapter["frames"]) != len(s.get("frames") or []):
@@ -117,7 +119,7 @@ def check_views_data(s: dict, data: dict, chapter: str, where: str) -> list[str]
             g = it.get("grid") or {}
             cells = g.get("cols", 0) * g.get("rows", 0)
             chs = it.get("chapters") or {}
-            fr = (chs.get(chapter) or chs.get("still") or [])
+            fr = (chs.get(f.get("chapter") or chapter) or chs.get("still") or [])
             if not isinstance(f.get("frame"), int) or not 0 <= f["frame"] < len(fr):
                 out.append(f"{at}: frame {f.get('frame')} not in the view's data")
                 continue
@@ -215,6 +217,10 @@ def check(public: Path) -> list[str]:
             if not isinstance(f.get("text"), str) or not f["text"].startswith(stamp):
                 bad(f"{at}: text must start with '{stamp}'")
 
+        a = s.get("about")
+        if a is not None and not (all(isinstance(a.get(k), str) and a[k] for k in ("what", "who", "when", "where", "why", "how"))
+                                  and a.get("journey") and all(j.get("title") and j.get("detail") for j in a["journey"])):
+            bad(f"{where}: about needs what, who, when, where, why, how and a journey of title and detail")
         problems.extend(check_views(s, where))
         if s.get("engine") == "sweep":
             problems.extend(check_sweep(public, s, where))
