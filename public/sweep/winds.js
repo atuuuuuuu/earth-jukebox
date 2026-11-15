@@ -29,7 +29,7 @@ export const COLOURS = {
   smoke: { noise: 'brown', low: 100, high: 500, q: 0.9, open: 2.0, gust: [0.055, 0.6], rough: 0.35, trim: 0 },
 };
 const ORDER = ['smoke', 'sand', 'ocean', 'breath'];   // for layers that name no colour
-const GAIN = 0.85;                // a wind at full level, before its trim
+const GAIN = 1.2;                 // a wind at full level, before its trim (about the loudness of the other tracks)
 const SOLO_DB = 2;                // a wind heard alone: its own full level (no mix trim), a little forward
 const TOP_HZ = 2000;              // no wind opens above this: soft and dark, like the reference
 const REVERB = 0.7;               // send to the hall: the winds sit far back in it

@@ -11,7 +11,20 @@
 //  * where the smoke (layer.wind 'smoke') is thickest, sparse soft crackles, each at its latitude.
 // Every layer has its own fixed scale for the whole track: 1 = its fullest stretch of the sweep.
 
-import { clamp } from '../music.js';
+import { clamp, scaleRange } from '../music.js';
+
+// NASA's stories also get a voice: the aerosol NASA names plays its own instrument (layer.story in
+// the data: cello for smoke, kalimba for dust, harp for sea salt, vibraphone for sulfate) where its
+// plume is thickest under the line, on a steady pulse, its pitch the plume's place in the window
+// (north higher). A thin plume at one latitude is one repeated note; a spiral climbs and falls.
+const E_PENTATONIC = [4, 6, 8, 11, 1];             // the app's calm scale (as night lights)
+const REGISTERS = {
+  cello: scaleRange(40, 64, E_PENTATONIC),          // E2 … E4: low and dark, for smoke
+  kalimba: scaleRange(52, 76, E_PENTATONIC),        // E3 … E5
+  harp: scaleRange(56, 83, E_PENTATONIC),           // G#3 … B5
+  vibraphone: scaleRange(64, 88, E_PENTATONIC),     // E4 … E6: high and glassy, for sulfate
+};
+const STORY = { perSecond: 3.2, min: 0.22, ring: 2.2, bow: 1.5 };
 
 // NASA's stories (a view, see sonifier.js): each story is a window with its own finer grid
 // (`frame.geo`), swept on its own. Inside a window the winds' register and stereo stretch to fit it
@@ -39,6 +52,8 @@ export function defaults(track) {
     yearSweep: track.chapters[0].secondsPerSweep,
     bed: 'winds',                   // tells the audio engine to build the winds instead of notes
     winds: (track.layers ?? []).map((L) => ({ id: L.id, wind: L.wind })),
+    // The story instruments to load (sample sets), one per aerosol that has one.
+    storyVoices: [...new Set((track.layers ?? []).map((L) => L.story).filter(Boolean))],
     solo: null,
   };
 }
@@ -117,7 +132,38 @@ export function prepare(track) {
     const s = sums[L.id].sort((a, b) => a - b);
     track._windNorm[L.id] = Math.max(1e-6, s[Math.floor(s.length * LEVEL_PERCENTILE)] ?? 1);
   }
+  // In a story, the wind of the aerosol NASA names fills the story: its own fullest stretch of the
+  // window blows in full (the others keep the scale shared by all the stories, a little softer).
+  for (const ch of track.chapters) {
+    for (const fr of ch.frames) {
+      if (!fr.focus || !fr._winds[fr.focus]) continue;
+      const s = [...fr._winds[fr.focus].sum].sort((a, b) => a - b);
+      fr._focusNorm = Math.max(1e-6, s[Math.floor(s.length * LEVEL_PERCENTILE)] ?? 1);
+    }
+  }
   return track;
+}
+
+/**
+ * The story's voice in column c: the instrument of the aerosol NASA names, at that aerosol's
+ * thickest cell under the line, on a steady pulse (about three notes a second at normal speed).
+ */
+export function storyNotes(track, frame, c) {
+  const L = track.layers?.find((x) => x.id === frame.focus);
+  const reg = L && REGISTERS[L.story];
+  if (!reg) return [];
+  const g = gridOf(track, frame), v = frame._layers[L.id];
+  const every = Math.max(1, Math.round(g.cols / ((frame.secondsPerSweep ?? 10) * STORY.perSecond)));
+  if (c % every) return [];
+  let r = -1, best = STORY.min;
+  for (let k = 0; k < g.rows; k++) if (v[k * g.cols + c] >= best) { best = v[k * g.cols + c]; r = k; }
+  if (r < 0) return [];
+  const t = clamp((best - STORY.min) / (1 - STORY.min), 0, 1);
+  const midi = reg[clamp(Math.round((1 - (r + 0.5) / g.rows) * (reg.length - 1)), 0, reg.length - 1)];
+  return [{
+    voice: 'story', instrument: L.story, kind: 'story', layer: L.id, row: r, col: c, midi,
+    velocity: 0.35 + 0.5 * Math.pow(t, 0.7), offset: 0, duration: L.story === 'cello' ? STORY.bow : STORY.ring,
+  }];
 }
 
 /** A wind's level 0..1 for a share `rel` (0..1) of the layer's fullest stretch: silent below the gate.
@@ -160,9 +206,10 @@ export function planStep(track, seg, c) {
   // Inside a window, its south edge plays as -60 degrees and its north edge as 60 (winds.js's span).
   const south = g.latNorth - g.rows * g.cellDeg;
   const tone = (lat) => (g.zoom ? -LAT_SPAN + (2 * LAT_SPAN * (lat - south)) / (g.latNorth - south) : lat);
+  if (frame.focus && (!params.solo || params.solo === frame.focus)) events.push(...storyNotes(track, frame, c));
   const winds = (track.layers ?? []).map((L) => {
     const w = frame._winds[L.id];
-    const rel = clamp(w.sum[c] / track._windNorm[L.id], 0, 1);
+    const rel = clamp(w.sum[c] / (L.id === frame.focus ? frame._focusNorm : track._windNorm[L.id]), 0, 1);
     let thick = 0;
     const v = frame._layers[L.id];
     for (let r = 0; r < g.rows; r++) thick = Math.max(thick, v[r * g.cols + c]);

@@ -639,6 +639,14 @@ class SweepSonifier {
     w.hear(x.id, t, 6.5);
     at(x, 0.25, t); at(x, 1, t + 1.2); at(x, 0.25, t + 3.4); at(x, 0, t + 4.6);
     if (x.wind === 'smoke') for (const [dt, vel] of [[1.9, 0.3], [2.6, 0.4], [3.1, 0.25]]) w.crackle({ layer: x.id, velocity: vel, pos: 0, duration: 0.03 }, t + dt);
+    // Its instrument in NASA's stories: a short rising phrase over the swell, as a plume would play it.
+    if (x.story && this.audio.story?.[x.story]) {
+      const frame = { focus: x.id, geo: { cols: 1, rows: 5, latNorth: 0, cellDeg: 1, lonWest: 0 }, secondsPerSweep: 1, _layers: { [x.id]: null } };
+      for (let k = 0; k < 5; k++) {
+        frame._layers[x.id] = Float32Array.from({ length: 5 }, (_, r) => (r === 4 - k ? 0.8 : 0));
+        for (const ev of aerosols.storyNotes(this.track, frame, 0)) this.audio.play(ev, t + 1.3 + k * 0.4, 0);
+      }
+    }
     return 6;
   }
 

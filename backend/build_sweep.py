@@ -684,7 +684,10 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
                   **({"scan": t["scan"]} if t.get("scan") else {})},
         "legend": legend,
         # Layers heard on their own (aerosols): id, spoken name, shortcut key, picture of it alone.
-        **({"layers": [{k: L[k] for k in ("id", "name", "key", "image") if k in L} for L in data["layers"]]}
+        # colour: the layer's swatch on NASA's key, as #rrggbb (the page marks it with this).
+        **({"layers": [{**{k: L[k] for k in ("id", "name", "key", "image") if k in L},
+                        **({"colour": "#{:02x}{:02x}{:02x}".format(*L["rgb"])} if L.get("rgb") else {})}
+                       for L in data["layers"]]}
            if data.get("layers") else {}),
         # Other ways to hear this track (NASA's zoom regions, NASA's stories): see build_views.
         **({"views": views} if views else {}),

@@ -134,6 +134,7 @@ void main() {
   else if (uSweep > 0.5 && uHead < 900.0) {
     col *= mix(1.0, 0.6, step(uHead, lon));
     float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
+    if (uBox.x < 900.0) ph *= step(uBox.y - 0.5, lat) * step(lat, uBox.w + 0.5);   // only across the window heard
     col = mix(col, vec3(1.0, 0.85, 0.5), 0.95 * ph);
   }
 

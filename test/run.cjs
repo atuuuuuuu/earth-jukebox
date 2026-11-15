@@ -277,6 +277,24 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
         && await page.evaluate("son.view === null"), back.slice(0, 100));
       await page.keyboard.press("h");
       check(`${ids[k]}: H lists ${vw.key}`, (await live()).includes(`${vw.key}: ${vw.legend.toLowerCase()}: whole map`));
+      // NASA's stories: one native button each; Enter on one plays that story at once, and it shows as pressed.
+      const stories = await page.evaluate(() => [...document.querySelectorAll("#story-buttons button")].map((b) => b.id));
+      const storyFrames = await page.evaluate(() => (son.viewOptions.find((o) => o.unit === "story")?.frames ?? []).map((f) => f.when));
+      check(`${ids[k]}: a story button for each story, only where there are stories`, (await page.isVisible("#story-list")) === storyFrames.length > 0 && stories.length === storyFrames.length, stories.join(", "));
+      if (stories.length > 1) {
+        await page.focus(`#${stories[1]}`);
+        await page.keyboard.press("Enter");
+        await page.waitForFunction("son.playing", null, { timeout: 15000, polling: 100 });
+        const said = await spoken();
+        check(`${ids[k]}: Enter on a story button plays "${storyFrames[1]}"`, said.startsWith(`Playing ${storyFrames[1]}.`) && await page.evaluate("son.index === 1 && son.view && son.view.unit === 'story'")
+          && (await page.getAttribute(`#${stories[1]}`, "aria-pressed")) === "true", said.slice(0, 90));
+        const notes = await page.evaluate(() => { let n = 0; for (const seg of son.player.segments) for (let c = 0; c < seg.steps; c++) n += son.mapping.planStep(son.track, seg, c).events.filter((e) => e.voice === "story").length; return n; });
+        check(`${ids[k]}: every story has its own instrument's notes`, notes > 60, `${notes} notes in all`);
+        await page.focus("#keys");
+        await page.keyboard.press("Space");   // pause
+        await page.keyboard.press(vw.key.toLowerCase());   // back to the whole map
+      }
+      check(`${ids[k]}: the flat map shows every window`, await page.evaluate(() => document.getElementById("view-map").hidden || document.querySelectorAll("#view-map-boxes .view-box").length >= 1));
       await page.focus("#title");
       await page.evaluate(() => { document.getElementById("live").textContent = "x"; });
       await page.keyboard.press(vw.key.toLowerCase());

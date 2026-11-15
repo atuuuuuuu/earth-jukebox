@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
 <a class="skip" href="#keys">Skip to the player</a>
@@ -51,6 +51,7 @@
   <section id="player" class="block player" aria-labelledby="player-h">
     <h2 id="player-h"><span class="step" aria-hidden="true">2</span>Listen: <span id="np-title">loading</span></h2>
     <div class="player-grid">
+      <div class="stage-col">
       <div class="stage" id="stage">
         <canvas id="globe" role="img" aria-label="3D globe"></canvas>
         <div id="video-wrap" class="video-wrap" role="img" aria-label="" hidden>
@@ -62,6 +63,17 @@
           <div class="stage-bar"><span id="stage-fill"></span></div>
         </div>
         <p class="stage-hint" aria-hidden="true">Drag to turn the globe. Click a place to hear it.</p>
+      </div>
+      <!-- Tracks with regions or stories: the whole flat map, every window on it, the one heard lit,
+           and the scan line moving through it. Seen only: the same is said by W, D and the buttons. -->
+      <figure id="view-map" class="view-map" aria-hidden="true" hidden>
+        <div class="view-map-frame">
+          <img id="view-map-img" alt="">
+          <div id="view-map-boxes"></div>
+          <span id="view-map-needle" class="view-needle" hidden></span>
+        </div>
+        <figcaption id="view-map-caption"></figcaption>
+      </figure>
       </div>
 
       <div class="controls">
@@ -94,6 +106,11 @@
           <div id="view-options" class="seg"></div>
           <p id="view-hint" class="muted small"></p>
         </fieldset>
+
+        <div id="story-list" class="story-list" role="group" aria-labelledby="story-list-h" hidden>
+          <p id="story-list-h" class="story-list-h"></p>
+          <div id="story-buttons" class="story-buttons"></div>
+        </div>
 
         <fieldset id="listen-field" class="field" aria-describedby="listen-hint" hidden>
           <legend>Listen to</legend>
@@ -221,7 +238,7 @@
 </footer>
 
 <script src="bundle.js?v=7"></script>
-<script src="globe.js?v=14"></script>
-<script src="app.js?v=16"></script>
+<script src="globe.js?v=15"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

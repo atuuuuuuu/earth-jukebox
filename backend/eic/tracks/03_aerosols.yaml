@@ -21,11 +21,14 @@ source:
 # The four aerosols, in the order of NASA's key (its swatches are read left to right).
 # key: the one-letter shortcut in the player. A (all) and the player's own keys are taken.
 # wind: the colour of its wind in public/sweep/winds.js (smoke, sand, ocean or breath).
+# story: the instrument that plays this aerosol's plume in NASA's stories, when it is the one NASA
+# names (a sample set in public/samples/): low bowed cello for smoke, wooden kalimba for desert dust,
+# flowing harp for sea spray, glassy vibraphone for sulfate.
 layers:
-  - { id: black-carbon, name: "Black carbon", key: B, wind: smoke }
-  - { id: dust, name: "Dust", key: U, wind: sand }
-  - { id: sea-salt, name: "Sea salt", key: T, wind: ocean }
-  - { id: sulfate, name: "Sulfate", key: L, wind: breath }
+  - { id: black-carbon, name: "Black carbon", key: B, wind: smoke, story: cello }
+  - { id: dust, name: "Dust", key: U, wind: sand, story: kalimba }
+  - { id: sea-salt, name: "Sea salt", key: T, wind: ocean, story: harp }
+  - { id: sulfate, name: "Sulfate", key: L, wind: breath, story: vibraphone }
 
 extraction:
   grid: { cols: 120, rows: 60 }
@@ -61,9 +64,9 @@ views:
   legend: Mode                 # not "Map": the player's map slider already has that name
   key: R                       # in the player, R switches between the whole map and the stories
   mode: tour                   # the stories play one after another, like the maps of a track
-  name: "NASA's stories"
+  name: "NASA's six stories"
   cell_deg: 0.75               # read again from the 8K still, finer than the whole map's 3 degrees
-  seconds_per_sweep: 14
+  seconds_per_sweep: 10           # short: each story is one phrase
   items:
     - id: hurricane-erin
       name: Hurricane Erin
@@ -73,10 +76,10 @@ views:
         The first Atlantic hurricane of 2025, off the east coast of the United States. Its strong
         winds whip sea spray into a spiral of sea salt, and it pulls in desert dust from Africa.
     - id: saharan-dust
-      name: Saharan dust
+      name: Dust from the Sahara
       box: [-85.5, 7.5, 34.5, 36.0]
       focus: dust
-      seconds: 24
+      seconds: 16
       about: >
         Dust from the Sahara blows west across the whole Atlantic Ocean and makes the sky hazy in
         the Caribbean, as far as the United States. The scan line starts at the Caribbean end and
@@ -128,15 +131,15 @@ legend:
     your right ear. Listen to all four winds together, or to one at a time.
   items:
     - sound: "Black carbon: dark, rough wind"
-      meaning: "Smoke from fires. A low, dark, slightly rough wind, with soft crackles where the smoke is thickest, as over central Africa."
+      meaning: "Smoke from fires. A low, dark, slightly rough wind, with soft crackles where the smoke is thickest, as over central Africa. In NASA's smoke stories, a low cello plays where the smoke is thickest."
     - sound: "Dust: sandy wind"
-      meaning: "Desert dust. A grainy wind in the middle, as over the Sahara and the dust blowing from it across the Atlantic."
+      meaning: "Desert dust. A grainy wind in the middle, as over the Sahara and the dust blowing from it across the Atlantic. In NASA's dust story, a kalimba plays along the dust."
     - sound: "Sea salt: low ocean wind"
-      meaning: "Salt spray from the sea. A low, smooth, airy wind, strongest over the stormy southern oceans."
+      meaning: "Salt spray from the sea. A low, smooth, airy wind, strongest over the stormy southern oceans. In the Hurricane Erin story, a harp traces the storm's spiral of sea spray."
     - sound: "Sulfate: thin, high wind"
-      meaning: "Sulfate from industry, ships and volcanoes. A thin, high, breathy wind, very soft, as over South and East Asia and the North Pacific."
+      meaning: "Sulfate from industry, ships and volcanoes. A thin, high, breathy wind, very soft, as over South and East Asia and the North Pacific. In the volcano stories, a vibraphone rings along the stream of sulfate."
     - sound: "Higher or lower, left or right"
-      meaning: "Where that aerosol is under the scan line: north is higher and in your left ear, south is lower and in your right ear."
+      meaning: "Where that aerosol is under the scan line: north is higher and in your left ear, south is lower and in your right ear. In NASA's six stories the line crosses only a window around each event, so high and low stretch to fit the window."
   caveat: >
     Values are read from the colours of NASA's picture, not from the model's numbers. NASA's key has
     colours but no numbers, so each aerosol is measured against its own thickest places: a loud dust

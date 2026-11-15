@@ -191,6 +191,13 @@ export class AudioEngine {
     }
     // The aerosol winds: no samples to load.
     if (this.settings.bed === 'winds') this.winds = new Winds({ keep: k, master: this.master, reverb: this.reverb, settings: this.settings });
+    // NASA's stories (aerosols): each named aerosol's own instrument, placed along the line like notes.
+    this.story = {};
+    for (const name of this.settings.storyVoices ?? []) {
+      // 5 dB below the instruments' own trims (by offline render): the winds stay the bed, no attack clips.
+      this.story[name] = { ...bus(), samplers: [], trim: (name === 'cello' ? CELLO.trim + 4 : (INSTRUMENTS[name]?.trim ?? 10)) - 5 };
+      this.story[name].panners = slots(this.story[name].level);
+    }
     // The sea's warm chords: pad samples, loaded below with the rest.
     if (this.settings.bed === 'chords') this.chords = new Chords({ keep: k, master: this.master, reverb: this.reverb, settings: this.settings });
     // Heartbeat: a soft low double thump, dry and centred.
@@ -203,6 +210,7 @@ export class AudioEngine {
     await Promise.all([
       ...(this.winds || this.chords ? [] : [this._loadVoice(this.cello, 'cello', CELLO.notes, 'cello'), this.setInstrument(this.settings.instrument)]),
       ...(this.chords ? [this.chords.load()] : []),
+      ...Object.entries(this.story).map(([name, v]) => this._loadVoice(v, name, name === 'cello' ? CELLO.notes : filesFor(name), `story:${name}`)),
       ...(this.orch ? [this._loadBowed('bass', this.orch.bassFilter), this._loadStrings(this.orch.stringsGain)] : []),
     ]);
     this.apply();
@@ -304,10 +312,14 @@ export class AudioEngine {
       o.windBus.send.gain.value = s.humReverb;
     }
     this.winds?.apply(s);
+    for (const v of Object.values(this.story ?? {})) {
+      v.level.gain.value = on('notes') * dbToGain(v.trim + s.notes);
+      v.send.gain.value = s.notesReverb;
+    }
     if (this.noteTone) this.noteTone.frequency.value = s.compare ? NOTE_TONE.compare : NOTE_TONE.marks;
     // With the sweep panner the slots stay centred: the panner alone places every note.
     const slotWidth = this.sweepPan ? 0 : s.width;
-    for (const voice of [this.notes, this.cello]) {
+    for (const voice of [this.notes, this.cello, ...Object.values(this.story ?? {})]) {
       voice.panners.forEach((p, i) => { p.pan.value = ((i / (PAN_SLOTS - 1)) * 2 - 1) * slotWidth; });
     }
     for (const smp of this.notes.samplers) if (smp && 'release' in smp) smp.release = Math.max(0.3, s.ring * 0.6);
@@ -326,7 +338,7 @@ export class AudioEngine {
   play(ev, time, pos) {
     if (ev.bed) { this._bow(ev, time); return; }
     if (ev.voice === 'crackle') { this.winds?.crackle(ev, time); return; }
-    const voice = ev.voice === 'cello' ? this.cello : this.notes;
+    const voice = ev.voice === 'cello' ? this.cello : ev.voice === 'story' ? (this.story?.[ev.instrument] ?? this.notes) : this.notes;
     const slot = this.sweepPan ? (PAN_SLOTS - 1) / 2 : Math.round(((clamp(pos, -1, 1) + 1) / 2) * (PAN_SLOTS - 1));
     const smp = voice.samplers[slot] ?? voice.samplers[(PAN_SLOTS - 1) / 2];
     smp?.triggerAttackRelease(midiToNote(ev.midi), ev.duration, time, ev.velocity);
@@ -454,7 +466,7 @@ export class AudioEngine {
     for (const p of [this.humGain.gain, this.humFilter.frequency, this.humPanner.pan, this.tenseGain.gain]) p.cancelScheduledValues(t);
     this.humGain.gain.setValueAtTime(this.humGain.gain.value, t);
     this.humGain.gain.linearRampToValueAtTime(0, t + 0.25);
-    for (const voice of [this.notes, this.cello]) for (const s of voice.samplers) s?.releaseAll(t);
+    for (const voice of [this.notes, this.cello, ...Object.values(this.story ?? {})]) for (const s of voice.samplers) s?.releaseAll(t);
     if (this.orch) {
       const o = this.orch;
       for (const p of [o.bassGain.gain, o.bassFilter.frequency]) p.cancelScheduledValues(t);

@@ -210,6 +210,7 @@
       loadImg(frames()[(i + 1) % n()].image);   // the next map, ready before it is needed
     }
     syncVideo(true);
+    showViewMap(i);
   };
 
   // Carbon dioxide is NASA's own turning-globe video: keep it in step with the sound.
@@ -229,6 +230,7 @@
     const here = son.placeNow();
     if (here) $("stage-when").textContent = `${son.frame().when} · ${here.date}`;
     syncVideo();
+    moveNeedle();
     requestAnimationFrame(tick);
   };
 
@@ -255,6 +257,7 @@
   const idle = () => {
     $("stage-fill").style.width = son ? `${son.progress() * 100}%` : "0";
     syncVideo();
+    moveNeedle();
   };
 
   const loadTrack = async (t, { announce = true } = {}) => {
@@ -292,6 +295,7 @@
     if (video) {
       const v = $("video");
       const data = await (await fetch(score.sweep.src)).json().catch(() => null);
+      if (mine !== gen) return;               // another track was chosen while this one loaded
       if (data?.media) { v.poster = data.media.poster; if (!v.src.endsWith(data.media.src)) v.src = data.media.src; }
     }
     if (globe) {
@@ -311,6 +315,8 @@
     $("compare-field").hidden = !son.canCompare;
     renderListen();
     renderViews();
+    renderStories();
+    renderViewMap();
     renderSounds();
     showFrame(0);
     idle();
@@ -348,7 +354,7 @@
     $("view-legend").textContent = score.views.legend;
     const key = viewKey() ? ` In the player, ${viewKey().toUpperCase()} moves to the next one.` : "";
     $("view-hint").textContent = (opts.length === 1
-      ? `${opts[0].name}: ${opts[0].frames.length} ${opts[0].unit === "story" ? "stories" : "maps"}, one after another, each in its own window.`
+      ? `${opts[0].name} play one after another, each in its own window, each with its own instrument. Or choose one below.`
       : `Hear the track inside one ${score.views.legend.toLowerCase()} instead of the whole map. The notes stretch to fit it.`) + key;
     for (const o of [{ id: "whole", name: "Whole map" }, ...opts]) {
       const label = document.createElement("label");
@@ -366,7 +372,7 @@
     if (unit() === "story") return `${name}: ${n()} stories, one after another. First: ${whenOf(0)}`;
     return n() > 1 ? `${name}: ${n()} maps, ${whenOf(0)} to ${whenOf(n() - 1)}` : `${name}, ${lowerFirst(whenOf(0))}`;
   };
-  const setView = (id) => {
+  const setView = (id, { quiet = false } = {}) => {
     if (!son || !views().length) return;
     if (playing) { playing = false; setPlayButton(); }
     son.setView(id && id !== "whole" ? id : null);
@@ -379,7 +385,87 @@
     lastNote = null;
     showFrame(0);
     idle();
-    say(`${viewText()}. About ${Math.round(son.passSeconds())} seconds. Press Space to play.`);
+    if (!quiet) say(`${viewText()}. About ${Math.round(son.passSeconds())} seconds. Press Space to play.`);
+  };
+
+  // ---------- NASA's stories: one button each, and the flat map of every window ----------
+  const storyOption = () => views().find((o) => o.unit === "story") ?? null;
+  const layerOf = (id) => layers().find((L) => L.id === id);
+  const renderStories = () => {
+    const opt = storyOption();
+    $("story-list").hidden = !opt;
+    $("story-buttons").innerHTML = "";
+    if (!opt) return;
+    $("story-list-h").textContent = `${opt.name}: choose one to hear it now`;
+    opt.frames.forEach((f, i) => {
+      const L = layerOf(f.focus);
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn story-btn"; b.id = `story-${i + 1}`; b.dataset.story = i;
+      b.setAttribute("aria-pressed", "false");
+      if (L?.colour) b.style.setProperty("--c", L.colour);
+      b.innerHTML = '<span class="swatch" aria-hidden="true"></span><span><span class="name"></span><span class="sr-only">, </span><span class="aero"></span></span>';
+      b.querySelector(".name").textContent = f.when;
+      b.querySelector(".aero").textContent = L ? L.name.toLowerCase() : "";
+      b.addEventListener("click", () => run(null, () => playStory(i)));
+      $("story-buttons").append(b);
+    });
+  };
+  // Play one story now: switch to the stories if need be, go to it, and play (or keep playing).
+  const playStory = (i) => {
+    const opt = storyOption();
+    if (!opt || !son) return;
+    if (son.view?.id !== opt.id) setView(opt.id, { quiet: true });
+    if (playing) { goTo(i, false); say(`Playing ${startText(i)}`); return; }
+    goTo(i, false);
+    play();
+  };
+
+  // The flat map: every window of the track's regions or stories, the one heard lit.
+  const viewBoxes = () => {
+    const opt = storyOption();
+    if (opt) return opt.frames.map((f, i) => ({ box: f.box, colour: layerOf(f.focus)?.colour, label: f.when, story: i }));
+    return views().map((o) => ({ box: o.frames[0].box, colour: null, label: o.name, id: o.id }));
+  };
+  const pct = (box) => ({ left: ((box[0] + 180) / 360) * 100, top: ((90 - box[3]) / 180) * 100, width: ((box[2] - box[0]) / 360) * 100, height: ((box[3] - box[1]) / 180) * 100 });
+  const renderViewMap = () => {
+    const has = views().length > 0 && !usesVideo();
+    $("view-map").hidden = !has;
+    $("view-map-boxes").innerHTML = "";
+    if (!has) return;
+    for (const v of viewBoxes()) {
+      const p = pct(v.box), el = document.createElement("span");
+      el.className = "view-box";
+      Object.assign(el.style, { left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, height: `${p.height}%` });
+      if (v.colour) el.style.setProperty("--c", v.colour);
+      el.dataset.label = v.label;
+      $("view-map-boxes").append(el);
+    }
+  };
+  const showViewMap = (i) => {
+    if ($("view-map").hidden) return;
+    const f = frames()[i], box = son?.boxOf(i);
+    const src = imageOf(i);
+    if (!$("view-map-img").src.endsWith(src)) $("view-map-img").src = src;
+    for (const el of $("view-map-boxes").children) el.classList.toggle("is-on", !!box && el.dataset.label === (unit() === "story" ? f.when : son.view?.name));
+    const L = unit() === "story" ? layerOf(f.focus) : null;
+    $("view-map-caption").innerHTML = "";
+    if (L?.colour) { const s = document.createElement("span"); s.className = "swatch"; s.style.setProperty("--c", L.colour); $("view-map-caption").append(s); }
+    $("view-map-caption").append(son?.view ? (unit() === "story" ? f.when : son.view.name) : "Whole map");
+    const small = document.createElement("small");
+    small.textContent = son?.view ? (L ? `${L.name.toLowerCase()}, ${unit()} ${i + 1} of ${n()}` : f.when) : `${viewBoxes().length} ${unit() === "story" || storyOption() ? "stories" : "regions"}: press ${viewKey()?.toUpperCase() ?? "a button"} to choose`;
+    $("view-map-caption").append(small);
+    for (const b of $("story-buttons").children) b.setAttribute("aria-pressed", String(unit() === "story" && Number(b.dataset.story) === i));
+    moveNeedle();
+  };
+  // The scan line on the flat map: inside the window heard, or from top to bottom on the whole map.
+  const moveNeedle = () => {
+    const needle = $("view-map-needle");
+    const lon = son?.headLon?.(true);
+    if ($("view-map").hidden || lon === null || lon === undefined || son?.scan === "south" || (!playing && !son.started && son.progress() === 0)) { needle.hidden = true; return; }
+    const box = son.boxOf(son.index) ?? [-180, -90, 180, 90];
+    const p = pct(box);
+    Object.assign(needle.style, { left: `${((lon + 180) / 360) * 100}%`, top: `${p.top}%`, height: `${p.height}%` });
+    needle.hidden = false;
   };
   $("view-options").addEventListener("change", (e) => { if (e.target.name === "view") setView(e.target.value); });
   const nextView = () => {
