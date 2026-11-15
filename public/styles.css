@@ -86,10 +86,6 @@ input[type="radio"]:focus-visible, input[type="checkbox"]:focus-visible { outlin
 .site-foot { margin-top: var(--s8); padding: var(--s6) 0 var(--s7); border-top: 1px solid var(--line); color: var(--faint); font-size: var(--t-sm); }
 .site-foot p { max-width: 90ch; }
 
-/* The mark: a globe, and the scan line through it */
-.brand-mark { flex: none; width: 0.7em; height: 0.7em; border-radius: 50%; border: 0.07em solid var(--muted); position: relative; }
-.brand-mark::after { content: ""; position: absolute; left: 50%; top: 0.06em; bottom: 0.06em; width: 0.07em; margin-left: -0.035em; background: var(--accent); }
-
 /* Intro */
 .intro { padding: var(--s6) 0 0; display: grid; gap: var(--s5) var(--s7); grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
 .intro h1 { display: flex; align-items: center; gap: 0.3em; }
