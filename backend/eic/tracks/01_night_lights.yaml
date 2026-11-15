@@ -7,6 +7,8 @@ builder: night_lights
 source:
   # Path relative to resources_root (see pipeline/config.py; override with EJ_RESOURCES env var)
   video: 01_NightLights/nightlights_flat_series_and_change_wZooms_13_EIC_2160p30_h265.mp4
+  # NASA's print of the final change map with its four zooms (1024 x 288): shown flat for the decade.
+  print: 01_NightLights/nightlights_flat_series_and_change_wZooms_13_EIC.02599_print.jpg
   svs_id: 5313
   url: https://svs.gsfc.nasa.gov/5313/
   svs_title: "Change in Night Lights between 2012 and 2023 - EIC Version"
@@ -48,6 +50,27 @@ extraction:
   median_frames: 5
   max_key_distance: 28            # Lab distance; farther = "no data"
 
+# Regions: the four pop-out zooms NASA adds in the second half of the EIC video ("zoomed-in views of
+# India, Ukraine, Western Europe, and the Eastern Mediterranean region", SVS 5313). The boxes are
+# NASA's own outline boxes on the map, measured on frame 1200 and converted with the calibration in
+# `geometry`, to the nearest half degree: [west, south, east, north]. Each region is read again from
+# the same frames as the whole map (years and change map), on a finer grid, so a short sweep of just
+# that region still has detail.
+views:
+  legend: Region
+  key: R                          # in the player, R moves to the next region (then back to the whole map)
+  cell_deg: 0.5
+  seconds_per_sweep: 12           # one west->east sweep of the region (each year, or the change map)
+  items:
+    - { id: western-europe, name: "Western Europe", box: [-11.5, 35.0, 13.5, 57.0] }
+    - { id: eastern-mediterranean, name: "Eastern Mediterranean", box: [27.0, 23.5, 41.0, 40.5] }
+    - id: ukraine
+      name: "Ukraine"
+      box: [22.5, 43.5, 40.5, 55.0]
+      # Said with every map of this region: the box is NASA's, and it is wider than Ukraine.
+      note: "NASA's box around Ukraine also takes in Moldova and parts of Belarus, Russia, Romania and Poland."
+    - { id: india, name: "India", box: [65.0, 7.5, 93.0, 32.5] }
+
 media:
   width: 2048                     # display images are true 2:1 equirectangular
   height: 1024
@@ -55,13 +78,13 @@ media:
 
 playback:
   seconds_per_sweep: 15.5         # one west->east sweep per year (3° column every ~129 ms)
-  change_seconds_per_sweep: 18    # slower sweep for the change map
+  change_seconds_per_sweep: 7.5   # the decade: one note per year (about half a second), then the change figure
   crossfade: 0.6
 
 legend:
   summary: >
     A slow scan line moves west to east across the night-time Earth, once per year
-    from 2012 to 2023, then once, more slowly, across a map of how lighting changed.
+    from 2012 to 2023. Then NASA's map of how lighting changed is heard as the decade, one note per year.
   method: >
     Everything you hear sits on the scan line. Stereo runs along the line: lights near
     the top of the map (north) sound in your left ear, lights near the bottom (south) in
@@ -72,10 +95,10 @@ legend:
       meaning: "Bright city cores, played the moment the scan line crosses them. Louder note = brighter city; the pitch and the ear it sounds in tell you how far north it is."
     - sound: "Deep hum"
       meaning: "A low drone under everything. It swells and brightens with the total light under the line, leans toward the ear where most of that light is, and falls silent over oceans and dark land."
-    - sound: "Rising pair of notes (change map)"
-      meaning: "New or brighter lights since 2012 (purple on the map)."
-    - sound: "Low falling cello (change map)"
-      meaning: "Lights that dimmed or went out since 2012 (orange on the map)."
+    - sound: "The decade (the last map)"
+      meaning: "NASA's map of what changed, heard for the whole map or the region chosen: one soft note per year from 2012 to 2023. Every place starts on the same note, and twice its light is one octave higher, half its light one octave lower."
+    - sound: "Rising, falling or single (end of the decade)"
+      meaning: "NASA's change map for that place: a rising pair where light grew (purple on the map), a falling pair where it dimmed (orange), a single note where it stayed about the same."
   caveat: >
     Values are read from the colours and brightness of NASA's video frames, not
     from the original satellite measurements, so they are relative levels.

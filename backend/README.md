@@ -1,4 +1,4 @@
-# Earth Jukebox backend
+# Hearth backend
 
 The backend turns NASA Earth Information Center videos into numbers and publishes them as a small
 API the website reads. It has no server and no database: Python programs you run on a laptop write

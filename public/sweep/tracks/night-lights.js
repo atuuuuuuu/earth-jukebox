@@ -28,8 +28,12 @@ export const params = {
 const MAX_NOTES = 3;               // per column
 const EXTRA_MARGIN = 0.15;         // 2nd/3rd note in a column must clear coreMin by this much…
 const EXTRA_MIN_BANDS = 3;         // …and sit at least 18° of latitude from the others
+const ZOOM_CORE_MIN = 0.2;         // inside a region (zoomed in), dimmer towns ring too: same for every region
 const CHANGE_MIN = 0.3;            // ~top 10% of changed cells
 const CHANGE_PAIR = 0.5;           // strong change: add the rising/falling second note
+// Two-sided maps: up is a rising pair, down a falling cello. 'change': night lights 2012 to 2023;
+// 'anomaly': sea temperature from normal (El Niño), where 1 = 4 degrees C, so notes from 1.2 degrees.
+const TWO_SIDED = new Set(['change', 'anomaly']);
 const HUM_GATE = 0.08;             // below this the hum is silent: dark land / open ocean
 // Air quality only: the air is never empty, so the drone never stops; over the worst air it turns
 // sour (tension) and notes slip into E minor, so dirty air sounds uneasy, not just louder.
@@ -72,9 +76,48 @@ export function configure(settings) {
   params.ring = settings.ring;
 }
 
-/** One segment per map; one step per 3° column. */
+/**
+ * The grid a map is read on: the track's world grid, or for a map inside a region (a view, see
+ * sonifier.js) that region's own finer grid, `frame.geo`. Inside a region the 20 notes and the two
+ * ears stretch to fit it: its north edge is the highest note.
+ */
+const gridOf = (track, frame) => frame.geo ?? track.grid;
+
+/** One segment per map; one step per column of its grid (3° on the whole map), or per year of the decade. */
 export function segments(track) {
-  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({ chapter, frame, steps: track.grid.cols })));
+  return track.chapters.flatMap((chapter) => chapter.frames.map((frame) => ({
+    chapter, frame, steps: frame.decade ? frame.decade.length + DECADE.tail : gridOf(track, frame).cols,
+  })));
+}
+
+// The change map is heard as "the decade": one soft note per year for the place (the whole map or
+// a region), from its light above the dark land (frame.decade). Every place starts on A3; twice its
+// light is one octave (five steps of A major pentatonic) higher, half its light one lower. Then
+// NASA's change map for the place (frame.figure): a rising pair, a falling cello pair, or one note.
+const DECADE_SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];   // from A2 (MIDI 45)
+const DECADE = { root: 45, start: 5, perDoubling: 5, tail: 2, ring: 0.9 };
+
+/** The note of one year: `light` against the place's first year with any light, or null (a rest). */
+export function decadeMidi(light, start) {
+  if (!(light > 0) || !(start > 0)) return null;
+  const step = clamp(DECADE.start + Math.round(DECADE.perDoubling * Math.log2(light / start)), 0, DECADE_SCALE.length - 1);
+  return DECADE.root + DECADE_SCALE[step];
+}
+
+/** One step of the decade: a year's note, then the change map's figure, then quiet. */
+export function decadeStep(frame, s) {
+  const D = frame.decade, start = D.find((v) => v > 0) ?? 0, hum = { level: 0.18, pan: 0 };
+  const note = (midi, offset, voice = 'notes', velocity = 0.55, duration = DECADE.ring) => ({ voice, kind: 'year', midi, velocity, offset, duration, pos: 0 });
+  if (s < D.length) {
+    const midi = decadeMidi(D[s], start);
+    return { events: midi ? [note(midi, 0)] : [], hum, decade: { year: s, ratio: start ? D[s] / start : 0 } };
+  }
+  const last = decadeMidi(D[D.length - 1], start) ?? DECADE.root + 12;
+  if (s > D.length) return { events: [], hum: { level: 0, pan: 0 }, decade: { year: D.length - 1, ratio: start ? D[D.length - 1] / start : 0, done: true } };
+  const events = frame.figure === 'more' ? [note(last, 0, 'notes', 0.6, 1.4), note(last + 4, 0.18, 'notes', 0.5, 1.6)]
+    : frame.figure === 'less' ? [note(last - 12, 0, 'cello', 0.6, 1.4), note(last - 15, 0.3, 'cello', 0.45, 1.6)]
+      : [note(last, 0, 'notes', 0.5, 1.6)];
+  return { events, hum, decade: { year: D.length - 1, ratio: start ? D[D.length - 1] / start : 0, figure: frame.figure } };
 }
 
 export function segmentSeconds(track, seg, settings) {
@@ -94,7 +137,9 @@ export function bandOfRow(r) {
   return clamp(BANDS - 1 - Math.floor((r - TOP_ROW) / ROWS_PER_BAND), 0, BANDS - 1);
 }
 
-const noteOfRow = (r) => BAND_NOTES[bandOfRow(r)];
+/** The band of row r of a map: on the world grid by latitude, inside a region by its share of the region. */
+const bandOf = (g, r) => (g.zoom ? clamp(BANDS - 1 - Math.floor(((r + 0.5) / g.rows) * BANDS), 0, BANDS - 1) : bandOfRow(r));
+const noteOf = (g, r) => BAND_NOTES[bandOf(g, r)];
 
 function lightSource(fr) {
   return fr._glow ? (i) => fr._glow[i] : (i) => fr._gain[i] + fr._loss[i];
@@ -102,11 +147,11 @@ function lightSource(fr) {
 
 /** Decode compact int arrays once and compute each chapter's loudness scales. */
 export function prepare(track) {
-  const g = track.grid;
   const toF = (a) => Float32Array.from(a, (v) => v / 100);
   for (const ch of track.chapters) {
     const colSums = [], cells = [];
     for (const fr of ch.frames) {
+      const g = gridOf(track, fr);
       for (const k of ['core', 'glow', 'gain', 'loss']) if (fr[k]) fr[`_${k}`] = toF(fr[k]);
       const val = lightSource(fr);
       for (let c = 0; c < g.cols; c++) {
@@ -122,7 +167,7 @@ export function prepare(track) {
     }
     if (ch.id === 'pollutants') {     // notes ring for each pollutant's thickest tenth (its scale differs)
       for (const fr of ch.frames) {
-        const v = [];
+        const g = gridOf(track, fr), v = [];
         for (let i = 0; i < fr._core.length; i++) if (inRange(g, Math.floor(i / g.cols))) v.push(fr._core[i]);
         v.sort((a, b) => a - b);
         fr._noteMin = Math.max(0.3, v[Math.floor(v.length * 0.9)] ?? 0.3);
@@ -137,8 +182,8 @@ export function prepare(track) {
 }
 
 /** Light 0..1 in each grid row of column c — the shape drawn on the scan line. */
-export function rowLevels(track, chapter, frame, c, out = new Float32Array(track.grid.rows)) {
-  const g = track.grid;
+export function rowLevels(track, chapter, frame, c, out = new Float32Array(gridOf(track, frame).rows)) {
+  const g = gridOf(track, frame);
   const val = lightSource(frame);
   for (let r = 0; r < g.rows; r++) {
     out[r] = inRange(g, r) ? Math.min(1, Math.sqrt(val(r * g.cols + c) / chapter._rowNorm)) : 0;
@@ -148,7 +193,7 @@ export function rowLevels(track, chapter, frame, c, out = new Float32Array(track
 
 /** Hum loudness 0..1 and where along the line the light sits (-1 = top/north … +1 = bottom/south). */
 function hum(track, chapter, frame, c) {
-  const g = track.grid;
+  const g = gridOf(track, frame);
   const val = lightSource(frame);
   let sum = 0, moment = 0;
   for (let r = 0; r < g.rows; r++) {
@@ -187,22 +232,23 @@ function peaks(arr, g, c, min) {
  */
 export function planStep(track, seg, c) {
   const { chapter, frame } = seg;
-  const g = track.grid;
+  if (frame.decade) return decadeStep(frame, c);
+  const g = gridOf(track, frame);
   const events = [];
   const ring = params.ring;
 
-  // Every chapter but the change map is a map of one quantity (light, lightning, a pollutant).
-  if (chapter.id !== 'change') {
-    const min = frame._noteMin ?? params.coreMin;
+  // Every chapter but the two-sided maps is a map of one quantity (light, lightning, a pollutant).
+  if (!TWO_SIDED.has(chapter.id)) {
+    const min = frame._noteMin ?? (g.zoom ? ZOOM_CORE_MIN : params.coreMin);
     const chosen = [];
     for (const q of peaks(frame._core, g, c, min)) {
       if (chosen.length >= MAX_NOTES) break;
-      const far = chosen.every((o) => Math.abs(bandOfRow(q.r) - bandOfRow(o.r)) >= EXTRA_MIN_BANDS);
+      const far = chosen.every((o) => Math.abs(bandOf(g, q.r) - bandOf(g, o.r)) >= EXTRA_MIN_BANDS);
       if (chosen.length === 0 || (q.v >= min + EXTRA_MARGIN && far)) chosen.push(q);
     }
     chosen.forEach((q, i) => {
       const t = clamp((q.v - min) / (1 - min), 0, 1);
-      let midi = noteOfRow(q.r);
+      let midi = noteOf(g, q.r);
       if (chapter.id === 'pollutants' && q.v >= min + AIR_HOT * (1 - min) && MINOR_SHIFT.has(midi % 12)) midi += 1;
       events.push({
         voice: 'notes', kind: 'note', row: q.r, col: c, midi,
@@ -212,7 +258,7 @@ export function planStep(track, seg, c) {
   } else {
     const gp = peaks(frame._gain, g, c, CHANGE_MIN)[0];
     if (gp) {
-      const b = bandOfRow(gp.r);
+      const b = bandOf(g, gp.r);
       const vel = 0.2 + 0.55 * gp.v;
       events.push({ voice: 'notes', kind: 'gain', row: gp.r, col: c, midi: BAND_NOTES[b], velocity: vel, offset: 0, duration: ring });
       if (gp.v >= CHANGE_PAIR) {
@@ -222,7 +268,7 @@ export function planStep(track, seg, c) {
     }
     const lp = peaks(frame._loss, g, c, CHANGE_MIN)[0];
     if (lp) {
-      const b = bandOfRow(lp.r);
+      const b = bandOf(g, lp.r);
       const vel = 0.25 + 0.55 * lp.v;
       events.push({ voice: 'cello', kind: 'loss', row: lp.r, col: c, midi: BAND_NOTES[b] - 12, velocity: vel, offset: 0.04, duration: 1.4 });
       if (lp.v >= CHANGE_PAIR) {
@@ -242,7 +288,7 @@ export function planStep(track, seg, c) {
 /** Geometry and light levels of the scan line at fraction p of the segment (for drawing). */
 let colA, colB;
 export function lineShape(track, seg, p, shape) {
-  const g = track.grid;
+  const g = gridOf(track, seg.frame);
   if (!shape.ys || shape.ys.length !== g.rows) {
     shape.ys = Float32Array.from({ length: g.rows }, (_, r) => (r + 0.5) / g.rows);
     shape.levels = new Float32Array(g.rows);

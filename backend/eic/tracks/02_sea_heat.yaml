@@ -1,0 +1,87 @@
+# Track 02 — Sea surface currents and temperature (NASA SVS 3912), "Warm and cold seas".
+# A flat world map whose surface currents are drawn as flow lines coloured by temperature. Each
+# colour is read back to degrees Celsius on NASA's own key (0 to 32 C). A level scan line sweeps the
+# map from north to south, once for each quarter of NASA's year-long movie.
+id: 02_sea_heat
+title: "Warm and Cold Seas"
+short: "Sea heat"
+builder: sea_heat
+
+source:
+  # Under EJ_RESOURCES. The movie without the colour key drawn on it (the other flat movie,
+  # flat_global_ecco2_2028x1024_comp_p30.mp4, has the key over the Southern Ocean).
+  video: 02_SeaSurface_Currents_Temp/ecco2_sst_flow.mp4
+  key: 02_SeaSurface_Currents_Temp/sst_ecco2_cbar.png
+  # NASA's per-frame dates for this movie, one line per frame ("23000  2007-03-25T12:00Z"), from
+  # https://svs.gsfc.nasa.gov/vis/a000000/a003900/a003912/flat_ecco2_dates.txt (2001 lines = 2001 frames).
+  dates: 02_SeaSurface_Currents_Temp/flat_ecco2_dates.txt
+  svs_id: 3912
+  url: https://svs.gsfc.nasa.gov/3912/
+  svs_title: "Global Sea Surface Currents and Temperature"
+  credit: "NASA/Goddard Space Flight Center Scientific Visualization Studio"
+  visualizer: "Greg Shirah"
+  dataset: "ECCO2 High Resolution Ocean and Sea Ice Model (NASA/JPL); GTOPO30 Topography and Bathymetry (USGS)"
+
+geometry:
+  # 2048 x 1024, a true 2:1 equirectangular world: column 0 = 180 W, row 0 = 90 N. The pipeline
+  # checks this against the Blue Marble's land and prints the best shift (it must be 0).
+  lon_at_x0: -180
+
+key:
+  values: [0, 32]                 # NASA's key: "Sea Surface Temp (C)", 0 at the left, 32 at the right
+  samples: 129                    # one key colour every 0.25 C
+
+extraction:
+  grid: { cols: 120, rows: 60 }   # 3 degree cells, row 0 = 90 N, col 0 = 180 W
+  every: 10                       # read every 10th frame: 3 frames a second of movie
+  sweeps: 4                       # equal quarters of the movie, one map (and one sweep) each
+  # A pixel is a flow line when it is bright and strongly coloured (grey land, white ice and the
+  # black sea between the lines are not), and its colour, brightness set aside, is near the key.
+  min_bright: 70                  # brightest channel, 0..255
+  min_sat: 0.45                   # (brightest - darkest) / brightest
+  max_key_distance: 18            # Lab distance to the nearest key colour
+  min_pixels: 40                  # flow-line pixels a cell needs over its quarter, else "no reading"
+
+media:
+  width: 2048
+  height: 1024
+  webp_quality: 82
+
+sound:
+  seconds_per_sweep: 16
+  # The chord grows as the water under the line warms: the area-weighted mean temperature of the
+  # sea cells under the line. Each group joins at `min` degrees C, on top of the ones below it.
+  # One white-key scale (D Dorian), after the warm pad of the reference (instrument.mp3).
+  voices:
+    - { min: 0, notes: [D2] }       # any sea: the deep base, quiet
+    - { min: 6, notes: [A2] }
+    - { min: 12, notes: [D3, F3] }
+    - { min: 18, notes: [A3, C4] }
+    - { min: 24, notes: [E4, G4] }
+    - { min: 28, notes: [A4, D5] }  # the warmest seas on Earth: the highest voices
+
+legend:
+  summary: >
+    NASA's model of the ocean surface from March 2007 to March 2008: its currents, drawn as flow
+    lines coloured by temperature. A level scan line moves down the map, from the Arctic to
+    Antarctica, once for each quarter of the year.
+  method: >
+    On this track the scan line lies on its side: it runs from west to east and moves from north to
+    south. So here your left ear is west and your right ear is east. The sound is a warm pad, after
+    NASA's reference instrument, with a soft melody on top: its notes climb as the water warms. The colour of every current is
+    read back to degrees Celsius on NASA's own key, from 0 to 32. Each sweep takes about 16 seconds.
+  items:
+    - sound: "Deep base note"
+      meaning: "Sea under the scan line. It is there over any water, alone over cold seas, and almost silent where the line crosses only land or ice. It is louder when more of the line is sea."
+    - sound: "Temperature notes"
+      meaning: "A soft swelling note every few degrees of latitude: its pitch is the temperature of the water under the line, one step of the scale higher for every two degrees. Warmer water sounds higher, colder water lower. Where part of the line is much warmer than the rest, it adds a second note in its own ear."
+    - sound: "Chord voices"
+      meaning: "Warm water under the line. The warmer it is, the more voices join on top, each one higher: a fifth from 6 degrees, more voices from 12, 18 and 24 degrees, and the highest from 28 degrees, the warmest seas on Earth."
+    - sound: "Left and right"
+      meaning: "Where along the line the warm water is: each voice leans toward it, west in your left ear, east in your right ear."
+  caveat: >
+    Temperatures are read from the colours of NASA's flow lines, so they are the model's sea surface
+    temperature as NASA drew it, to about one degree, and only where a current is drawn: land, sea
+    ice and Antarctica have no reading. NASA's key starts at 0 degrees, so colder water near the ice
+    reads as 0 to 2 degrees. Each sweep is one quarter of NASA's year-long movie, the
+    middle value of every reading in it, so short changes inside a quarter are smoothed away.

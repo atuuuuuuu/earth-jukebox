@@ -184,6 +184,15 @@ def ranked(grid, sign: int = 1, n: int = 3, floor: float = 0.0) -> list[tuple[in
     return sorted(cells, key=lambda t: -sign * t[2])[:n]
 
 
+def spread(cells, n: int = 3) -> list:
+    """The first n cells at least 3 cells (30 degrees) apart, so each names a different place."""
+    out = []
+    for q in cells:
+        if len(out) < n and all(max(abs(q[0] - o[0]), abs(q[1] - o[1])) >= 3 for o in out):
+            out.append(q)
+    return out
+
+
 def r3(grid):
     return [[None if v is None else round(v, 3) for v in row] for row in grid]
 
@@ -233,6 +242,18 @@ def build_years(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+def decade_words(decade: list | None, figure: str | None) -> str:
+    """How the change map sounds for a place: its light year by year (one note each), then NASA's figure."""
+    if not decade or not decade[0]:
+        return ""
+    pct = round((decade[-1] / decade[0] - 1) * 100)
+    trend = "about the same light" if abs(pct) < 3 else f"{abs(pct)} percent {'more' if pct > 0 else 'less'} light"
+    fig = {"more": "a rising pair, as NASA's change map shows more light",
+           "less": "a falling pair, as NASA's change map shows less light"}.get(figure, "a single note, as NASA's change map shows little change")
+    return (f" Heard as the decade, one note per year from the same starting note, an octave higher for twice the light: "
+            f"2023 has {trend} than 2012 above the dark land. Then {fig}.")
+
+
 def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
     g = data["grid"]
     frames = []
@@ -253,7 +274,8 @@ def build_change(data: dict, chapter: dict, t: dict) -> list[dict]:
         text = (f"{when}. Light grew in {round(more * 100, 1)} percent of the map read "
                 f"and dimmed in {round(less * 100, 1)} percent. "
                 + (f"Most new light: {listing(gains)}. " if gains else "")
-                + (f"Most dimming: {listing(losses)}." if losses else "No square dimmed overall."))
+                + (f"Most dimming: {listing(losses)}." if losses else "No square dimmed overall.")
+                + decade_words(f.get("decade"), f.get("figure")))
         frames.append({
             "date": f"{int(end):04d}-07-01",
             "when": when,
@@ -437,10 +459,284 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
     return frames
 
 
+# ---------------------------------------------------------------- views (regions, stories)
+#
+# A track's data may hold `views`: other ways to hear the same track, each on its own finer grid
+# (backend/eic writes them). "choose": pick one window, and the track's maps play inside it (NASA's
+# zoom regions on night lights). "tour": every window in turn, one sweep each (NASA's stories on the
+# aerosol map). The score gets the spoken name and text of every map of every option.
+
+# More cities, only for naming spots on a view's finer grid (the whole maps keep PLACES).
+VIEW_PLACES = PLACES + [
+    ("Kharkiv", 50.0, 36.2), ("Odesa", 46.5, 30.7), ("Dnipro", 48.5, 35.0), ("Lviv", 49.8, 24.0),
+    ("Minsk", 53.9, 27.6), ("Bucharest", 44.4, 26.1), ("Chisinau", 47.0, 28.9), ("Rostov-on-Don", 47.2, 39.7),
+    ("Voronezh", 51.7, 39.2), ("Ankara", 39.9, 32.9), ("Izmir", 38.4, 27.1), ("Athens", 38.0, 23.7),
+    ("Tel Aviv", 32.1, 34.8), ("Amman", 31.95, 35.9), ("Beirut", 33.9, 35.5), ("Damascus", 33.5, 36.3),
+    ("Alexandria", 31.2, 29.9), ("Aswan", 24.1, 32.9), ("Jeddah", 21.5, 39.2), ("Nicosia", 35.2, 33.4),
+    ("Barcelona", 41.4, 2.2), ("Lisbon", 38.7, -9.1), ("Porto", 41.15, -8.6), ("Amsterdam", 52.4, 4.9),
+    ("Brussels", 50.85, 4.35), ("Munich", 48.1, 11.6), ("Hamburg", 53.55, 10.0), ("Dublin", 53.35, -6.3),
+    ("Lyon", 45.75, 4.85), ("Marseille", 43.3, 5.4), ("Zurich", 47.4, 8.5), ("Manchester", 53.5, -2.2),
+    ("Hyderabad", 17.4, 78.5), ("Chennai", 13.1, 80.3), ("Ahmedabad", 23.0, 72.6), ("Pune", 18.5, 73.9),
+    ("Kathmandu", 27.7, 85.3), ("Colombo", 6.9, 79.9), ("Lucknow", 26.85, 80.95), ("Patna", 25.6, 85.1),
+    ("Nagpur", 21.15, 79.1), ("Jaipur", 26.9, 75.8),
+]
+
+
+def near(lat: float, lon: float, within: float = 1.5) -> str:
+    """'around Kyiv' for the nearest listed city within `within` degrees, else the coordinates."""
+    best, name = within, None
+    for n, la, lo in VIEW_PLACES:
+        d = math.hypot((lo - lon) * math.cos(math.radians(lat)), la - lat)
+        if d <= best:
+            best, name = d, n
+    return f"around {name}" if name else f"around {deg_text(lat, lon)}"
+
+
+def view_cells(g: dict):
+    """(row, col, latitude, longitude, area weight) of every cell of a view's grid."""
+    for r in range(g["rows"]):
+        lat = g["latNorth"] - (r + 0.5) * g["cellDeg"]
+        for c in range(g["cols"]):
+            yield r, c, lat, g["lonWest"] + (c + 0.5) * g["cellDeg"], math.cos(math.radians(lat))
+
+
+def spots(g: dict, values: list[float], sign: int = 1, n: int = 3, floor: float = 0.05, apart: float = 2.5) -> str:
+    """The n strongest places (cells at least `apart` degrees from each other), named, as one phrase."""
+    cells = sorted(((sign * v, lat, lon) for (r, c, lat, lon, _), v in zip(view_cells(g), values) if sign * v > floor),
+                   reverse=True)
+    picked = []
+    for v, lat, lon in cells:
+        if all(math.hypot(lat - a, lon - b) >= apart for a, b in picked):
+            picked.append((lat, lon))
+        if len(picked) == n:
+            break
+    names = list(dict.fromkeys(near(lat, lon) for lat, lon in picked))   # one city named once
+    if len(names) <= 1:
+        return "".join(names)
+    sep = ("; ", "; and ") if any("degrees" in x for x in names) else (", ", " and ")
+    return sep[0].join(names[:-1]) + sep[1] + names[-1]
+
+
+def region_frames(item: dict, chapter: str, frames: list[dict]) -> list[dict]:
+    """One map per map of the track, inside the region: when, text, and where its data is."""
+    g, out = item["grid"], []
+    name = f"{item['name']}. {item['note']}".rstrip(".") if item.get("note") else item["name"]
+    data = item["chapters"][chapter]
+    weights = [w for *_, w in view_cells(g)]
+    if chapter == "years":
+        totals = [sum(w * v for w, v in zip(weights, f["glow"])) for f in data]
+    for i, (f, base) in enumerate(zip(data, frames)):
+        when = base["when"]
+        if chapter == "years":
+            glow = [v / 100 for v in f["glow"]]
+            pct = round((totals[i] / (totals[0] or 1) - 1) * 100)
+            first = frames[0]["when"]
+            change = ("The first year of this region." if i == 0
+                      else f"About the same total light as in {first}." if pct == 0
+                      else f"Total light: {abs(pct)} percent {'more' if pct > 0 else 'less'} than in {first}.")
+            text = f"{when}. {name}. {change} Brightest: {spots(g, glow)}."
+        else:
+            net = [(a - b) / 100 for a, b in zip(f["gain"], f["loss"])]
+            wsum = sum(weights) or 1
+            more = sum(w for w, v in zip(weights, net) if v >= 0.05) / wsum
+            less = sum(w for w, v in zip(weights, net) if v <= -0.05) / wsum
+            gains, losses = spots(g, net, 1), spots(g, net, -1)
+            text = (f"{when}. {name}. Light grew in {round(more * 100, 1)} percent of the region and dimmed in "
+                    f"{round(less * 100, 1)} percent. "
+                    + (f"Most new light: {gains}. " if gains else "No place grew brighter overall. ")
+                    + (f"Most dimming: {losses}." if losses else "No place dimmed overall.")
+                    + decade_words(f.get("decade"), f.get("figure")))
+        out.append({"when": when, "text": text.strip(), "box": item["box"], "base": i, "view": item["id"], "frame": i})
+    return out
+
+
+def story_frame(item: dict, layers: list[dict]) -> dict:
+    """One story of a tour: its name, our words from NASA's facts, and which winds are loudest in it."""
+    g = item["grid"]
+    weights = [w for *_, w in view_cells(g)]
+    vals = item["chapters"]["still"][0]["layers"]
+    means = sorted(((sum(w * v for w, v in zip(weights, vals[L["id"]])) / 100 / (sum(weights) or 1), L["name"].lower())
+                    for L in layers), reverse=True)
+    loud = [n for m, n in means if m >= 0.02][:3]
+    heard = (f" Loudest winds here: {', then '.join(loud)}." if loud else "")
+    return {"when": item["name"], "text": f"{item['name']}. {item['about']}{heard}", "box": item["box"],
+            "focus": item.get("focus"), "base": 0, "view": item["id"], "frame": 0}
+
+
+def build_views(data: dict, t: dict, frames: list[dict]) -> dict | None:
+    v = data.get("views")
+    if not v:
+        return None
+    if v.get("mode") == "tour":
+        options = [{"id": v.get("id") or "stories", "name": v.get("name") or v["legend"], "unit": "story",
+                    "frames": [story_frame(it, data.get("layers") or []) for it in v["items"]]}]
+    else:
+        chapters = t.get("chapters") or [t["chapter"]]
+        if any(c not in it["chapters"] for it in v["items"] for c in chapters):
+            return None
+        options = []
+        for it in v["items"]:
+            out, offset = [], 0
+            for c in chapters:
+                n = len(it["chapters"][c])
+                out += [{**f, "base": offset + f["base"], "chapter": c} for f in region_frames(it, c, frames[offset:offset + n])]
+                offset += n
+            options.append({"id": it["id"], "name": it["name"], "unit": "map", "frames": out})
+    return {"legend": v["legend"], **({"key": v["key"]} if v.get("key") else {}), "options": options}
+
+
+# ---------------------------------------------------------------- sea heat (sweeps of one movie)
+
+def sea_name(lat: float, lon: float) -> str:
+    """The sea a point lies in, in words: "the Bay of Bengal", "the western Pacific, north of the equator"."""
+    lon = (lon + 180) % 360 - 180
+    if lat >= 66:
+        return "the Arctic Ocean"
+    if lat <= -50:
+        return "the Southern Ocean"
+    if 52 <= lat and (lon >= 160 or lon <= -157):
+        return "the Bering Sea"
+    if 45 <= lat < 66 and 135 <= lon < 160:
+        return "the Sea of Okhotsk"
+    if 51 <= lat and -95 <= lon <= -77:
+        return "Hudson Bay"
+    if 50 <= lat and -65 <= lon <= -45:
+        return "the Labrador Sea"
+    if 53 <= lat and 10 <= lon <= 30:
+        return "the Baltic Sea"
+    if 12 <= lat <= 30 and 32 <= lon <= 44:
+        return "the Red Sea"
+    if 23 <= lat <= 31 and 47 <= lon <= 57:
+        return "the Persian Gulf"
+    if 30 <= lat <= 46 and -6 <= lon <= 37:
+        return "the Mediterranean Sea"
+    if 18 <= lat <= 31 and -98 <= lon <= -80:
+        return "the Gulf of Mexico"
+    if 9 <= lat < 22 and -88 <= lon <= -60:
+        return "the Caribbean Sea"
+    if 5 <= lat <= 25 and 50 <= lon <= 77:
+        return "the Arabian Sea"
+    if 5 <= lat <= 23 and 80 <= lon <= 95:
+        return "the Bay of Bengal"
+    if (20 <= lon < 100 and lat < 25) or (100 <= lon < 135 and lat < -10):
+        return "the Indian Ocean"
+    side = "north of the equator" if lat > 2 else "south of the equator" if lat < -2 else "at the equator"
+    atlantic_west = -100 if lat >= 18 else -84 if lat >= 8 else -70
+    if atlantic_west <= lon <= 20:
+        return f"the {'North' if lat > 0 else 'South'} Atlantic"
+    across = (lon - 120) % 360                    # the Pacific, from 120 E eastward
+    part = "western" if across < 60 else "central" if across < 125 else "eastern"
+    return f"the {part} Pacific, {side}"
+
+
+def sea_spots(grid, n: int, warmest: bool) -> str:
+    """The n warmest (or coldest) 10-degree squares, one per sea: "the Bay of Bengal, 30 degrees; …"."""
+    cells = sorted(((v, r, c) for r, row in enumerate(grid) for c, v in enumerate(row) if v is not None),
+                   reverse=warmest)
+    out, seen = [], set()
+    for v, r, c in cells:
+        name = sea_name(cell_lat(r), cell_lon(c))
+        sea = name.split(",")[0]                 # one spot per sea, north or south of the equator alike
+        if sea in seen:
+            continue
+        seen.add(sea)
+        out.append(f"{name}, {round(v)} degree{'' if round(v) == 1 else 's'}")
+        if len(out) == n:
+            break
+    return "; ".join(out)
+
+
+def build_sweeps(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """Sea surface temperature: one map per section of NASA's movie, in degrees C on NASA's key."""
+    g = data["grid"]
+    lat_range = tuple(t.get("latRange", (-90, 90)))
+    frames = []
+    for f in chapter["frames"]:
+        grid = pool(f["temp"], g, lat_range)
+        st = stats(grid, t["hotLine"])
+        when = f["label"]
+        text = (f"{when}. Where NASA draws currents, the sea surface averages {round(st['mean'])} degrees Celsius. "
+                f"Warmest: {sea_spots(grid, 3, True)}. Coldest: {sea_spots(grid, 2, False)}. "
+                f"Water of {t['hotLine']:g} degrees or more covers {round(st['hot'] * 100)} percent of the sea read.")
+        frames.append({
+            "date": f.get("from"),
+            "when": when,
+            "image": f["image"],
+            "alt": f.get("alt", ""),
+            **st,
+            "grid": [[None if v is None else round(v, 1) for v in row] for row in grid],
+            "text": text,
+        })
+    return frames
+
+
+def build_map(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """One world map from a NASA film: ocean currents (NASA's flat map), carbon dioxide (its turning globe, flattened)."""
+    g = data["grid"]
+    pooled = [pool([None if v is None else v / 100 for v in f["glow"]], g) for f in chapter["frames"]]
+    scale = percentile([v for grid in pooled for row in grid for v in row if v], 0.99) or 1.0
+    frames = []
+    for f, grid in zip(chapter["frames"], pooled):
+        grid = [[None if v is None else min(1.0, v / scale) for v in row] for row in grid]
+        busy = spread(ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.05))   # each a different current or plume
+        text = f"{f['label']}. {f['about']} " + (f"{t['words']['busiest']}: {listing(busy)}." if busy else "")
+        frames.append({
+            "date": None,
+            "when": f["label"],
+            "image": f["image"],
+            "alt": f.get("alt", ""),
+            **stats(grid, t["hotLine"]),
+            "relativeTotal": 1.0,
+            "grid": r3(grid),
+            "text": text.strip(),
+        })
+    return frames
+
+
+def build_anomaly(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """El Niño: one map a month of how much warmer or cooler than normal the sea is, in degrees C on
+    NASA's fixed scale. The maps come in pairs (a month of 2025, then the same month of 2026), so
+    they carry no date: the date order check is for maps in time order."""
+    g, unit, line, hot = data["grid"], chapter["degreesPerUnit"], chapter["elNinoLine"], t["hotLine"]
+
+    def than(x: float, ref: str) -> str:
+        return f"about as warm as {ref}" if abs(x) < 0.05 else f"{abs(x):.1f} degrees C {'warmer' if x > 0 else 'cooler'} than {ref}"
+
+    labels = {f["label"]: f for f in chapter["frames"]}
+    frames = []
+    # Name only squares that are mostly sea: "around Warsaw" would mean the Baltic, and mislead.
+    sea = pool([0.0 if a is None else 1.0 for a in chapter["frames"][0]["gain"]], g)
+    at_sea = lambda cells: [q for q in cells if sea[q[0]][q[1]] >= 0.5]
+    for f in chapter["frames"]:
+        grid = pool([None if a is None else (a - b) / 100 * unit for a, b in zip(f["gain"], f["loss"])], g)
+        st = stats(grid, hot)
+        cool = stats([[None if v is None else -v for v in row] for row in grid], hot)["hot"]
+        rel = f["nino34Relative"]
+        month, year = f["label"].rsplit(" ", 1)
+        before = labels.get(f"{month} {int(year) - 1}")
+        warmest = spread(at_sea(ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.5)))
+        coolest = spread(at_sea(ranked(grid, -1, GRID_ROWS * GRID_COLS, 0.5)))
+        text = (f"{f['label']}" + (f", {f['span']} only" if f["days"] < 20 else "")
+                + f". The El Niño box in the central Pacific is {than(f['nino34'], 'normal')}, and "
+                + f"{than(rel, 'the tropical ocean as a whole')}: "
+                + (f"El Niño, above the line of {line} degrees warmer. " if rel >= line else f"below the El Niño line of {line} degrees warmer. ")
+                + (f"A year earlier it was {than(before['nino34Relative'], 'the tropics')}. " if before else "")
+                + (f"Warmest: {listing(warmest)}. " if warmest else "")
+                + (f"Coolest: {listing(coolest)}. " if coolest else "")
+                + f"{round(st['hot'] * 100)} percent of the sea read is at least {hot:g} degree warmer than normal, "
+                + f"{round(cool * 100)} percent at least {hot:g} degree cooler.")
+        frames.append({
+            "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""), **st,
+            "grid": r3(grid), "text": text,
+        })
+    return frames
+
+
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
 BUILDERS = {"years": build_years, "change": build_change, "weeks": build_weeks, "parts": build_parts,
-            "pollutants": build_pollutants, "scenes": build_scenes, "still": build_still}
+            "pollutants": build_pollutants, "scenes": build_scenes, "still": build_still, "sweeps": build_sweeps,
+            "currents": build_map, "anomaly": build_anomaly}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 
@@ -453,16 +749,23 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
     if not src.is_file():
         raise ConfigError(f"Track {t['id']}: {src} not found. Run the EIC pipeline first (backend/eic).")
     data = json.loads(src.read_text(encoding="utf-8"))
-    chapter = next((c for c in data["chapters"] if c["id"] == t["chapter"]), None)
-    if chapter is None:
-        raise ConfigError(f"Track {t['id']}: no chapter '{t['chapter']}' in {src}")
-    frames = BUILDERS[t["chapter"]](data, chapter, {**t, "_public": public})
+    if t.get("lesson") and not (public / t["lesson"]).is_file():
+        raise ConfigError(f"Track {t['id']}: lesson {t['lesson']} not found. Run the EIC pipeline first (backend/eic).")
+    frames = []
+    for cid in t.get("chapters") or [t["chapter"]]:
+        chapter = next((c for c in data["chapters"] if c["id"] == cid), None)
+        if chapter is None:
+            raise ConfigError(f"Track {t['id']}: no chapter '{cid}' in {src}")
+        frames += BUILDERS[cid](data, chapter, {**t, "_public": public})
     s = data["source"]
     legend = dict(data["legend"])
     if t.get("summary"):
         legend["summary"] = t["summary"]
-    if t["chapter"] in LEGEND_KEEP:
+    if t["chapter"] in LEGEND_KEEP and not t.get("chapters"):
         legend["items"] = [i for i in legend["items"] if i["sound"].startswith(LEGEND_KEEP[t["chapter"]])]
+    views = build_views(data, t, frames)
+    if views and t.get("viewsMethod"):
+        legend["method"] = f"{legend['method'].strip()} {t['viewsMethod']}"
     score = {
         "api": API_VERSION,
         "id": t["id"],
@@ -473,11 +776,23 @@ def build_track(t: dict, public: Path) -> tuple[dict, dict]:
         "leftLon": data.get("grid", {}).get("lonWest", -180),
         "words": t["words"],
         "sweep": {"src": t["data"], "chapter": t["chapter"], "mapping": t.get("mapping", "night-lights"),
-                  "instrument": t.get("instrument", "vibraphone")},
+                  "instrument": t.get("instrument", "vibraphone"),
+                  **({"chapters": t["chapters"]} if t.get("chapters") else {}),
+                  # Which way the scan line moves: only said when it is not the usual west to east.
+                  **({"scan": t["scan"]} if t.get("scan") else {})},
         "legend": legend,
+        # A guided lesson shown before the player (ocean currents: the Gulf Stream), in data/.
+        **({"lesson": t["lesson"]} if t.get("lesson") else {}),
         # Layers heard on their own (aerosols): id, spoken name, shortcut key, picture of it alone.
-        **({"layers": [{k: L[k] for k in ("id", "name", "key", "image") if k in L} for L in data["layers"]]}
+        # colour: the layer's swatch on NASA's key, as #rrggbb (the page marks it with this).
+        **({"layers": [{**{k: L[k] for k in ("id", "name", "key", "image") if k in L},
+                        **({"colour": "#{:02x}{:02x}{:02x}".format(*L["rgb"])} if L.get("rgb") else {})}
+                       for L in data["layers"]]}
            if data.get("layers") else {}),
+        # "About this track": what, who, when, where, why, how, and where it comes from (config).
+        **({"about": t["about"]} if t.get("about") else {}),
+        # Other ways to hear this track (NASA's zoom regions, NASA's stories): see build_views.
+        **({"views": views} if views else {}),
         # Names for 10-degree cells that hold a listed city, "row,col": name. Only for speech.
         "places": {f"{r},{c}": n for r in range(GRID_ROWS) for c in range(GRID_COLS) if (n := place_in(r, c))},
         "frames": frames,
@@ -511,7 +826,7 @@ def main(config_path: Path) -> None:
     index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {
         "api": API_VERSION, "generated": date.today().isoformat(), "sample": False, "tracks": []}
     ours = {t["id"] for t in cfg["tracks"]}
-    index["tracks"] = [t for t in index["tracks"] if t["id"] not in ours]
+    index["tracks"] = [t for t in index["tracks"] if t["id"] not in ours and t.get("engine") != "sweep"]
     (public / "api" / "scores").mkdir(parents=True, exist_ok=True)
     for t in cfg["tracks"]:
         entry, score = build_track(t, public)

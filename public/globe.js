@@ -37,7 +37,9 @@ uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
 uniform float uSweep;          // 1 when the scan line moves freely at uHead (sweep tracks)
-uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 new light, 2 dimmed)
+uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 lavender, 2 orange, 3 blue)
+uniform vec4 uBox;             // the window heard now (a region or story): west, south, east, north; x > 900 = none
+uniform float uScanLat;        // 1: the scan line is a latitude (uHead) moving south (sea heat); 0: a longitude
 
 float lonDist(float a, float b) { return abs(mod(a - b + 540.0, 360.0) - 180.0); }
 float band(float d, float w) { return 1.0 - smoothstep(0.0, w, d); }
@@ -112,10 +114,27 @@ void main() {
   float gLat = line(15.0 - abs(mod(lat + 90.0, 30.0) - 15.0), 1.0);
   col = mix(col, vec3(1.0), 0.10 * max(gLon, gLat));
 
+  // A region or story: only its window is heard. Outside it rests dim; a thin outline marks it.
+  if (uBox.x < 900.0) {
+    float inLon = step(uBox.x, lon) * step(lon, uBox.z), inLat = step(uBox.y, lat) * step(lat, uBox.w);
+    col *= mix(0.45, 1.0, inLon * inLat);
+    float edgeLon = min(lonDist(lon, uBox.x), lonDist(lon, uBox.z)) * cos(radians(lat));
+    float edgeLat = min(abs(lat - uBox.y), abs(lat - uBox.w));
+    float outline = max(line(edgeLon, 1.5) * step(uBox.y, lat) * step(lat, uBox.w),
+                        line(edgeLat, 1.5) * step(uBox.x, lon) * step(lon, uBox.z));
+    col = mix(col, vec3(0.9, 0.92, 0.95), 0.8 * outline);
+  }
+
+  // A line moving south (sea heat): a circle of latitude; the part not yet heard, south of it, rests dimmer.
+  if (uSweep > 0.5 && uHead < 900.0 && uScanLat > 0.5) {
+    col *= mix(1.0, 0.6, step(lat, uHead));
+    col = mix(col, vec3(1.0, 0.85, 0.5), 0.95 * line(abs(lat - uHead), 2.5));
+  }
   // Sweep tracks: one thin scan line moving west to east. The part not yet heard rests dimmer.
-  if (uSweep > 0.5 && uHead < 900.0) {
+  else if (uSweep > 0.5 && uHead < 900.0) {
     col *= mix(1.0, 0.6, step(uHead, lon));
     float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
+    if (uBox.x < 900.0) ph *= step(uBox.y - 0.5, lat) * step(lat, uBox.w + 0.5);   // only across the window heard
     col = mix(col, vec3(1.0, 0.85, 0.5), 0.95 * ph);
   }
 
@@ -128,7 +147,7 @@ void main() {
     float fade = 1.0 - p.z;
     float ring = (1.0 - smoothstep(0.0, 1.2, abs(d - (1.5 + 6.0 * p.z)))) * fade;
     float core = (1.0 - smoothstep(0.0, 1.8, d)) * fade;
-    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : vec3(1.0, 0.66, 0.41);
+    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : p.w < 2.5 ? vec3(1.0, 0.66, 0.41) : vec3(0.55, 0.8, 1.0);
     col = mix(col, pc, clamp(0.8 * ring + core, 0.0, 1.0));
   }
 
@@ -202,6 +221,8 @@ void main() {
       this.fps = 24;         // smooth enough, and light on older laptops
       this.nextDraw = 0;
       this.cell = [-1, -1];
+      this.box = null;        // the window heard now: [west, south, east, north], or null for the whole map
+      this.scanLat = false;   // true: headFn gives the latitude of a line moving south (sea heat)
       this.mix = 1;
       this.dataOn = true;
       this.scale = 0.9;
@@ -249,7 +270,7 @@ void main() {
       const ib = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       this.u = {};
-      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing"]) this.u[n] = gl.getUniformLocation(p, n);
+      for (const n of ["uMVP", "uRot", "uData0", "uData1", "uEarth", "uMix", "uLeftLon", "uHead", "uCell", "uDataOn", "uPx", "uFull", "uSweep", "uPing", "uBox", "uScanLat"]) this.u[n] = gl.getUniformLocation(p, n);
       this.tex = [this.texture(), this.texture(), this.texture()];
       gl.uniform1i(this.u.uData0, 0); gl.uniform1i(this.u.uData1, 1); gl.uniform1i(this.u.uEarth, 2);
       gl.enable(gl.DEPTH_TEST);
@@ -299,7 +320,7 @@ void main() {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.tex[1]);
     }
 
-    // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
+    // A note sounded at lon, lat. kind: 0 a note, 1 lavender (new light), 2 orange (dimmed, or warmer sea), 3 blue (cooler sea).
     ping(lon, lat, kind = 0) {
       this.pings.push({ lon, lat, kind, born: performance.now() });
       if (this.pings.length > 6) this.pings.shift();
@@ -383,7 +404,12 @@ void main() {
         this.headSpeed = l != null && prev != null ? clamp(wrap(l - prev) / Math.max(dt, 1e-3), 0, 200) : 0;
         this.headLon2 = l;
       }
-      if (this.follow && this.headLon < 900) {
+      if (this.scanLat && this.headLon < 900) {
+        // A line moving south: tilt to keep it in view, and keep turning so every sea passes by.
+        if (this.follow) this.targetTilt = clamp(this.headLon, -60, 60);
+        if (this.spin && !still && !(this.idleUntil > now)) this.yaw = wrap(this.yaw + dt * 9);
+        this.targetYaw = null;
+      } else if (!this.scanLat && this.follow && this.headLon < 900) {
         // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
         const diff = wrap(this.headLon - this.yaw);
         const moving = still ? 0 : this.headSpeed;
@@ -429,6 +455,8 @@ void main() {
       gl.uniform1f(this.u.uPx, w / Math.max(1, this.canvas.clientWidth));
       gl.uniform1f(this.u.uFull, this.full ? 1 : 0);
       gl.uniform1f(this.u.uSweep, this.headFn ? 1 : 0);
+      gl.uniform4fv(this.u.uBox, this.box ? new Float32Array(this.box) : new Float32Array([999, 0, 0, 0]));
+      gl.uniform1f(this.u.uScanLat, this.scanLat ? 1 : 0);
       const now = performance.now(), pings = new Float32Array(24);
       for (let k = 0; k < 6; k++) {
         const p = this.pings[k];

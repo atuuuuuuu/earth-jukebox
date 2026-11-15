@@ -7,33 +7,14 @@
       "id": "night-lights",
       "code": "1",
       "title": "Earth at night",
-      "subtitle": "City lights, 2012 to 2023",
-      "description": "One slow scan across the Earth at night for each year from 2012 to 2023. Bright cities ring notes; a deep hum follows all the light.",
+      "subtitle": "City lights 2012 to 2023, then what changed",
+      "description": "One slow scan across the Earth at night for each year from 2012 to 2023: bright cities ring notes, a deep hum follows all the light. Then NASA's map of what changed, heard as the decade: one note per year, higher as the light grows.",
       "score": "api/scores/night-lights.json",
-      "frames": 12,
+      "frames": 13,
       "firstDate": "2012-07-01",
       "lastDate": "2023-07-01",
-      "when": "2012 to 2023",
-      "units": "share of the brightest light",
-      "engine": "sweep",
-      "source": {
-        "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
-        "url": "https://svs.gsfc.nasa.gov/5313/",
-        "credit": "NASA's Scientific Visualization Studio, visualizer Kel Elkins (USRA). Data: Black Marble: Next Generation (Suomi NPP VIIRS, NASA/NOAA)"
-      }
-    },
-    {
-      "id": "night-change",
-      "code": "2",
-      "title": "Night lights: what changed",
-      "subtitle": "2012 compared with 2023",
-      "description": "NASA's map of how night lights changed from 2012 to 2023, scanned once, slowly. A rising pair of notes is new light; a low falling cello is light that dimmed.",
-      "score": "api/scores/night-change.json",
-      "frames": 1,
-      "firstDate": "2023-07-01",
-      "lastDate": "2023-07-01",
-      "when": "Change from 2012 to 2023",
-      "units": "change in light",
+      "when": "2012 to Change from 2012 to 2023",
+      "units": "share of the brightest light (years); change in light (the change map)",
       "engine": "sweep",
       "source": {
         "title": "Change in Night Lights between 2012 and 2023 - EIC Version",
@@ -43,7 +24,7 @@
     },
     {
       "id": "air-quality",
-      "code": "3",
+      "code": "2",
       "title": "Air quality",
       "subtitle": "Four pollutants, summer 2024",
       "description": "NASA's model of the air we breathe in July and August 2024, a summer of huge wildfires. One scan for each pollutant: fine particles, carbon monoxide, nitrogen oxides and ozone. Clean air is a calm drone; dirty air rings notes and turns the drone sour.",
@@ -62,26 +43,26 @@
     },
     {
       "id": "ocean-currents",
-      "code": "4",
+      "code": "3",
       "title": "Ocean currents",
-      "subtitle": "Perpetual Ocean, 2021 to 2023",
-      "description": "NASA's tour of the ocean's great currents, from January 2021 to December 2023: the whole globe, then the Kuroshio off Japan, the Agulhas off South Africa and the Gulf Stream. A harp rings as currents and eddies cross a line through the picture; a soft pulse marks each month.",
+      "subtitle": "Surface currents, 2007 to 2008",
+      "description": "Starts with a guided lesson: what a current is, then the Gulf Stream's direction, speed and changes, one idea at a time. Then a scan line crosses NASA's world map of the ocean's surface currents, March 2007 to March 2008: only what is under the line plays.",
       "score": "api/scores/ocean-currents.json",
-      "frames": 8,
+      "frames": 1,
       "firstDate": null,
       "lastDate": null,
-      "when": "The whole ocean to The whole ocean again",
-      "units": "brightness of moving water on the line",
+      "when": "March 2007 to March 2008",
+      "units": "brightness of moving water, relative",
       "engine": "sweep",
       "source": {
-        "title": "Perpetual Ocean 2: Western Boundary Currents",
-        "url": "https://svs.gsfc.nasa.gov/5425/",
-        "credit": "NASA's Scientific Visualization Studio, visualizer Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC); scientists Atousa Saberi (NASA/GSFC), Josh Willis (JPL). Data: ECCO2 high-resolution ocean and sea ice model (NASA/JPL); Blue Marble: Next Generation"
+        "title": "Global Sea Surface Currents and Temperature",
+        "url": "https://svs.gsfc.nasa.gov/3912/",
+        "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio, visualizer Greg Shirah, Horace Mitchell, Eric Sokolowsky; scientists Hong Zhang (UCLA), Dimitris Menemenlis (NASA/JPL). Data: ECCO2 high-resolution ocean and sea ice model (MIT/NASA JPL)"
       }
     },
     {
       "id": "carbon-dioxide",
-      "code": "5",
+      "code": "4",
       "title": "Carbon dioxide",
       "subtitle": "Seven weeks of early 2020",
       "description": "NASA's model of carbon dioxide on a turning globe. A scan line runs pole to pole; the hum is the carbon dioxide on it, and turns tense over dense plumes. A soft heartbeat marks each day.",
@@ -100,7 +81,7 @@
     },
     {
       "id": "lightning",
-      "code": "6",
+      "code": "5",
       "title": "Lightning",
       "subtitle": "2017 to 2023, in 14 parts",
       "description": "Lightning seen from the International Space Station, March 2017 to July 2023, in 14 parts, in order. A deep bass swells with all the lightning under the scan line, strings rise as the storms move north, and a harp plucks the strongest storms.",
@@ -119,7 +100,7 @@
     },
     {
       "id": "aerosols",
-      "code": "7",
+      "code": "6",
       "title": "Aerosols",
       "subtitle": "Four winds, 19 August 2025",
       "description": "NASA's model of the aerosols in the air at one moment, scanned once, slowly. Each aerosol is its own wind: rough smoke, sandy dust, low sea salt and thin, high sulfate. Listen to all four, or to one at a time.",
@@ -134,6 +115,44 @@
         "title": "GEOS Aerosols (2025)",
         "url": "https://svs.gsfc.nasa.gov/5669/",
         "credit": "NASA's Scientific Visualization Studio. Data: NASA's GEOS model (Goddard Earth Observing System)"
+      }
+    },
+    {
+      "id": "sea-heat",
+      "code": "7",
+      "title": "Warm and cold seas",
+      "subtitle": "Sea surface temperature, March 2007 to March 2008",
+      "description": "NASA's model of the ocean's surface currents, coloured by temperature, over one year. A level scan line moves down the map from the Arctic to Antarctica, once each season, with west in your left ear and east in your right. Cold sea is a deep base note; the warmer the water, the more and higher chord voices join it.",
+      "score": "api/scores/sea-heat.json",
+      "frames": 4,
+      "firstDate": "2007-03-25",
+      "lastDate": "2007-12-08",
+      "when": "25 March to 19 June 2007 to 8 December 2007 to 3 March 2008",
+      "units": "degrees Celsius, read from NASA's colour key",
+      "engine": "sweep",
+      "source": {
+        "title": "Global Sea Surface Currents and Temperature",
+        "url": "https://svs.gsfc.nasa.gov/3912/",
+        "credit": "NASA/Goddard Space Flight Center Scientific Visualization Studio, visualizer Greg Shirah. Data: ECCO2 High Resolution Ocean and Sea Ice Model (NASA/JPL); GTOPO30 Topography and Bathymetry (USGS)"
+      }
+    },
+    {
+      "id": "el-nino",
+      "code": "8",
+      "title": "El Niño: then and now",
+      "subtitle": "Sea temperature, 2025 and 2026",
+      "description": "NASA's map of how much warmer or cooler than normal the sea is, one map a month: each month of 2025, then the same month of 2026. A rising pair of notes is sea much warmer than normal; a low falling cello, much cooler. Listen to the middle of the Pacific: in 2026, El Niño warms it.",
+      "score": "api/scores/el-nino.json",
+      "frames": 22,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "January 2025 to November 2026",
+      "units": "degrees C from normal",
+      "engine": "sweep",
+      "source": {
+        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
+        "url": "https://svs.gsfc.nasa.gov/5176/",
+        "credit": "NASA's Scientific Visualization Studio. Data: MUR SST v4.1 (NASA JPL PO.DAAC)"
       }
     }
   ]

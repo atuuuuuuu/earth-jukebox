@@ -10,7 +10,8 @@
     "build": "esbuild src/engine.js --bundle --format=iife --global-name=EJ --minify --outfile=public/bundle.js",
     "serve": "python3 scripts/serve.py 8000",
     "test": "node test/run.cjs",
-    "test:responsive": "node test/responsive.cjs"
+    "test:responsive": "node test/responsive.cjs",
+    "test:lesson": "node test/lesson.cjs"
   },
   "dependencies": {
     "tone": "15.1.22"

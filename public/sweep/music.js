@@ -14,6 +14,14 @@ export function midiToNote(m) {
   return NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 }
 
+/** "D2" -> 38, "A#3" or "Bb3" -> 58. */
+export function noteToMidi(name) {
+  const m = /^([A-G])([#b]?)(-?\d+)$/.exec(name);
+  if (!m) throw new Error(`Not a note: ${name}`);
+  const pc = NAMES.indexOf(m[1]) + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+  return (Number(m[3]) + 1) * 12 + pc;
+}
+
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** Map a value in [lo, hi] onto a note list (north/higher = higher pitch). */

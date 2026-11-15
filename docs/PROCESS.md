@@ -1,6 +1,6 @@
-# How Earth Jukebox was made, and why
+# How Hearth was made, and why
 
-Earth Jukebox turns NASA Earth Information Center visualizations into sound for blind and low-vision
+Hearth turns NASA Earth Information Center visualizations into sound for blind and low-vision
 listeners. This note explains the choices behind it: what we read from NASA's pictures, how those
 numbers become sound, and why each track sounds the way it does.
 

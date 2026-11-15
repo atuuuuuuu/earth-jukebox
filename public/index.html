@@ -3,29 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Earth Jukebox: hear NASA's views of Earth</title>
-<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, carbon dioxide, lightning and aerosols, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
-<meta name="theme-color" content="#0a0d14">
+<title>Hearth: hear NASA's views of Earth</title>
+<meta name="description" content="Hearth: NASA views of Earth at night, air pollution, ocean currents, carbon dioxide, lightning, aerosols, sea surface temperature and El Niño, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
+<meta name="theme-color" content="#080b12">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0d14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffc861' stroke-width='2.5'/%3E%3Cpath d='M16 7v18' stroke='%23ffc861' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Atkinson+Hyperlegible+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 <a class="skip" href="#keys">Skip to the player</a>
 
 <header class="site-head">
   <div class="wrap head-inner">
-    <p class="brand"><span class="brand-mark" aria-hidden="true"></span>Earth Jukebox</p>
-    <p class="brand-tag">NASA Space Apps 2026</p>
+    <p class="brand-tag">NASA Space Apps 2026 · The Earth Information Jukebox</p>
   </div>
 </header>
 
 <main id="main" class="wrap">
   <section class="intro" aria-labelledby="title">
     <div>
-      <h1 id="title">Hear NASA's views of Earth</h1>
+      <h1 id="title"><span class="brand-mark" aria-hidden="true"></span>Hearth</h1>
+      <p class="tagline">Hear NASA's views of Earth.</p>
       <p class="lede">Each track turns a NASA visualization into sound: city lights, the air we breathe, the ocean's great currents. A line crosses the picture, and whatever it crosses plays.</p>
     </div>
     <div class="start" aria-labelledby="start-h">
@@ -34,12 +34,19 @@
         <li>Choose a track in the list below, with the arrow keys.</li>
         <li>Press <kbd>Tab</kbd> to reach the player's keyboard area, then <kbd>Space</kbd> to play or pause.</li>
         <li>In the player, press <kbd>H</kbd> to hear every key, and <kbd>W</kbd> to ask where you are.</li>
-        <li>Use headphones if you can: the north sounds in your left ear, the south in your right.</li>
+        <li>Use headphones if you can: the north sounds in your left ear, the south in your right. On the sea temperature track the line moves from north to south, so there west is left and east is right.</li>
         <li>Every key you press is named out loud, with a soft click. Turn that off in Settings.</li>
       </ol>
+      <div class="btn-row">
+        <button id="guide-start" class="btn" type="button" aria-describedby="guide-hint">Guide me through the page</button>
+        <button id="show" class="btn" type="button" aria-describedby="show-hint">Play the whole jukebox</button>
+      </div>
+      <p id="guide-hint" class="muted small">The guide names each part of the page, one at a time, and never plays sound.</p>
+      <p id="show-hint" class="muted small">Plays about 30 seconds of every track in turn, naming each one. Escape stops it.</p>
     </div>
   </section>
 
+  <div class="console">
   <section id="tracks" class="block" aria-labelledby="tracks-h">
     <h2 id="tracks-h"><span class="step" aria-hidden="true">1</span>Choose a track</h2>
     <fieldset class="track-list">
@@ -48,9 +55,91 @@
     </fieldset>
   </section>
 
+  <!-- Tracks with a guided lesson (ocean currents): one idea at a time, before the player. lesson.js runs it. -->
+  <section id="lesson" class="block lesson" aria-labelledby="lesson-h" hidden>
+    <h2 id="lesson-h">Learn first: <span id="lesson-title">a guided example</span></h2>
+    <p class="muted">One idea at a time, at your own pace. Each step explains its sound before you hear it, and nothing plays until you press Play.</p>
+    <div class="lesson-grid">
+      <figure class="lesson-fig">
+        <div id="lesson-pic" class="lesson-pic" role="img" aria-label="NASA's picture of the Gulf Stream">
+          <img id="lesson-img" alt="">
+          <svg id="lesson-mark" viewBox="0 0 640 360" aria-hidden="true" focusable="false"></svg>
+        </div>
+        <figcaption id="lesson-caveat" class="muted small"></figcaption>
+      </figure>
+      <div class="lesson-body">
+        <div id="lesson-keys" class="keys" tabindex="0" role="application" aria-roledescription="keyboard area"
+             aria-label="Lesson keys" aria-describedby="lesson-keys-hint">
+          <p id="lesson-keys-hint">Lesson keyboard area. Right arrow: next step. Left arrow: back. Space: play or pause. R: replay. W: where am I. T: go to the full tour. H: every lesson key.</p>
+        </div>
+        <p id="lesson-pos" class="lesson-pos"></p>
+        <h3 id="lesson-step-h"></h3>
+        <p id="lesson-text"></p>
+        <div id="lesson-try" role="group" aria-labelledby="lesson-try-h" hidden>
+          <h4 id="lesson-try-h">Try each sound</h4>
+          <div id="lesson-previews" class="demos"></div>
+        </div>
+        <div class="btn-row four">
+          <button id="lesson-back" class="btn" type="button" aria-keyshortcuts="ArrowLeft">Back</button>
+          <button id="lesson-play" class="btn btn-play" type="button" data-state="paused" aria-keyshortcuts="Space"><span class="play-icon" aria-hidden="true"></span><span id="lesson-play-label">Play</span></button>
+          <button id="lesson-replay" class="btn" type="button" aria-keyshortcuts="R">Replay</button>
+          <button id="lesson-next" class="btn" type="button" aria-keyshortcuts="ArrowRight">Next</button>
+        </div>
+        <div class="btn-row">
+          <button id="lesson-where" class="btn" type="button" aria-keyshortcuts="W">Where am I?</button>
+          <a id="lesson-to-tour" class="btn btn-link" href="#keys" aria-keyshortcuts="T">Go to the full tour</a>
+        </div>
+        <div class="announce">
+          <p class="announce-h" aria-hidden="true">Now</p>
+          <p id="lesson-state"></p>
+        </div>
+        <p id="lesson-source" class="muted small"></p>
+      </div>
+    </div>
+    <fieldset class="lesson-settings">
+      <legend>Lesson sound</legend>
+      <div class="lesson-settings-grid">
+        <fieldset class="field">
+          <legend>Pace</legend>
+          <div class="seg">
+            <label><input type="radio" name="lesson-pace" value="1.5"> Slow</label>
+            <label><input type="radio" name="lesson-pace" value="1" checked> Normal</label>
+            <label><input type="radio" name="lesson-pace" value="0.7"> Fast</label>
+          </div>
+          <p class="muted small">How long each sound and each pause lasts. The speeds of the water never change.</p>
+        </fieldset>
+        <div class="field">
+          <label for="lesson-fx">Lesson sounds volume</label>
+          <input id="lesson-fx" type="range" min="0" max="100" value="80" step="5">
+        </div>
+        <div>
+          <label class="check"><input id="lesson-bg" type="checkbox" aria-describedby="lesson-bg-hint"> Ocean background sound</label>
+          <p id="lesson-bg-hint" class="muted small">Off unless you turn it on. Soft surf for atmosphere only: it carries no information, and it dips under every lesson sound.</p>
+          <div class="field">
+            <label for="lesson-bg-vol">Background volume</label>
+            <input id="lesson-bg-vol" type="range" min="0" max="100" value="30" step="5">
+          </div>
+        </div>
+        <div>
+          <label class="check"><input id="lesson-speak" type="checkbox" aria-describedby="lesson-speak-hint"> Read the lesson aloud</label>
+          <p id="lesson-speak-hint" class="muted small">With your device's voice, the same as Read aloud in Settings. With a screen reader, leave this off: it reads the lesson in its own voice, at its own speed.</p>
+          <div class="field">
+            <label for="voice-vol">Voice volume</label>
+            <input id="voice-vol" type="range" min="10" max="100" value="100" step="10">
+          </div>
+          <div class="field">
+            <label for="voice-rate">Voice speed</label>
+            <input id="voice-rate" type="range" min="50" max="200" value="100" step="10">
+          </div>
+        </div>
+      </div>
+    </fieldset>
+  </section>
+
   <section id="player" class="block player" aria-labelledby="player-h">
     <h2 id="player-h"><span class="step" aria-hidden="true">2</span>Listen: <span id="np-title">loading</span></h2>
     <div class="player-grid">
+      <div class="stage-col">
       <div class="stage" id="stage">
         <canvas id="globe" role="img" aria-label="3D globe"></canvas>
         <div id="video-wrap" class="video-wrap" role="img" aria-label="" hidden>
@@ -62,6 +151,22 @@
           <div class="stage-bar"><span id="stage-fill"></span></div>
         </div>
         <p class="stage-hint" aria-hidden="true">Drag to turn the globe. Click a place to hear it.</p>
+      </div>
+      <!-- Tracks with regions or stories: the whole flat map, every window on it, the one heard lit,
+           and the scan line moving through it. Seen only: the same is said by W, D and the buttons. -->
+      <figure id="view-map" class="view-map" aria-hidden="true" hidden>
+        <div class="view-map-frame">
+          <img id="view-map-img" alt="">
+          <div id="view-map-boxes"></div>
+          <span id="view-map-needle" class="view-needle" hidden></span>
+        </div>
+        <figcaption id="view-map-caption"></figcaption>
+      </figure>
+      <!-- The decade as a picture: one dot per year's note, higher = more light than the first year. Seen only. -->
+      <figure id="decade-chart" class="decade-chart" aria-hidden="true" hidden>
+        <svg id="decade-svg" role="presentation" focusable="false"></svg>
+        <figcaption id="decade-caption" class="small"></figcaption>
+      </figure>
       </div>
 
       <div class="controls">
@@ -84,9 +189,22 @@
           <input id="map" type="range" min="0" max="0" value="0" step="1">
         </div>
 
+        <button id="decade-go" class="btn" type="button" hidden>Hear the change over the decade</button>
+
         <div id="compare-field" hidden>
           <label class="check"><input id="compare" type="checkbox" aria-describedby="compare-hint" aria-keyshortcuts="C"> Compare with previous part</label>
           <p id="compare-hint" class="muted small">Each sweep plays what changed since the part before, in the same places: short rising notes for more lightning, falling notes for less, quiet where it stayed the same.</p>
+        </div>
+
+        <fieldset id="view-field" class="field" aria-describedby="view-hint" hidden>
+          <legend id="view-legend">Region</legend>
+          <div id="view-options" class="seg"></div>
+          <p id="view-hint" class="muted small"></p>
+        </fieldset>
+
+        <div id="story-list" class="story-list" role="group" aria-labelledby="story-list-h" hidden>
+          <p id="story-list-h" class="story-list-h"></p>
+          <div id="story-buttons" class="story-buttons"></div>
         </div>
 
         <fieldset id="listen-field" class="field" aria-describedby="listen-hint" hidden>
@@ -100,6 +218,9 @@
           <button id="describe" class="btn" type="button" aria-keyshortcuts="D">Describe this map</button>
           <button id="help" class="btn" type="button" aria-keyshortcuts="H">Keys</button>
         </div>
+        <a id="to-lesson" class="btn btn-link" href="#lesson-keys" aria-keyshortcuts="L" hidden>Go to this track's guided lesson</a>
+
+        <p id="readout" class="readout" aria-hidden="true"></p>
 
         <div class="announce">
           <p class="announce-h" aria-hidden="true">Spoken</p>
@@ -109,6 +230,7 @@
       </div>
     </div>
   </section>
+  </div>
 
   <section id="sounds" class="block" aria-labelledby="sounds-h">
     <h2 id="sounds-h"><span class="step" aria-hidden="true">3</span>What the sounds mean</h2>
@@ -118,6 +240,24 @@
     <p class="muted" id="demos-hint">Each button plays a short example, then says what it means. The examples are made up; the tracks are real NASA data.</p>
     <div id="demos" class="demos" aria-labelledby="demos-h" aria-describedby="demos-hint" role="group"></div>
     <p id="caveat" class="muted small"></p>
+    <details id="about-sound" class="about" hidden>
+      <summary>About this track</summary>
+      <dl id="about-list"></dl>
+      <h3 id="about-chain-h">Where it comes from</h3>
+      <ol id="about-chain" aria-labelledby="about-chain-h"></ol>
+    </details>
+  </section>
+
+  <section id="mystery" class="block" aria-labelledby="mystery-h" hidden>
+    <h2 id="mystery-h">Mystery place</h2>
+    <p class="muted" id="mystery-hint">Hear a place's decade of night lights without being told where it is: one note per year, then what NASA's change map shows. Then guess.</p>
+    <button id="mystery-play" class="btn" type="button" aria-describedby="mystery-hint">Play a mystery place</button>
+    <fieldset id="mystery-guess" class="field" hidden>
+      <legend>Where was it?</legend>
+      <div id="mystery-options" class="seg"></div>
+      <button id="mystery-again" class="btn" type="button">Hear it again</button>
+    </fieldset>
+    <p id="mystery-result" class="muted"></p>
   </section>
 
   <section id="explore" class="block" aria-labelledby="explore-h">
@@ -159,9 +299,11 @@
       </fieldset>
       <div class="checks">
         <label class="check"><input id="announce" type="checkbox" checked aria-describedby="announce-hint"> Say each new map</label>
-        <p id="announce-hint" class="muted small">While playing, says the year, pollutant, scene, week or part as each map starts.</p>
+        <p id="announce-hint" class="muted small">While playing, says the year, pollutant, scene, week, part or season as each map starts.</p>
         <label class="check"><input id="mono" type="checkbox" aria-describedby="mono-hint"> Mono</label>
         <p id="mono-hint" class="muted small">Every sound in the centre, for one earbud or hearing in one ear.</p>
+        <label class="check" id="continuous-row"><input id="continuous" type="checkbox" aria-describedby="continuous-hint"> Continuous sound</label>
+        <p id="continuous-hint" class="muted small">One held voice that glides from note to note instead of separate notes: easier to follow as a line. On tracks that play notes.</p>
         <label class="check"><input id="keyecho" type="checkbox" checked aria-describedby="keyecho-hint"> Name each key I press</label>
         <p id="keyecho-hint" class="muted small">Says what a key did, like "Next map", before the answer, and tells you when a key does nothing.</p>
         <label class="check"><input id="clicks" type="checkbox" checked aria-describedby="clicks-hint"> Click on each key</label>
@@ -175,6 +317,10 @@
         <button id="save" class="btn" type="button" aria-describedby="save-hint">Save as audio file</button>
         <p id="save-hint" class="muted small">Downloads this track as a WAV file, up to 3 minutes.</p>
       </div>
+      <div>
+        <button id="csv" class="btn" type="button" aria-describedby="csv-hint">Save the numbers as CSV</button>
+        <p id="csv-hint" class="muted small">The 10 degree squares of every map of this track, with their values, units and source, to open in a spreadsheet.</p>
+      </div>
     </div>
   </section>
 
@@ -187,11 +333,11 @@
       </article>
       <article aria-labelledby="how-2">
         <h3 id="how-2">Reading NASA's pictures</h3>
-        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: a line through the middle of NASA's picture measures the bright white flow lines, ten times per second of video.</p>
+        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: NASA's world map of surface currents, averaged over a year, where brighter flow lines mean faster water; the guided lesson measures how NASA's flow lines move off Florida. El Niño: every daily sea temperature map is read back into degrees from NASA's own colour bar and averaged by month.</p>
       </article>
       <article aria-labelledby="how-3">
         <h3 id="how-3">Turning numbers into sound</h3>
-        <p>The rule is the same on every track, so you only learn it once. Up is higher pitch and your left ear; down is lower and your right. A note rings where a place is bright, thick or fast; a deep drone carries everything under the line. Notes use a pentatonic scale, so they never clash by accident; when they do clash, it means something.</p>
+        <p>The rule is the same on every track, so you only learn it once. Up is higher pitch and your left ear; down is lower and your right. A note rings where a place is bright, thick or fast; a deep drone carries everything under the line. Notes use a pentatonic scale, so they never clash by accident; when they do clash, it means something. One track turns the line on its side: on Warm and cold seas it moves from the Arctic down to Antarctica, so west is your left ear and east your right, and the warmer the sea under it, the more and higher voices join a warm chord.</p>
       </article>
       <article aria-labelledby="how-4">
         <h3 id="how-4">Beauty and urgency</h3>
@@ -205,17 +351,26 @@
     <ul id="credits" class="credits"></ul>
     <p class="muted small">Values are read from the colours of NASA's visualizations, so they are relative levels, not satellite units. Not an official NASA product.</p>
   </section>
+<div id="guide" class="guide" role="region" aria-label="Guided tour" hidden>
+  <p id="guide-count" class="muted small"></p>
+  <p id="guide-text"></p>
+  <div class="btn-row three">
+    <button id="guide-back" class="btn" type="button">Back</button>
+    <button id="guide-next" class="btn" type="button">Next</button>
+    <button id="guide-close" class="btn" type="button">Close the guide</button>
+  </div>
+</div>
 </main>
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality and ocean tracks by Earth Jukebox.</p>
-    <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Built with help from an AI coding assistant; no data, images or audio are AI-generated.</p>
+    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality, ocean, aerosol, sea temperature and El Niño tracks by the Hearth team.</p>
+    <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Code and data processing written with help from Claude Code, an AI coding assistant (see Use of AI in the README); no data, images or audio are AI-generated.</p>
   </div>
 </footer>
 
 <script src="bundle.js?v=7"></script>
-<script src="globe.js?v=12"></script>
-<script src="app.js?v=14"></script>
+<script src="globe.js?v=16"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>

@@ -7,15 +7,15 @@
 import { AudioEngine } from './audio.js';
 import { Player } from './player.js';
 import { renderBuffer } from './render.js';
-import { clamp } from './music.js';
+import { clamp, midiToNote } from './music.js';
 import * as nightLights from './tracks/night-lights.js';
 import * as co2 from './tracks/co2.js';
-import * as ocean from './tracks/ocean.js';
 import * as lightning from './tracks/lightning.js';
 import * as aerosols from './tracks/aerosols.js';
+import * as seaHeat from './tracks/sea-heat.js';
 
 const T = window.EJ.Tone;
-const MAPPINGS = { 'night-lights': nightLights, co2, ocean, lightning, aerosols };
+const MAPPINGS = { 'night-lights': nightLights, co2, lightning, aerosols, 'sea-heat': seaHeat };
 const SPEED_KEYS = ['yearSweep', 'changeSweep', 'orbitSeconds'];   // seconds the speed setting scales
 
 // The mix chosen by ear on Night Lights (13 Nov 2026), from team RUSTMN's settings.js.
@@ -75,11 +75,16 @@ DEMOS.air = [
   ['tense', 'The worst air', 'The drone turns sour', 'The worst air. Where pollution is thickest, clashing notes creep into the drone and it turns harsh.'],
   DEMOS.light[1],
 ];
-DEMOS.ocean = [
-  ['city', 'A current', 'One harp note', 'A current or eddy. When bright, fast water crosses the line, a harp note rings. Brighter water rings louder.'],
-  ['swell', 'The swell', 'Grows, then settles', 'The swell. It follows all the moving water on the line: soft over calm sea, full over strong currents.'],
-  ['beat', 'A new month', 'A soft low pulse', 'A new month. One soft low pulse at the start of each month of the tour.'],
-  ['top', 'Top and bottom', 'High left, then low right', 'Top and bottom of the picture. Water near the top rings higher, in your left ear; near the bottom, lower, in your right ear.'],
+DEMOS.currents = [
+  ['city', 'A strong current', 'One harp note', 'A strong current. When the scan line crosses fast, bright water such as the Gulf Stream, a harp note rings. Stronger rings louder.'],
+  DEMOS.light[1],
+  ['hum', 'The hum', 'Swells, then fades', 'The hum. It follows all the moving water under the scan line: quiet over calm sea, fuller over strong currents, silent over land. It is not the sound of waves.'],
+];
+DEMOS.anomaly = [
+  ['gain', 'Warmer than normal', 'A rising pair of notes', 'Warmer than normal. Where the sea is at least 1.2 degrees warmer than usual for the time of year, a note rings as the scan line crosses it; from 2 degrees, a rising pair. Warmer rings louder.'],
+  ['loss', 'Cooler than normal', 'A low falling cello', 'Cooler than normal. Where the sea is at least 1.2 degrees cooler than usual, a low cello falls. Cooler rings louder.'],
+  ['hum', 'Deep hum', 'Swells, then fades', 'The deep hum. It grows with how far from normal the sea under the scan line is, warm or cool. It is quiet where the sea is close to normal, and silent over land.'],
+  DEMOS.light[1],
 ];
 // Lightning's examples follow its legend, in the same order, then the stereo sweep.
 DEMOS.lightning = [
@@ -108,73 +113,164 @@ const about = (n) => {
 
 class SweepSonifier {
   constructor(score, data, mapping, {
-    bpm = 84, volume = 100, mono = false, startIndex = 0, muted = [],
+    bpm = 84, volume = 100, mono = false, continuous = false, startIndex = 0, muted = [],
     onFrame = () => {}, onStep = () => {}, onEnd = () => {}, onNote = () => {}, onBeat = () => {},
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
-    this.kind = mapping === co2 ? 'co2' : mapping === ocean ? 'ocean' : mapping === lightning ? 'lightning'
-      : mapping === aerosols ? 'aerosols' : score.sweep.chapter === 'change' ? 'change'
+    // Maps on the night-lights mapping take their kind from the chapter: 'change' (lights 2012 to 2023),
+    // 'currents' (ocean surface currents), 'anomaly' (El Niño: sea temperature from normal, two-sided).
+    this.kind = mapping === co2 ? 'co2' : mapping === lightning ? 'lightning'
+      : mapping === aerosols ? 'aerosols' : mapping === seaHeat ? 'sea'
+        : ['change', 'currents', 'anomaly'].includes(score.sweep.chapter) ? score.sweep.chapter
         : score.sweep.chapter === 'pollutants' ? 'air' : 'light';
-    this.bedWord = this.kind === 'lightning' ? 'bass' : 'hum';   // what "Where am I" calls the low layer
-    this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
-    this.track = { ...data, chapters: [this.chapter] };
-    const d = mapping.defaults(data);
-    this.base = Object.fromEntries(SPEED_KEYS.filter((k) => k in d).map((k) => [k, d[k]]));
-    this.settings = { ...SOUND, ...d, instrument: score.sweep.instrument || SOUND.instrument, width: mono ? 0 : SOUND.width };
-    this.applyTempo();
-    mapping.configure(this.settings);
+    this.bedWord = this.kind === 'lightning' ? 'bass' : this.kind === 'sea' ? 'chord' : 'hum';   // what "Where am I" calls the low layer
+    // Which way the scan line moves (score.sweep.scan): "east" (a north-south line, the default) or
+    // "south" (a west-east line moving down the map: west is then the left ear).
+    this.scan = score.sweep.scan ?? 'east';
+    this.data = data;
+    // One chapter of the data, or several played in a row (score.sweep.chapters: night lights' years, then the decade).
+    this.whole = { ...data, chapters: (score.sweep.chapters ?? [score.sweep.chapter]).map((id) => data.chapters.find((c) => c.id === id)) };
+    this.view = null;              // the view heard now (score.views option), or null for the whole map
+    this.settings = { ...SOUND, ...mapping.defaults(data), instrument: score.sweep.instrument || SOUND.instrument, width: mono ? 0 : SOUND.width };
+    this.settings.continuous = continuous && !this.settings.bed;
+    this.useTrack(this.whole, data);
     this.audio = new AudioEngine({ humNotes: mapping.HUM_NOTES, settings: this.settings });
     this.audio.muted = new Set(muted);
     this.audio.setVolume(dbFor(volume));
-    this.player = new Player({
-      track: this.track, mapping, audio: this.audio, settings: this.settings,
-      onVoice: (ev) => this.voice(ev),
-      onBeat: (v) => this.onBeat(v),
-      onStep: (seg, step, plan) => this.stepped(seg, step, plan),
-      onEnd: () => this.onEnd(),
-    });
+    this.player = this.makePlayer();
     this.lastSeg = null;
     this.lastLevel = 0;
     this.seek(startIndex);
   }
 
+  /** Play `track` from now on: its chapter, and the sweep speeds it asks for (scaled by the speed setting). */
+  useTrack(track, defaultsFrom = track) {
+    this.track = track;
+    this.chapter = { ...track.chapters[0], frames: track.chapters.flatMap((c) => c.frames) };   // every map, in order
+    const d = this.mapping.defaults(defaultsFrom);
+    this.base = Object.fromEntries(SPEED_KEYS.filter((k) => k in d).map((k) => [k, d[k]]));
+    this.applyTempo();
+    this.mapping.configure(this.settings);
+  }
+
+  makePlayer() {
+    return new Player({
+      track: this.track, mapping: this.mapping, audio: this.audio, settings: this.settings,
+      onVoice: (ev) => this.voice(ev),
+      onBeat: (v) => this.onBeat(v),
+      onStep: (seg, step, plan) => this.stepped(seg, step, plan),
+      onEnd: () => this.onEnd(),
+    });
+  }
+
   frameIndexOf(seg) { return this.chapter.frames.indexOf(seg.frame); }
+
+  // ---- views: other ways to hear the track (score.views; backend/API.md) ----
+  // NASA's zoom regions (night lights) or NASA's stories (aerosols). A view replaces the list of maps:
+  // each of its maps is a window of the picture with its own finer grid (in the sweep data).
+
+  /** The view options of this track ({id, name, unit, frames}), or an empty list. */
+  get viewOptions() { return this.score.views?.options ?? []; }
+  /** The maps heard now: the track's own, or the view's (each with the picture of the map it is read from). */
+  get frames() {
+    if (!this.view) return this.score.frames;
+    this._frames ??= this.view.frames.map((f) => ({ ...this.score.frames[f.base], ...f }));
+    return this._frames;
+  }
+  /** What one map is called now: "map", or "story" in NASA's stories. */
+  get unit() { return this.view?.unit ?? 'map'; }
+
+  /** Hear a view (its id), or the whole map (null). Starts again at its first map, paused. */
+  setView(id) {
+    const opt = this.viewOptions.find((o) => o.id === id) ?? null;
+    if (opt === this.view) return;
+    this.player.pause();
+    this.view = opt;
+    this._frames = null;
+    if (opt) this.useTrack(this.viewTrack(opt));
+    else this.useTrack(this.whole, this.data);
+    this.player = this.makePlayer();
+    this.seek(0);
+  }
+
+  /** The sweep data of a view, built once: each map is its window's fine grid (`geo`), prepared to play. */
+  viewTrack(opt) {
+    this._viewTracks ??= new Map();
+    if (!this._viewTracks.has(opt.id)) {
+      const items = new Map((this.data.views?.items ?? []).map((it) => [it.id, it]));
+      const flat = this.whole.chapters.flatMap((c) => c.frames), chapters = [];
+      for (const f of opt.frames) {
+        const wc = this.whole.chapters.find((c) => c.id === f.chapter) ?? this.whole.chapters[0];
+        let ch = chapters.find((c) => c.id === wc.id);
+        // The decade keeps its own pace; a region's sweeps and the stories keep theirs.
+        if (!ch) chapters.push(ch = { id: wc.id, title: wc.title, secondsPerSweep: wc.id === 'change' ? wc.secondsPerSweep : null, frames: [] });
+        const it = items.get(f.view);
+        const fine = (it.chapters[wc.id] ?? Object.values(it.chapters)[0])[f.frame];
+        const own = flat[f.base] ?? flat[0];
+        ch.frames.push({
+          label: own.label, image: own.image, ...fine, geo: { ...it.grid, zoom: true }, box: it.box,
+          focus: f.focus ?? null, secondsPerSweep: it.secondsPerSweep,
+        });
+      }
+      for (const ch of chapters) ch.secondsPerSweep ??= ch.frames[0].secondsPerSweep;
+      this._viewTracks.set(opt.id, this.mapping.prepare({ ...this.data, chapters }));
+    }
+    return this._viewTracks.get(opt.id);
+  }
+
+  /** Whether map i is night lights' change map, heard as the decade (one note per year). */
+  isDecade(i = this.index) {
+    let k = i;
+    for (const c of this.track.chapters) { if (k < c.frames.length) return c.id === 'change' && !!c.frames[k].decade; k -= c.frames.length; }
+    return false;
+  }
+
+  /** The light of each year for the place of map i when it is the decade (whole map or the region heard), else null. */
+  decadeSeries(i = this.index) {
+    let k = i;
+    for (const c of this.track.chapters) { if (k < c.frames.length) return c.id === 'change' ? c.frames[k].decade ?? null : null; k -= c.frames.length; }
+    return null;
+  }
+
+  /** The window of map i ([west, south, east, north]) while a view is heard, else null. */
+  boxOf(i = this.index) { return this.view ? this.frames[i]?.box ?? null : null; }
 
   /** Longitude under the scan line at `step` (whole or fractional) of segment `seg`. */
   lonAt(seg, step) {
-    const t = this.track;
-    if (t.grid) return t.grid.lonWest + (step + 0.5) * t.grid.cellDeg;
+    const t = this.track, g = seg.frame.geo ?? t.grid;
+    if (g) return g.lonWest + (step + 0.5) * g.cellDeg;
     return wrapLon(t.lonAtStep0 + t.lonPerStep * (seg.frame.startStep + step));
   }
 
   stepped(seg, step, plan) {
     const i = this.frameIndexOf(seg);
-    if (seg !== this.lastSeg) { this.lastSeg = seg; this.onFrame(this.score.frames[i], i); }
+    if (seg !== this.lastSeg) { this.lastSeg = seg; this.onFrame(this.frames[i], i); }
     this.lastLevel = plan.hum.level;
     // `under` is the column itself where the sound is a smoothed level (lightning's bed);
     // `change` is the net change under the line in lightning's compare mode.
     // `winds`: each layer's wind right now (aerosols), for "Where am I?".
+    // `sea`: the line's latitude and the water under it (sea heat), for "Where am I?".
     this.onStep(i, {
       lon: this.lonAt(seg, step), light: plan.hum.under ?? plan.hum.level, change: plan.hum.change,
-      notes: plan.events.filter((e) => !e.bed).length, winds: plan.layers?.winds,
+      notes: plan.events.filter((e) => !e.bed).length, winds: plan.layers?.winds, sea: plan.sea, decade: plan.decade,
     });
   }
 
   voice(ev) {
     // Bow strokes of the bed are not places, and a flurry is marked once: nothing more to show.
     if (ev.bed || ev.echo) return;
-    const t = this.track, seg = this.player.segmentAt(this.player.currentPosition);
-    const lat = ev.lat ?? (ev.row !== undefined && t.grid
-      ? t.grid.latNorth - (ev.row + 0.5) * t.grid.cellDeg
+    const t = this.track, seg = this.player.segmentAt(this.player.currentPosition), g = seg.frame.geo ?? t.grid;
+    const lat = ev.lat ?? (ev.row !== undefined && g
+      ? g.latNorth - (ev.row + 0.5) * g.cellDeg
       : (Math.asin(clamp(-ev.pos, -1, 1)) * 180) / Math.PI);
-    const lon = ev.lon ?? (ev.col !== undefined && t.grid ? t.grid.lonWest + (ev.col + 0.5) * t.grid.cellDeg : this.lonAt(seg, 0));
+    const lon = ev.lon ?? (ev.col !== undefined && g ? g.lonWest + (ev.col + 0.5) * g.cellDeg : this.lonAt(seg, 0));
     this.lastNote = { kind: ev.kind, midi: ev.midi, lat, lon, pos: ev.pos, velocity: ev.velocity, at: performance.now() };
     this.onNote(this.lastNote);
   }
 
   get index() { return this.frameIndexOf(this.player.segmentAt(this.player.currentPosition)); }
   get playing() { return this.player.playing; }
-  frame() { return this.score.frames[this.index]; }
+  frame() { return this.frames[this.index]; }
 
   /** Where the scan line is: 0..1 through the current map. */
   progress() {
@@ -185,16 +281,23 @@ class SweepSonifier {
   /** Longitude of the scan line while playing (or always), else null. On the audio clock. */
   headLon(always = false) {
     if (!this.player.playing && !always) return null;
-    const seg = this.player.segmentAt(this.player.currentPosition);
-    return this.track.grid ? this.track.grid.lonWest + this.progress() * 360 : this.lonAt(seg, this.progress() * seg.steps);
+    const seg = this.player.segmentAt(this.player.currentPosition), g = seg.frame.geo ?? this.track.grid;
+    return g ? g.lonWest + this.progress() * g.cols * g.cellDeg : this.lonAt(seg, this.progress() * seg.steps);
   }
 
-  /** For the ocean tour: where the camera is and the date on screen, in words; else null. */
-  placeNow() {
-    if (this.kind !== 'ocean') return null;
+  /** For a line moving south (sea heat): its latitude while playing (or always), else null. */
+  headLat(always = false) {
+    if (this.scan !== 'south' || (!this.player.playing && !always)) return null;
+    const g = this.track.grid, rows = this.track._rows;
+    return g.latNorth - (rows[0] + this.progress() * rows.length) * g.cellDeg;
+  }
+
+  /** Sea heat: the line and the water under it where the line is now, playing or not. */
+  seaNow() {
+    if (this.kind !== 'sea') return null;
     const seg = this.player.segmentAt(this.player.currentPosition);
-    const s = Math.floor(seg.frame.startStep + this.progress() * (seg.steps - 1));
-    return { place: seg.frame.place, date: ocean.dateAt(this.track, s) };
+    const s = clamp(Math.floor(this.progress() * seg.steps), 0, seg.steps - 1);
+    return this.mapping.planStep(this.track, seg, s).sea;
   }
 
   /** For tracks played from a NASA video: the video time that matches the sound, in seconds. */
@@ -237,6 +340,10 @@ class SweepSonifier {
   setTempo(bpm) { this.bpm = bpm; this.applyTempo(); this.player.retime(); }
   setVolume(volume) { this.volume = volume; this.audio.setVolume(dbFor(volume)); }
   setMono(mono) { this.settings.width = mono ? 0 : SOUND.width; if (this.audio.ready) this.audio.apply(); }
+  /** True when the track plays notes, so they can be heard one by one or as one gliding voice. */
+  get hasNotes() { return !this.settings.bed; }
+  /** Continuous: the notes as one held voice that glides from note to note (note tracks only). */
+  setContinuous(on) { this.settings.continuous = !!on && this.hasNotes; this.hush(); }
 
   // ---- layers heard alone (aerosols) ----
 
@@ -284,7 +391,7 @@ class SweepSonifier {
   }
 
   /** What D says: the map's own text, or in compare mode what changed since the map before. */
-  describeText(i = this.index) { return this.comparing ? this.compareText(i) : this.score.frames[i].text; }
+  describeText(i = this.index) { return this.comparing ? this.compareText(i) : this.frames[i].text; }
 
   /** What changed from map i - 1 to map i, from the score's 10-degree grids (one fixed scale). */
   compareText(i) {
@@ -365,27 +472,30 @@ class SweepSonifier {
 
   /** Play one 10-degree cell of frame i, the way the sweep would, and say what it holds. */
   async probe(c, r, i = this.index) {
-    const v = this.score.frames[i]?.grid?.[r]?.[c];
+    const v = this.frames[i]?.grid?.[r]?.[c];
     if (v === undefined) return null;
     try { await this.ensureAudio(); } catch { return null; }
     const w = this.score.words;
     if (v === null) return w.missing;
     const lat = 90 - (r + 0.5) * 10, t = T.now() + 0.05, a = this.audio;
+    if (this.kind === 'sea') return this.probeSea(c, v, t);
     const midi = this.noteForLat(lat), pos = this.posForLat(lat);
     const pct = Math.round(Math.abs(v) * 100);
-    if (this.kind === 'change') {
-      if (v >= 0.05) {
-        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * v, duration: 1.5 }, t, pos);
-        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * v, duration: 1.5 }, t + 0.11, pos);
-        return `light grew, ${pct} percent of the strongest change on this map.`;
+    if (this.kind === 'change' || this.kind === 'anomaly' || this.isDecade(i)) {
+      // Night lights: v is -1..1 of the strongest change. El Niño: v is degrees C from normal, 4 = the end of NASA's bar.
+      const sea = this.kind === 'anomaly', u = sea ? Math.min(1, Math.abs(v) / 4) : Math.abs(v), deg = `${Math.abs(v).toFixed(1)} degrees C`;
+      if (v >= (sea ? 0.25 : 0.05)) {
+        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * u, duration: 1.5 }, t, pos);
+        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * u, duration: 1.5 }, t + 0.11, pos);
+        return sea ? `${deg} warmer than normal for the time of year.` : `light grew, ${pct} percent of the strongest change on this map.`;
       }
-      if (v <= -0.05) {
-        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * -v, duration: 1.4 }, t, pos);
-        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * -v, duration: 1.6 }, t + 0.3, pos);
-        return `light dimmed, ${pct} percent of the strongest change on this map.`;
+      if (v <= (sea ? -0.25 : -0.05)) {
+        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * u, duration: 1.4 }, t, pos);
+        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * u, duration: 1.6 }, t + 0.3, pos);
+        return sea ? `${deg} cooler than normal for the time of year.` : `light dimmed, ${pct} percent of the strongest change on this map.`;
       }
       a.play({ voice: 'notes', midi, velocity: 0.15, duration: 0.8 }, t, pos);
-      return 'about the same as in 2012.';
+      return sea ? 'close to normal for the time of year.' : 'about the same as in 2012.';
     }
     const how = v >= 0.5 ? 'high' : v >= 0.05 ? 'some' : 'almost none';
     if (this.kind === 'lightning') return this.probeLightning(c, r, i, v, { lat, midi, t, how, pct });
@@ -444,7 +554,7 @@ class SweepSonifier {
    * fades. Says how much of each is there, each against its own thickest places.
    */
   probeLayers(c, r, i, { lat, t }) {
-    const w = this.audio.winds, F = this.score.frames[i];
+    const w = this.audio.winds, F = this.frames[i];
     const vals = this.layers.map((L) => ({ L, v: F.layers?.[L.id]?.[r]?.[c] ?? 0 }));
     const heard = vals.filter((x) => !this.solo || x.L.id === this.solo);
     const winds = heard.map(({ L, v }) => ({ id: L.id, level: aerosols.windLevel(v), open: v, lat, thick: v }));
@@ -465,9 +575,83 @@ class SweepSonifier {
     return here.length ? `${here.map((x) => `${name(x.L)}, ${pct(x.v)}`).join('; ')}.` : `almost no ${this.score.words.what}.`;
   }
 
+  /**
+   * One 10-degree square of sea (sea heat): the chord of its temperature, placed west to east by its
+   * longitude, for a moment; says the temperature and how many voices that is.
+   */
+  probeSea(c, v, t) {
+    const ch = this.audio.chords;
+    const x = clamp((-180 + (c + 0.5) * 10) / 180, -1, 1);
+    const chord = seaHeat.chordFor(this.track, v, 1, () => x);
+    ch?.set(chord, t);
+    ch?.note({ midi: seaHeat.melodyMidi(v), velocity: 0.7, duration: 1.4, pan: x }, t + 0.05);
+    ch?.set({ levels: chord.levels.map(() => 0), pans: chord.pans }, t + 2.2);
+    const voices = chord.levels.filter((l) => l > 0.05).length;
+    const feel = v >= 28 ? 'among the warmest seas on Earth' : v >= 24 ? 'warm' : v >= 18 ? 'mild' : v >= 12 ? 'cool' : v >= 6 ? 'cold' : 'very cold';
+    return `${Math.round(v * 10) / 10} degrees Celsius on NASA's key, ${feel}: note ${midiToNote(seaHeat.melodyMidi(v))}, ${voices === 1 ? 'over the deep base note alone' : `over ${voices} chord voices`}.`;
+  }
+
+  /** Sea heat's examples: cold sea, warm sea, and west and east. */
+  seaDemos() {
+    const items = this.score.legend.items;
+    const say = (start) => items.find((it) => it.sound.startsWith(start));
+    return [
+      { id: 'cold', label: 'Cold sea', hint: 'Deep base note only', text: `Cold sea, near the poles: the deep base note alone. ${say('Deep base')?.meaning ?? ''}`.trim() },
+      { id: 'warm', label: 'Warm sea', hint: 'Rising notes, voice by voice', text: `From cold to warm sea, 0 to 30 degrees: a soft note climbs one step for every two degrees, and the chord voices join one by one until the full chord of the tropics. ${say('Chord voices')?.meaning ?? ''}`.trim() },
+      { id: 'cooling', label: 'Warm to cold', hint: 'Falling notes, voices leave', text: 'From warm to cold sea, 30 degrees down to 0: the soft notes fall one step for every two degrees, and the chord voices leave, highest first, until only the deep base note is left.' },
+      { id: 'sides', label: 'West and east', hint: 'Left ear, then right ear', text: `West and east. On this track the scan line lies on its side, so warm water in the west sounds in your left ear and warm water in the east in your right ear. In this example warm water moves from the far west to the far east.` },
+    ];
+  }
+
+  /** Play one sea heat example on the chords. Returns how long it takes, in seconds. */
+  seaDemo(id, t) {
+    const ch = this.audio.chords;
+    if (!ch) return 0;
+    const at = (temp, time, x = 0) => ch.set(seaHeat.chordFor(this.track, temp, 1, () => x), time);
+    const off = (time) => ch.set({ levels: this.track._voices.map(() => 0), pans: null }, time);
+    switch (id) {
+      case 'cold': at(2, t); off(t + 3.2); return 4.5;
+      case 'warm': case 'cooling': {
+        const up = id === 'warm';
+        for (let k = 0; k <= 30; k++) {
+          const temp = up ? k : 30 - k, time = t + k * 0.3;
+          at(temp, time);
+          if (k % 2 === 0) ch.note({ midi: seaHeat.melodyMidi(temp), velocity: 0.7, duration: 0.9, pan: 0 }, time);
+        }
+        off(t + 11); return 12.5;
+      }
+      case 'sides':
+        for (let k = 0; k <= 16; k++) at(29, t + k * 0.3, -1 + k / 8);
+        off(t + 5.5); return 7;
+      default: return 0;
+    }
+  }
+
+  /** Play a decade (light per year, then NASA's figure) exactly as the last map does. Returns its length in seconds. */
+  playDecade(decade, figure, t) {
+    const frame = { decade, figure };
+    for (let s = 0; s <= decade.length; s++) {
+      for (const ev of nightLights.decadeStep(frame, s).events) this.audio.play(ev, t + s * 0.5 + ev.offset, 0);
+    }
+    return decade.length * 0.5 + 2;
+  }
+
+  /** Mystery place: the decade of one region (an id of score.views), played with no name. Returns seconds. */
+  async mysteryDecade(id) {
+    try { await this.ensureAudio(); } catch { return 0; }
+    const ch = this.data.views?.items.find((x) => x.id === id)?.chapters.change?.[0];
+    return ch ? this.playDecade(ch.decade, ch.figure, T.now() + 0.05) : 0;
+  }
+
   /** The example sounds for this track: [{id, label, hint, text}]. */
   demos() {
     if (this.kind === 'aerosols') return this.layerDemos();
+    if (this.kind === 'sea') return this.seaDemos();
+    // Night lights' last map, the decade: its own example after the sweep's.
+    if (this.whole.chapters.some((c) => c.frames.some((f) => f.decade))) {
+      return [...DEMOS.light, ['decade', 'The decade', 'A note per year, then a pair', "The decade, on the last map. One soft note per year from 2012 to 2023: every place starts on the same note, and twice its light is one octave higher. In this example the light grows by half, then the rising pair says NASA's change map shows more light."]]
+        .map(([id, label, hint, text]) => ({ id, label, hint, text }));
+    }
     return (DEMOS[this.kind] ?? []).map(([id, label, hint, text]) => ({ id, label, hint, text }));
   }
 
@@ -509,6 +693,14 @@ class SweepSonifier {
     w.hear(x.id, t, 6.5);
     at(x, 0.25, t); at(x, 1, t + 1.2); at(x, 0.25, t + 3.4); at(x, 0, t + 4.6);
     if (x.wind === 'smoke') for (const [dt, vel] of [[1.9, 0.3], [2.6, 0.4], [3.1, 0.25]]) w.crackle({ layer: x.id, velocity: vel, pos: 0, duration: 0.03 }, t + dt);
+    // Its instrument in NASA's stories: a short rising phrase over the swell, as a plume would play it.
+    if (x.story && this.audio.story?.[x.story]) {
+      const frame = { focus: x.id, geo: { cols: 1, rows: 5, latNorth: 0, cellDeg: 1, lonWest: 0 }, secondsPerSweep: 1, _layers: { [x.id]: null } };
+      for (let k = 0; k < 5; k++) {
+        frame._layers[x.id] = Float32Array.from({ length: 5 }, (_, r) => (r === 4 - k ? 0.8 : 0));
+        for (const ev of aerosols.storyNotes(this.track, frame, 0)) this.audio.play(ev, t + 1.3 + k * 0.4, 0);
+      }
+    }
     return 6;
   }
 
@@ -517,6 +709,7 @@ class SweepSonifier {
     try { await this.ensureAudio(); } catch { return 0; }
     const a = this.audio, t = T.now() + 0.05, N = nightLights.BAND_NOTES, mid = N[10];
     if (this.kind === 'aerosols') return this.layerDemo(id, t);
+    if (this.kind === 'sea') return this.seaDemo(id, t);
     const note = (midi, at, pos, vel = 0.6, voice = 'notes', dur = 2) => a.play({ voice, midi, velocity: vel, duration: dur }, t + at, pos);
     // Lightning: one bass bow stroke; one mark note; and the sweep panner set to `x` (-1 west … +1 east).
     const bow = (at, rel) => a.play(lightning.bedEvents(rel, 'Eb', `demo${at}`, 0)[0], t + at);
@@ -564,6 +757,8 @@ class SweepSonifier {
         }
         return 2.2;
       }
+      // A place whose light grows by half over the decade, then NASA's rising pair.
+      case 'decade': return this.playDecade(Array.from({ length: 12 }, (_, y) => 1 + y / 22), 'more', t);
       case 'city': note(mid, 0, 0, 0.7); return 2.2;
       case 'north': note(N[18], 0, -1, 0.6); note(N[2], 1.2, 1, 0.6); return 3.2;
       case 'hum':
@@ -571,7 +766,7 @@ class SweepSonifier {
         a.setHum(0, 0, t + 3.8, 0.3); return 4;
       case 'tense':
         a.setHum(0.6, 0, t, 0.3); a.setHum(0.8, 0, t + 0.4, 1.2, 1); a.setHum(0, 0, t + 2.6, 0.6, 0); return 3.4;
-      case 'beat': a.beat(t, 0.9); if (this.kind !== 'ocean') a.beat(t + 1.2, 0.9); return 2;
+      case 'beat': a.beat(t, 0.9); a.beat(t + 1.2, 0.9); return 2;
       case 'swell':
         a.setHum(0.1, 0, t, 0.2); a.setHum(0.85, 0, t + 0.2, 1.8); a.setHum(0.1, 0, t + 2.4, 1.6);
         a.setHum(0, 0, t + 4.2, 0.4); return 4.4;
@@ -586,7 +781,10 @@ class SweepSonifier {
   async earcon(kind = 'ok') {
     try { await this.ensureAudio(); } catch { return; }
     if (!this.click) this.click = new T.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.03 }, volume: -22 }).toDestination();
-    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, T.now() + 0.01);
+    // Keys pressed while the sounds first load all wake up together: give each click its own moment.
+    const at = Math.max(T.now() + 0.01, (this.lastClick ?? 0) + 0.06);
+    this.lastClick = at;
+    this.click.triggerAttackRelease(kind === 'edge' ? 'A3' : 'E6', 0.05, at);
   }
 
   /** Stop any example or one-spot sound at once. */
