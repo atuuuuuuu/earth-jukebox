@@ -41,7 +41,12 @@ const check = (name, ok, detail = "") => { if (!ok) failures++; console.log(`${o
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   await page.goto("http://localhost:8125/");
   await page.waitForFunction("window.ready === true", null, { timeout: 15000 });
-  const live = async (ms = 200) => { await page.waitForTimeout(ms); return (await page.textContent("#live")).trim(); };
+  // A key clears the live region at once and fills it 60 ms later; on a busy machine later still.
+  const live = async (ms = 200) => {
+    await page.waitForTimeout(ms);
+    if (ms) await page.waitForFunction('document.getElementById("live").textContent.trim() !== ""', null, { timeout: 5000, polling: 50 }).catch(() => {});
+    return (await page.textContent("#live")).trim();
+  };
   const waitLive = (re, timeout = 12000) => page.waitForFunction(`${re}.test(document.getElementById("live").textContent)`, null, { timeout, polling: 50 });
   check("no lesson on a track without one", await page.isHidden("#lesson"));
 
@@ -66,10 +71,19 @@ const check = (name, ok, detail = "") => { if (!ok) failures++; console.log(`${o
   check("D reads the step: explanation first, then what to press", s1.startsWith("Read the step again. Step 1 of 13: What is an ocean current? An ocean current is water")
     && s1.includes("A wave is different") && s1.endsWith("Right arrow: next step."), s1.slice(0, 90));
   await page.evaluate("window.meter = new EJ.Tone.Meter(); EJ.Tone.getDestination().connect(window.meter); window.peak = -Infinity; setInterval(() => { const v = window.meter.getValue(); if (v > window.peak) window.peak = v; }, 20);");
+  // The page records which came first, so a slow machine cannot change the answer.
+  await page.evaluate(() => {
+    window.order = [];
+    const box = document.getElementById("live");
+    new MutationObserver(() => { if (box.textContent === "A wave.") window.order.push("name"); })
+      .observe(box, { childList: true, characterData: true, subtree: true });
+    const push = window.lesson.voices.push;
+    window.lesson.voices.push = function (...v) { window.order.push("sound"); return push.apply(this, v); };
+  });
   await page.keyboard.press("Space");
-  await waitLive("/^A wave\\.$/");
-  check("Space: the example's name is said before its sound", (await page.evaluate("window.lesson.voices.length")) === 0);
-  await page.waitForFunction("window.lesson.voices.length > 0", null, { timeout: 5000 });
+  await page.waitForFunction("window.order.includes('sound')", null, { timeout: 15000 });
+  const order = await page.evaluate("window.order.join()");
+  check("Space: the example's name is said before its sound", order.startsWith("name,sound"), order);
   check("then the sound plays", true, await page.textContent("#lesson-state"));
   await waitLive("/Press R to hear it again/", 20000);
   const pk = await page.evaluate("Math.round(window.peak * 10) / 10");
