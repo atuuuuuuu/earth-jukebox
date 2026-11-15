@@ -112,9 +112,8 @@ void main() {
   float gLat = line(15.0 - abs(mod(lat + 90.0, 30.0) - 15.0), 1.0);
   col = mix(col, vec3(1.0), 0.10 * max(gLon, gLat));
 
-  // Sweep tracks: one thin scan line moving west to east. The part not yet heard rests dimmer.
+  // Sweep tracks: one thin scan line moving west to east.
   if (uSweep > 0.5 && uHead < 900.0) {
-    col *= mix(1.0, 0.6, step(uHead, lon));
     float ph = line(lonDist(lon, uHead), 2.5) * meridianFade;
     col = mix(col, vec3(1.0, 0.85, 0.5), 0.95 * ph);
   }
@@ -207,6 +206,7 @@ void main() {
       this.scale = 0.9;
       this.full = false;      // true: the frame covers the whole planet (night lights)
       this.headFn = null;     // sweep tracks: () => scan line longitude, or null when silent
+      this.headLon = 999;     // the scan line as drawn, or 999 when nothing is playing
       this.headSpeed = 0;
       this.pings = [];
       this.reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -377,20 +377,18 @@ void main() {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       const still = this.reduced.matches;
-      this.headLon = 999;
-      if (this.headFn) {
-        // Sweep tracks: the line's longitude comes straight from the audio clock.
-        const l = this.headFn();
-        const prev = this.headLon2;
-        this.headLon = l == null ? 999 : l;
-        this.headSpeed = l != null && prev != null ? clamp(wrap(l - prev) / Math.max(dt, 1e-3), 0, 200) : 0;
-        this.headLon2 = l;
+      // Sweep tracks: the line's longitude comes from the audio clock, which moves in small jumps.
+      // The line glides on at a steady speed and eases toward it, so it and the turning globe never shudder.
+      const l = this.headFn ? this.headFn() : null;
+      if (l == null) this.headLon = 999;
+      else if (still || this.headLon > 900 || Math.abs(wrap(l - this.headLon)) > 20) { this.headLon = l; this.headSpeed = 0; }   // start, or a jump to another map
+      else {
+        const e = wrap(l - this.headLon - this.headSpeed * dt);
+        this.headLon = wrap(this.headLon + this.headSpeed * dt + 0.3 * e);
+        this.headSpeed = clamp(this.headSpeed + 0.05 * e / Math.max(dt, 1e-3), 0, 200);
       }
       if (this.follow && this.headLon < 900) {
-        // Turn at the scan's own speed, plus a gentle pull to stay centred: steady, no hops.
-        const diff = wrap(this.headLon - this.yaw);
-        const moving = still ? 0 : this.headSpeed;
-        this.yaw = still ? wrap(this.headLon) : wrap(this.yaw + moving * dt + diff * Math.min(1, dt * 5));
+        this.yaw = this.headLon;     // the line stays in the middle and the Earth turns under it
         this.targetYaw = this.yaw;   // stay here when the music stops
       } else if (this.targetYaw !== null && this.targetYaw !== undefined) {
         const diff = wrap(this.targetYaw - this.yaw);

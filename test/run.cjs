@@ -125,6 +125,7 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
       await page.waitForFunction(`window.son && son.score.id === "${ids[k]}" && !document.getElementById('play').disabled`, null, { timeout: 15000 });
       await page.waitForFunction(`document.getElementById("live").textContent.startsWith("Track ${k + 1} of")`, null, { timeout: 5000, polling: 50 }).catch(() => {});
       check(`key ${k + 1}: track ${ids[k]} chosen and announced`, (await live(0)).startsWith(`Track ${k + 1} of ${ids.length}`), await live(0));
+      if (ids[k - 1] === "atmospheric-river") check(`key ${k + 1}: NASA's film stops with its track`, await page.evaluate("document.getElementById('video').paused"));
     }
     await page.keyboard.press("Space");
     await page.waitForFunction("son.playing", null, { timeout: 15000 });

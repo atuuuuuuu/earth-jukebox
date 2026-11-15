@@ -146,6 +146,17 @@
     const earth = new Image();
     earth.onload = () => globe.setEarth(earth);
     earth.src = "textures/blue-marble.jpg";
+    // Stars behind the globe, drawn once from a fixed seed so they never move.
+    const c = document.createElement("canvas"), g = c.getContext("2d");
+    c.width = c.height = 480;
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 260; i++) {
+      const r = rnd() < 0.92 ? rnd() * 0.9 + 0.2 : rnd() * 1.4 + 0.8;
+      g.fillStyle = `rgba(${200 + rnd() * 55 | 0},${210 + rnd() * 45 | 0},255,${0.25 + rnd() * 0.7})`;
+      g.beginPath(); g.arc(rnd() * 480, rnd() * 480, r, 0, Math.PI * 2); g.fill();
+    }
+    $("stage").style.setProperty("--stars", `url(${c.toDataURL()})`);
   } catch {
     globe = null;
     $("globe").hidden = true;
@@ -246,6 +257,7 @@
     if (lesson) { lesson.dispose(); lesson = window.lesson = null; }
     $("lesson").hidden = $("to-lesson").hidden = true;
     playing = false; setPlayButton();
+    $("video").pause();   // NASA's film stops with its track, or it keeps decoding out of sight
     $("play").disabled = true;
     $("alert").hidden = true;
     track = t;
@@ -286,12 +298,13 @@
     $("video-wrap").hidden = !video;
     $("globe").hidden = video || !globe;
     $("map-img").hidden = video || !!globe;
-    document.querySelector(".stage-hint").hidden = video || !globe;
+    document.querySelector(".stage-hint").hidden = document.querySelector(".halo").hidden = video || !globe;
     const media = video && son.track.media;
     if (media) { const v = $("video"); v.poster = media.poster; if (!v.src.endsWith(media.src)) v.src = media.src; }
     if (globe) {
       globe.headFn = video ? null : () => son?.headLon();
-      globe.full = true;
+      // Sea maps: NASA paints land plain grey (no reading there), so the planet's own land shows instead.
+      globe.full = !["anomaly", "currents"].includes(score.sweep.chapter);
       globe.pings = [];
     }
 
