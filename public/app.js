@@ -10,6 +10,16 @@
     set(k, v) { try { localStorage.setItem(`ej:${k}`, JSON.stringify(v)); } catch { /* private mode: not remembered */ } },
   };
 
+  // Light or dark mode, remembered on this device (index.html applies it before the page draws).
+  const root = document.documentElement;
+  const showTheme = () => $("theme").setAttribute("aria-pressed", String(root.dataset.theme === "light"));
+  showTheme();
+  $("theme").addEventListener("click", () => {
+    root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
+    store.set("theme", root.dataset.theme);
+    showTheme();
+  });
+
   // ---------- Speaking ----------
   // One polite live region. Clearing it first makes a repeated message speak again.
   // "Read aloud" uses the device's voice, at the volume and speed set in the lesson's settings.

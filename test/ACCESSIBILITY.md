@@ -45,6 +45,7 @@ While playing, the page says only the year, week or part as each map starts (tur
 - [ ] Keys 1 to 8 choose a track; changing track never doubles the notes
 - [ ] M turns mono on and off: sounds stay in the middle, then move between the ears again
 - [ ] Escape stops all sound and speech, from anywhere on the page
+- [ ] The Light mode button at the top says "toggle button, pressed" or "not pressed", and the choice is kept after a reload
 - [ ] Each example button plays a sound, then says what it means
 - [ ] A city button plays that place and says its value
 - [ ] Save as audio file says "Making the audio file", then "Saved ...", and a file downloads

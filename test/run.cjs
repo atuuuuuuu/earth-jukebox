@@ -117,6 +117,14 @@ const AXE = "axe.run(document, { runOnly: ['wcag2a','wcag2aa','wcag21a','wcag21a
 
   // ---- Every track, by number key: loads, plays, and passes axe.
   await page.evaluate(axeSource);
+  // Both colour themes: the page opens in the system's (light in this browser), and the button switches.
+  check("opens in the system's colour theme", await page.evaluate("document.documentElement.dataset.theme") === "light");
+  await page.click("#theme");
+  const darkAxe = await page.evaluate(AXE);
+  check("dark mode: button says not pressed, and axe", await page.evaluate("document.documentElement.dataset.theme === 'dark' && document.getElementById('theme').getAttribute('aria-pressed') === 'false'")
+    && darkAxe.violations.length === 0, darkAxe.violations.map((v) => `${v.id} (${v.nodes.length})`).join(", ") || `${darkAxe.passes.length} rules passed`);
+  await page.click("#theme");
+  check("light mode again, remembered", await page.evaluate("document.documentElement.dataset.theme === 'light' && localStorage.getItem('ej:theme') === '\"light\"'"));
   const ids = await page.evaluate(() => [...document.querySelectorAll('input[name="track"]')].map((r) => r.value));
   for (let k = 0; k < ids.length; k++) {
     await page.focus("#keys");

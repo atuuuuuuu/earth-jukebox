@@ -1,4 +1,4 @@
-/* Earth Jukebox. Dark, calm, high contrast. Every colour pair here meets WCAG 2.2 AA (most AAA). */
+/* Earth Jukebox. Dark or light, calm, high contrast. Every colour pair here meets WCAG 2.2 AA (most AAA). */
 :root {
   --bg: #0a0d14;
   --surface: #121826;
@@ -9,10 +9,30 @@
   --accent: #ffc861;        /* 12:1 on --bg */
   --accent-ink: #1d1404;
   --danger: #ff8a7a;
+  --danger-bg: #2a1513;
+  --accent-hover: #ffd88a;
+  --focus-halo: rgba(10, 13, 20, 0.9);
   --radius: 14px;
   --gap: clamp(16px, 2.5vw, 28px);
   --font: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
+}
+/* Light mode (the button at the top, or the system's setting): dark ink on light paper.
+   On --bg: text 16:1, muted 7.6:1, accent 6.6:1, danger 6.1:1, borders 3.4:1; white on accent 7.1:1. */
+:root[data-theme="light"] {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-2: #e9edf5;
+  --line: #7d879b;
+  --text: #141a26;
+  --muted: #465063;
+  --accent: #7a4f00;
+  --accent-ink: #ffffff;
+  --accent-hover: #5f3d00;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --focus-halo: rgba(255, 255, 255, 0.9);
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -40,7 +60,7 @@ kbd {
 .wrap { width: min(1180px, 100% - 32px); margin-inline: auto; }
 
 /* Focus: thick, bright, never hidden. */
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; box-shadow: 0 0 0 6px rgba(10, 13, 20, 0.9); border-radius: 8px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus-halo); border-radius: 8px; }
 input[type="radio"]:focus-visible, input[type="checkbox"]:focus-visible { outline-offset: 2px; }
 
 .skip {
@@ -56,6 +76,10 @@ input[type="radio"]:focus-visible, input[type="checkbox"]:focus-visible { outlin
 .brand-mark { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--accent); position: relative; }
 .brand-mark::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2.5px; margin-left: -1.25px; background: var(--accent); }
 .brand-tag { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.brand-h { color: var(--accent); }   /* H + earth: "hear Earth". Screen readers say Earth Jukebox. */
+.head-end { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.theme-btn { min-height: 44px; padding: 6px 14px; font-size: 0.95rem; }
+.theme-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .site-foot { margin-top: 48px; padding: 28px 0 40px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.95rem; }
 
 /* Intro */
@@ -116,6 +140,8 @@ input[type="radio"], input[type="checkbox"] { width: 22px; height: 22px; accent-
   position: relative; aspect-ratio: 1 / 1; max-height: 640px; width: 100%; border-radius: var(--radius); overflow: hidden;
   background: radial-gradient(closest-side, rgba(70, 140, 255, 0.18), transparent 75%), var(--stars, none), #030712;
   background-size: auto, 480px 480px, auto; border: 1px solid var(--line); container-type: size;
+  /* Space stays dark in light mode too: the globe and its words keep the dark colours. */
+  --text: #f3f5f9; --muted: #b9c2d6; --accent: #ffc861; color: var(--text);
 }
 /* A soft blue glow round the globe, which fills 90 percent of the stage's shorter side */
 .halo {
@@ -151,13 +177,13 @@ input[type="radio"], input[type="checkbox"] { width: 22px; height: 22px; accent-
   display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 64px; font-size: 1.3rem;
   background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
 }
-.btn-play:hover:not(:disabled) { background: #ffd88a; }
+.btn-play:hover:not(:disabled) { background: var(--accent-hover); }
 .play-icon { width: 0; height: 0; border-style: solid; border-width: 10px 0 10px 16px; border-color: transparent transparent transparent currentColor; }
 .btn-play[data-state="playing"] .play-icon { width: 16px; height: 20px; border: 0; border-left: 5px solid currentColor; border-right: 5px solid currentColor; }
 .announce { border-left: 4px solid var(--accent); background: var(--surface); border-radius: 0 12px 12px 0; padding: 10px 14px; min-height: 72px; }
 .announce-h { margin: 0 0 2px; font-size: 0.85rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
 #live { margin: 0; }
-.alert { border: 2px solid var(--danger); border-radius: 12px; padding: 12px 14px; color: var(--text); background: #2a1513; }
+.alert { border: 2px solid var(--danger); border-radius: 12px; padding: 12px 14px; color: var(--text); background: var(--danger-bg); }
 .alert .btn { margin-top: 8px; }
 
 /* Guided lesson (before the player) */
