@@ -219,24 +219,14 @@ pitch (and its ear), the whole line sounds as a deep hum, and bright places ring
 
 ## Use of AI
 
-NASA Space Apps asks every project to say where AI was used. Hearth was built with help from an AI
-coding assistant, Claude Code (Anthropic), working under the rules in `AGENTS.md` and the team's specs:
+NASA Space Apps asks every project to say where AI was used.
 
-- **Code written with Claude Code (AI-assisted):** much of the web page (`public/app.js`,
-  `public/globe.js`, `public/index.html`, `public/styles.css`), the sound engine in `public/sweep/`
-  (the track mappings, the winds, the sea temperature chords and the views: regions and stories), the
-  score builder and its validator (`backend/build_sweep.py`, `backend/validate_api.py`) and the
-  browser and backend tests.
-- **Data processing written with Claude Code (AI-assisted):** the Python pipeline in `backend/eic/`
-  that reads NASA's videos and images (colour keys, grids, the aerosol unmixing, the sea temperature
-  reading, the night-lights decade and regions). It is ordinary, repeatable code: no AI model runs on
-  the data, and running the pipeline again gives the same numbers.
-- **Text written with Claude Code (AI-assisted):** much of the spoken text, the legends, "About this
-  track" (written from NASA's own pages) and this documentation.
-- **Not AI-generated:** the data, images and video (all NASA's), the instrument samples (FluidR3_GM),
-  and the sound itself, which the page computes from NASA's data as you listen.
-
-The team chose the challenge, the NASA resources and the sound design, decided what to build, and
-reviewed, listened to and tested every change.
+- **The team's:** the idea, the choice of NASA resources, the sonification approach (the scan line
+  and how each track maps data to sound) and the sound design.
+- **AI-assisted:** we used an AI coding assistant (Claude Code) to help write the code (the page, the
+  sound engine, the data pipeline and the tests) and much of the written text, from our specifications.
+  We reviewed, listened to and tested every change.
+- **Not AI-generated:** the data, images and video (all NASA's), the instrument samples (FluidR3_GM)
+  and the sound, which the page computes from NASA's data as you listen. No AI model runs on the data.
 
 Hearth is not an official NASA product.
