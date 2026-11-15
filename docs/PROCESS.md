@@ -34,6 +34,7 @@ That decided the interface before any sound was designed:
 | Carbon dioxide | 8, DYAMOND Global Carbon Dioxide (SVS 5196) | Carbon dioxide on NASA's turning globe, flattened into one world map |
 | Lightning | 9, Lightning from the ISS 2017 to 2023 (SVS 5011) | Lightning strikes per place |
 | Atmospheric river | A River in the Sky (SVS 4960) | Water vapour along a line through NASA's moving picture, with NASA's own clock |
+| El Niño: then and now | Sea Surface Temperature Anomaly, Near Real Time (SVS 5176) | Degrees C warmer or cooler than normal, read from NASA's colour bar, one map a month |
 
 ## Reading NASA's pictures (backend/eic, Python with OpenCV)
 
@@ -80,6 +81,14 @@ that show it face-on.
 the picture is read for NASA's blue water-vapour shading, and NASA's own date overlay is lined up
 with the film at 19 points, so the spoken dates and the clock over the picture match NASA's.
 
+**El Niño.** NASA's film is a flat world map, one day a frame from 18 May 2024 to 4 November 2026.
+Every colour on the sea is a number on NASA's colour bar (-4 to +4 degrees C from normal), so we
+read each pixel back as the nearest bar colour; land, ice and NASA's date stamp match no bar colour
+and carry no reading. Every day of a month is averaged into one map. The maps come in pairs, each
+month of 2025 then the same month of 2026, so the listener hears the same water a year apart. The
+check: NOAA's relative Niño 3.4 for September 2026 was +2.1 degrees C; ours, from NASA's pixels, is
++2.05.
+
 **Night lights and lightning** are explained in each track's YAML file in `backend/eic/tracks/`.
 
 ## Turning numbers into sound (public/sweep, Tone.js)
@@ -118,13 +127,17 @@ meaning choose its mood:
   went out falls, on a cello.
 - **Carbon dioxide rings where it is dense.** Notes mark the plumes (eastern China, Africa's fires,
   the Amazon), and a deep hum follows all the carbon dioxide under the line.
+- **El Niño is heard a year apart.** In 2025 the El Niño box in the middle of the Pacific is quiet,
+  with a few cellos. In the same months of 2026 the same water rings: single notes from May, rising
+  pairs from June, and from July the whole box.
 
 ## Checking the work
 
 - `backend/validate_api.py` checks every score against the contract in `backend/API.md`.
 - `backend/tests/` tests the score builders and the video readers with known answers: the strong
   currents are where the Gulf Stream, Kuroshio and Agulhas run, carbon dioxide is dense over eastern
-  China and clean over the South Pacific, the Gulf Stream flows north off Miami.
+  China and clean over the South Pacific, the Gulf Stream flows north off Miami, El Niño is in 2026
+  and not 2025, and September 2026 agrees with NOAA's index.
 - `test/run.cjs` drives the real page by keyboard in a browser: every key, every track, the spoken
   answers, the sound level, the scan line, the video staying in step, axe, and no keyboard trap.
 - `test/lesson.cjs` does the same for the guided lesson; `test/responsive.cjs` checks every width

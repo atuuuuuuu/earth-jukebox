@@ -37,7 +37,7 @@ uniform float uDataOn;
 uniform float uPx;             // device pixels per CSS pixel
 uniform float uFull;           // 1 when the whole frame is data (night lights): no Blue Marble, no masks
 uniform float uSweep;          // 1 when the scan line moves freely at uHead (sweep tracks)
-uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 new light, 2 dimmed)
+uniform vec4 uPing[6];         // notes just played: lon, lat, age 0..1 (1 = gone), kind (0 note, 1 lavender, 2 orange, 3 blue)
 
 float lonDist(float a, float b) { return abs(mod(a - b + 540.0, 360.0) - 180.0); }
 float band(float d, float w) { return 1.0 - smoothstep(0.0, w, d); }
@@ -128,7 +128,7 @@ void main() {
     float fade = 1.0 - p.z;
     float ring = (1.0 - smoothstep(0.0, 1.2, abs(d - (1.5 + 6.0 * p.z)))) * fade;
     float core = (1.0 - smoothstep(0.0, 1.8, d)) * fade;
-    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : vec3(1.0, 0.66, 0.41);
+    vec3 pc = p.w < 0.5 ? vec3(1.0, 0.84, 0.59) : p.w < 1.5 ? vec3(0.77, 0.65, 1.0) : p.w < 2.5 ? vec3(1.0, 0.66, 0.41) : vec3(0.55, 0.8, 1.0);
     col = mix(col, pc, clamp(0.8 * ring + core, 0.0, 1.0));
   }
 
@@ -302,7 +302,7 @@ void main() {
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.tex[1]);
     }
 
-    // A note sounded at lon, lat. kind: 0 city light, 1 new light, 2 dimmed.
+    // A note sounded at lon, lat. kind: 0 a note, 1 lavender (new light), 2 orange (dimmed, or warmer sea), 3 blue (cooler sea).
     ping(lon, lat, kind = 0) {
       this.pings.push({ lon, lat, kind, born: performance.now() });
       if (this.pings.length > 6) this.pings.shift();

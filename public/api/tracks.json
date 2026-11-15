@@ -135,6 +135,25 @@
         "url": "https://svs.gsfc.nasa.gov/4960/",
         "credit": "NASA's Scientific Visualization Studio, visualizer Greg Shirah (NASA/GSFC), Horace Mitchell (NASA/GSFC), Cindy Starr (GST), Kel Elkins (USRA); scientists Allison Collow (UMBC), Natalie Thomas (UMBC), Michael Bosilovich (NASA/GSFC). Data: MERRA-2 reanalysis, hourly (NASA GMAO); GTOPO30 topography (USGS)"
       }
+    },
+    {
+      "id": "el-nino",
+      "code": "8",
+      "title": "El Niño: then and now",
+      "subtitle": "Sea temperature, 2025 and 2026",
+      "description": "NASA's map of how much warmer or cooler than normal the sea is, one map a month: each month of 2025, then the same month of 2026. A rising pair of notes is sea much warmer than normal; a low falling cello, much cooler. Listen to the middle of the Pacific: in 2026, El Niño warms it.",
+      "score": "api/scores/el-nino.json",
+      "frames": 22,
+      "firstDate": null,
+      "lastDate": null,
+      "when": "January 2025 to November 2026",
+      "units": "degrees C from normal",
+      "engine": "sweep",
+      "source": {
+        "title": "Sea Surface Temperature (SST) Anomaly, Near Real Time",
+        "url": "https://svs.gsfc.nasa.gov/5176/",
+        "credit": "NASA's Scientific Visualization Studio. Data: MUR SST v4.1 (NASA JPL PO.DAAC)"
+      }
     }
   ]
 }

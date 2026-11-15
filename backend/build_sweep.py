@@ -182,6 +182,15 @@ def ranked(grid, sign: int = 1, n: int = 3, floor: float = 0.0) -> list[tuple[in
     return sorted(cells, key=lambda t: -sign * t[2])[:n]
 
 
+def spread(cells, n: int = 3) -> list:
+    """The first n cells at least 3 cells (30 degrees) apart, so each names a different place."""
+    out = []
+    for q in cells:
+        if len(out) < n and all(max(abs(q[0] - o[0]), abs(q[1] - o[1])) >= 3 for o in out):
+            out.append(q)
+    return out
+
+
 def r3(grid):
     return [[None if v is None else round(v, 3) for v in row] for row in grid]
 
@@ -305,10 +314,7 @@ def build_map(data: dict, chapter: dict, t: dict) -> list[dict]:
     frames = []
     for f, grid in zip(chapter["frames"], pooled):
         grid = [[None if v is None else min(1.0, v / scale) for v in row] for row in grid]
-        busy = []                     # the strongest places at least 30 degrees apart, so each is a different current or plume
-        for q in ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.05):
-            if len(busy) < 3 and all(max(abs(q[0] - o[0]), abs(q[1] - o[1])) >= 3 for o in busy):
-                busy.append(q)
+        busy = spread(ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.05))   # each a different current or plume
         text = f"{f['label']}. {f['about']} " + (f"{t['words']['busiest']}: {listing(busy)}." if busy else "")
         frames.append({
             "date": None,
@@ -319,6 +325,45 @@ def build_map(data: dict, chapter: dict, t: dict) -> list[dict]:
             "relativeTotal": 1.0,
             "grid": r3(grid),
             "text": text.strip(),
+        })
+    return frames
+
+
+def build_anomaly(data: dict, chapter: dict, t: dict) -> list[dict]:
+    """El Niño: one map a month of how much warmer or cooler than normal the sea is, in degrees C on
+    NASA's fixed scale. The maps come in pairs (a month of 2025, then the same month of 2026), so
+    they carry no date: the date order check is for maps in time order."""
+    g, unit, line, hot = data["grid"], chapter["degreesPerUnit"], chapter["elNinoLine"], t["hotLine"]
+
+    def than(x: float, ref: str) -> str:
+        return f"about as warm as {ref}" if abs(x) < 0.05 else f"{abs(x):.1f} degrees C {'warmer' if x > 0 else 'cooler'} than {ref}"
+
+    labels = {f["label"]: f for f in chapter["frames"]}
+    frames = []
+    # Name only squares that are mostly sea: "around Warsaw" would mean the Baltic, and mislead.
+    sea = pool([0.0 if a is None else 1.0 for a in chapter["frames"][0]["gain"]], g)
+    at_sea = lambda cells: [q for q in cells if sea[q[0]][q[1]] >= 0.5]
+    for f in chapter["frames"]:
+        grid = pool([None if a is None else (a - b) / 100 * unit for a, b in zip(f["gain"], f["loss"])], g)
+        st = stats(grid, hot)
+        cool = stats([[None if v is None else -v for v in row] for row in grid], hot)["hot"]
+        rel = f["nino34Relative"]
+        month, year = f["label"].rsplit(" ", 1)
+        before = labels.get(f"{month} {int(year) - 1}")
+        warmest = spread(at_sea(ranked(grid, 1, GRID_ROWS * GRID_COLS, 0.5)))
+        coolest = spread(at_sea(ranked(grid, -1, GRID_ROWS * GRID_COLS, 0.5)))
+        text = (f"{f['label']}" + (f", {f['span']} only" if f["days"] < 20 else "")
+                + f". The El Niño box in the central Pacific is {than(f['nino34'], 'normal')}, and "
+                + f"{than(rel, 'the tropical ocean as a whole')}: "
+                + (f"El Niño, above the line of {line} degrees warmer. " if rel >= line else f"below the El Niño line of {line} degrees warmer. ")
+                + (f"A year earlier it was {than(before['nino34Relative'], 'the tropics')}. " if before else "")
+                + (f"Warmest: {listing(warmest)}. " if warmest else "")
+                + (f"Coolest: {listing(coolest)}. " if coolest else "")
+                + f"{round(st['hot'] * 100)} percent of the sea read is at least {hot:g} degree warmer than normal, "
+                + f"{round(cool * 100)} percent at least {hot:g} degree cooler.")
+        frames.append({
+            "date": None, "when": f["label"], "image": f["image"], "alt": f.get("alt", ""), **st,
+            "grid": r3(grid), "text": text,
         })
     return frames
 
@@ -369,7 +414,7 @@ def build_pollutants(data: dict, chapter: dict, t: dict) -> list[dict]:
 
 
 BUILDERS = {"years": build_years, "change": build_change, "parts": build_parts, "pollutants": build_pollutants,
-            "scenes": build_scenes, "currents": build_map, "plumes": build_map}
+            "scenes": build_scenes, "currents": build_map, "plumes": build_map, "anomaly": build_anomaly}
 
 LEGEND_KEEP = {"years": ("Ringing notes", "Deep hum"), "change": ("Deep hum", "Rising pair", "Low falling cello")}
 

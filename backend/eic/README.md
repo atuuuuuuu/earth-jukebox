@@ -21,6 +21,8 @@ colour key, grid, playback timing and the screen-reader sound legend. The tracks
 `01_night_lights`, `06_air_quality` (four pollutant strips rebuilt into one world map each),
 `07_ocean_map` and `06_co2_map` (one world map each: NASA's flat ECCO2 film, and NASA's turning
 globe flattened; `pipeline/tracks/globe_map.py`), `07_ocean_lesson` (the guided Gulf Stream lesson),
-`08_atmospheric_river` (played against NASA's own video, with NASA's clock) and `07_lightning`
-(corrected for how often the space station looks at each latitude).
+`08_atmospheric_river` (played against NASA's own video, with NASA's clock), `09_el_nino` (NASA's sea
+temperature anomaly read back into degrees C from its colour bar, one map a month,
+`pipeline/tracks/sst_anomaly.py`) and `07_lightning` (corrected for how often the space station looks
+at each latitude).
 `pipeline.fetch_samples` downloads the instrument samples into `public/samples/`.

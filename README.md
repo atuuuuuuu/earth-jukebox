@@ -27,6 +27,7 @@ Resource numbers are the order on the challenge's Resources tab.
 | 5 | **Carbon dioxide**, a world map from NASA's turning globe, 14 January to 3 March 2020 | 8: [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | 6 | **Lightning**, March 2017 to July 2023 in 14 equal parts | 9: [Lightning Events Detected from the ISS 2017-2023](https://svs.gsfc.nasa.gov/5011/) |
 | 7 | **Atmospheric river**, NASA's 3D film of a Pineapple Express, December 2010, with NASA's clock over the film | [A 3D View of an Atmospheric River from an Earth System Model](https://svs.gsfc.nasa.gov/4960/) |
+| 8 | **El Niño: then and now**, NASA's map of sea temperature compared with normal, each month of 2025 then the same month of 2026 | [Sea Surface Temperature (SST) Anomaly, Near Real Time](https://svs.gsfc.nasa.gov/5176/) |
 
 ## Using it without sight
 
@@ -104,7 +105,7 @@ for the file and URL; `data/eic/` is not in git), then:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r backend/eic/pipeline/requirements.txt
-npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_map, 07_ocean_map, 07_ocean_lesson, 07_lightning
+npm run eic -- 06_air_quality      # or 01_night_lights, 06_co2_map, 07_ocean_map, 07_ocean_lesson, 07_lightning, 09_el_nino
 npm run api && npm run validate
 ```
 
@@ -116,6 +117,9 @@ mkdir -p data/eic/07_Perpetual_Ocean data/eic/06_CO2_DYAMOND
 git show 281f561:public/media/07_ocean_currents/tour.mp4 > data/eic/07_Perpetual_Ocean/tour.mp4   # 07_ocean_lesson
 git show 281f561:public/media/06_co2_dyamond/orbit.mp4 > data/eic/06_CO2_DYAMOND/orbit.mp4       # 06_co2_map
 ```
+
+El Niño (`09_el_nino`) reads NASA's 4096 x 2048 film `sst_anomaly_30_sec_4096x2048_2x1_30p.mp4` and its
+colour bar `colorbar.jpg`, both from [SVS 5176](https://svs.gsfc.nasa.gov/5176/), in `data/eic/09_SST_Anomaly/`.
 
 ## How it works
 
@@ -145,7 +149,8 @@ git show 281f561:public/media/06_co2_dyamond/orbit.mp4 > data/eic/06_CO2_DYAMOND
    at a time; notes ring as it crosses bright places (vibraphone for lights and air, harp for the
    ocean, kalimba for lightning), a drone follows everything under the line. The worst air turns the
    drone sour and the notes minor; the atmospheric river adds a soft pulse each time NASA's clock
-   passes midnight.
+   passes midnight. El Niño is two-sided: a rising pair of notes where the sea is much warmer than
+   normal, a low falling cello where it is much cooler.
 4. **Page** (`public/app.js`, `globe.js`). Plain HTML, CSS and JavaScript; the globe is plain WebGL.
 
 ### The sound follows NASA's Caldwell 73 sonification

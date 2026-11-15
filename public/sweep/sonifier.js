@@ -82,6 +82,12 @@ DEMOS.plumes = [
   DEMOS.light[1],
   ['hum', 'Deep hum', 'Swells, then fades', 'The deep hum. It follows all the carbon dioxide under the scan line: quiet over clean air, fuller over plumes.'],
 ];
+DEMOS.anomaly = [
+  ['gain', 'Warmer than normal', 'A rising pair of notes', 'Warmer than normal. Where the sea is at least 1.2 degrees warmer than usual for the time of year, a note rings as the scan line crosses it; from 2 degrees, a rising pair. Warmer rings louder.'],
+  ['loss', 'Cooler than normal', 'A low falling cello', 'Cooler than normal. Where the sea is at least 1.2 degrees cooler than usual, a low cello falls. Cooler rings louder.'],
+  ['hum', 'Deep hum', 'Swells, then fades', 'The deep hum. It grows with how far from normal the sea under the scan line is, warm or cool. It is quiet where the sea is close to normal, and silent over land.'],
+  DEMOS.light[1],
+];
 DEMOS.lightning = [
   ['city', 'Storms', 'One drop-like note', 'Storms. Each place with a lot of lightning plays one drop-like note as the line crosses it. More lightning rings louder.'],
   DEMOS.light[1],
@@ -95,7 +101,7 @@ class SweepSonifier {
   } = {}) {
     Object.assign(this, { score, mapping, onFrame, onStep, onEnd, onNote, onBeat, bpm, volume });
     this.kind = score.sweep.mapping === 'river' ? 'river'
-      : ['change', 'currents', 'plumes'].includes(score.sweep.chapter) ? score.sweep.chapter
+      : ['change', 'currents', 'plumes', 'anomaly'].includes(score.sweep.chapter) ? score.sweep.chapter
         : score.sweep.chapter === 'pollutants' ? 'air'
         : score.sweep.instrument === 'kalimba' ? 'lightning' : 'light';
     this.chapter = data.chapters.find((c) => c.id === score.sweep.chapter);
@@ -237,19 +243,21 @@ class SweepSonifier {
     const lat = 90 - (r + 0.5) * 10, t = T.now() + 0.05, a = this.audio;
     const midi = this.noteForLat(lat), pos = this.posForLat(lat);
     const pct = Math.round(Math.abs(v) * 100);
-    if (this.kind === 'change') {
-      if (v >= 0.05) {
-        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * v, duration: 1.5 }, t, pos);
-        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * v, duration: 1.5 }, t + 0.11, pos);
-        return `light grew, ${pct} percent of the strongest change on this map.`;
+    if (this.kind === 'change' || this.kind === 'anomaly') {
+      // Night lights: v is -1..1 of the strongest change. El Niño: v is degrees C from normal, 4 = the end of NASA's bar.
+      const sea = this.kind === 'anomaly', u = sea ? Math.min(1, Math.abs(v) / 4) : Math.abs(v), deg = `${Math.abs(v).toFixed(1)} degrees C`;
+      if (v >= (sea ? 0.25 : 0.05)) {
+        a.play({ voice: 'notes', midi, velocity: 0.3 + 0.5 * u, duration: 1.5 }, t, pos);
+        a.play({ voice: 'notes', midi: midi + 2, velocity: 0.25 + 0.4 * u, duration: 1.5 }, t + 0.11, pos);
+        return sea ? `${deg} warmer than normal for the time of year.` : `light grew, ${pct} percent of the strongest change on this map.`;
       }
-      if (v <= -0.05) {
-        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * -v, duration: 1.4 }, t, pos);
-        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * -v, duration: 1.6 }, t + 0.3, pos);
-        return `light dimmed, ${pct} percent of the strongest change on this map.`;
+      if (v <= (sea ? -0.25 : -0.05)) {
+        a.play({ voice: 'cello', midi: midi - 12, velocity: 0.3 + 0.5 * u, duration: 1.4 }, t, pos);
+        a.play({ voice: 'cello', midi: midi - 14, velocity: 0.2 + 0.3 * u, duration: 1.6 }, t + 0.3, pos);
+        return sea ? `${deg} cooler than normal for the time of year.` : `light dimmed, ${pct} percent of the strongest change on this map.`;
       }
       a.play({ voice: 'notes', midi, velocity: 0.15, duration: 0.8 }, t, pos);
-      return 'about the same as in 2012.';
+      return sea ? 'close to normal for the time of year.' : 'about the same as in 2012.';
     }
     a.play({ voice: 'notes', midi, velocity: v < 0.05 ? 0.1 : 0.22 + 0.62 * Math.pow(v, 0.8), duration: 2 }, t, pos);
     a.setHum(Math.max(0.1, Math.sqrt(v)), pos, t, 0.3);

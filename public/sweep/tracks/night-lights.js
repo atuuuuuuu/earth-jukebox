@@ -30,6 +30,9 @@ const EXTRA_MARGIN = 0.15;         // 2nd/3rd note in a column must clear coreMi
 const EXTRA_MIN_BANDS = 3;         // …and sit at least 18° of latitude from the others
 const CHANGE_MIN = 0.3;            // ~top 10% of changed cells
 const CHANGE_PAIR = 0.5;           // strong change: add the rising/falling second note
+// Two-sided maps: up is a rising pair, down a falling cello. 'change': night lights 2012 to 2023;
+// 'anomaly': sea temperature from normal (El Niño), where 1 = 4 degrees C, so notes from 1.2 degrees.
+const TWO_SIDED = new Set(['change', 'anomaly']);
 const HUM_GATE = 0.08;             // below this the hum is silent: dark land / open ocean
 // Air quality only: the air is never empty, so the drone never stops; over the worst air it turns
 // sour (tension) and notes slip into E minor, so dirty air sounds uneasy, not just louder.
@@ -191,8 +194,8 @@ export function planStep(track, seg, c) {
   const events = [];
   const ring = params.ring;
 
-  // Every chapter but the change map is a map of one quantity (light, lightning, a pollutant).
-  if (chapter.id !== 'change') {
+  // Every chapter but the two-sided maps is a map of one quantity (light, lightning, a pollutant).
+  if (!TWO_SIDED.has(chapter.id)) {
     const min = frame._noteMin ?? params.coreMin;
     const chosen = [];
     for (const q of peaks(frame._core, g, c, min)) {

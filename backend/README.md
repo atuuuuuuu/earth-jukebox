@@ -48,6 +48,7 @@ python3 backend/validate_api.py public               # "API OK"
 | `07_ocean_lesson` | `07_Perpetual_Ocean/tour.mp4`, our 640 x 360 copy of `perpetual_ocean2_CLOSE_093_clean_noDate_1080p30.mp4` ([5425](https://svs.gsfc.nasa.gov/5425/)); see the main README to restore it |
 | `07_ocean_map` | `07_ECCO2/ecco2_sst_flow.webmhd.webm` ([3912](https://svs.gsfc.nasa.gov/3912/)) |
 | `06_co2_map` | `06_CO2_DYAMOND/orbit.mp4`, our 1280 x 720 copy of `dyamondPointCloud_12-1-2023b_dyamond_co2_anim_globe_orbit_1080p30_h265.mp4` ([5196](https://svs.gsfc.nasa.gov/5196/)); see the main README to restore it |
+| `09_el_nino` | `09_SST_Anomaly/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4` and its `colorbar.jpg` ([5176](https://svs.gsfc.nasa.gov/5176/)) |
 | `07_lightning` | `iss_lightning_sos_yearly_07312023_2048p60.mp4`, the flat Science On a Sphere version ([5011](https://svs.gsfc.nasa.gov/5011/)); the turning-globe `iss_lightning_sphere_*.mp4` cannot be read this way |
 
 ## Explaining it to the judges

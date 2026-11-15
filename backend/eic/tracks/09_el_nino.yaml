@@ -1,0 +1,56 @@
+# Track 8, El Niño: NASA's sea surface temperature anomaly film read back into degrees C, one map a
+# month: each month of 2025, then the same month of 2026, back to back ("then and now").
+# See pipeline/tracks/sst_anomaly.py. Reads the film and its colour bar from EJ_RESOURCES (data/eic).
+id: 09_el_nino
+title: "El Niño: then and now, sea surface temperature 2025 and 2026"
+short: "El Niño"
+builder: sst_anomaly
+chapter: anomaly
+label: "Each month of 2025, then the same month of 2026"
+
+start: "2024-05-18"            # NASA's date stamp on frame 0; one day a frame (frame 499 says 29 Sep 2025)
+months: ["2025-01", "2026-01", "2025-02", "2026-02", "2025-03", "2026-03", "2025-04", "2026-04",
+         "2025-05", "2026-05", "2025-06", "2026-06", "2025-07", "2026-07", "2025-08", "2026-08",
+         "2025-09", "2026-09", "2025-10", "2026-10", "2025-11", "2026-11"]
+colour_bar:
+  file: 09_SST_Anomaly/colorbar.jpg   # NASA's bar from the SVS 5176 page, 1024 x 512
+  box: [129, 248, 896, 263]           # x from -4 to +4 degrees C; rows clear of the tick marks
+  range: [-4, 4]
+  max_dist: 14                        # Lab distance; colours farther from the bar (land, ice, text) have no reading
+date_box: [0, 0.895, 0.148, 1.0]      # NASA's date stamp, bottom left, as fractions of the frame
+scale: 4                              # degrees C that count as 1 in the sound: the end of NASA's bar
+min_days: 0.5                         # a pixel needs a reading on at least half the month's days
+min_share: 0.3                        # a 3 degree cell needs a reading in at least 30% of its pixels
+el_nino_line: 0.5                     # NOAA's El Niño threshold, on the relative Niño 3.4
+media: {width: 1440, height: 720, webp_quality: 80}
+playback: {seconds_per_sweep: 12}
+
+source:
+  video: 09_SST_Anomaly/sst_anomaly_30_sec_4096x2048_2x1_30p.mp4   # under EJ_RESOURCES (data/eic)
+  svs_id: 5176
+  url: https://svs.gsfc.nasa.gov/5176/
+  svs_title: "Sea Surface Temperature (SST) Anomaly, Near Real Time"
+  credit: "NASA's Scientific Visualization Studio"
+  dataset: "MUR SST v4.1 (NASA JPL PO.DAAC)"
+
+legend:
+  summary: >
+    A scan line moves west to east across NASA's map of how much warmer or cooler than normal the
+    sea is, one map a month: each month of 2025, then the same month of 2026.
+  method: >
+    Only what is under the scan line plays. Where the sea is much warmer than normal, a rising pair
+    of notes rings; where it is much cooler, a low cello falls. North rings higher and in your left
+    ear, south lower and in your right. A deep hum grows with how far from normal the sea under the
+    line is, warm or cool, and is silent over land. Listen for the middle of the Pacific: in 2026,
+    El Niño warms it.
+  items:
+    - sound: "Rising pair of notes"
+      meaning: "Sea at least 1.2 degrees C warmer than normal for the time of year. A pair from 2 degrees. Louder = warmer."
+    - sound: "Low falling cello"
+      meaning: "Sea at least 1.2 degrees C cooler than normal. Louder = cooler."
+    - sound: "Deep hum"
+      meaning: "How far from normal the sea under the line is, warm or cool. Silent over land and sea ice."
+  caveat: >
+    Each map is the average of every daily map NASA made that month (November 2026: 1 to 4
+    November, the end of NASA's film). Values are read from NASA's colour bar, -4 to +4 degrees C,
+    so anything beyond reads as 4. Normal means the average for that day of the year.

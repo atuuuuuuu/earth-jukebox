@@ -179,6 +179,29 @@
         "calm": "There is little water vapour in the picture.",
         "note": "kalimba note"
       }
+    },
+    {
+      "id": "el-nino",
+      "code": "8",
+      "title": "El Niño: then and now",
+      "subtitle": "Sea temperature, 2025 and 2026",
+      "description": "NASA's map of how much warmer or cooler than normal the sea is, one map a month: each month of 2025, then the same month of 2026. A rising pair of notes is sea much warmer than normal; a low falling cello, much cooler. Listen to the middle of the Pacific: in 2026, El Niño warms it.",
+      "data": "data/09_el_nino.json",
+      "chapter": "anomaly",
+      "units": "degrees C from normal",
+      "range": [
+        -4,
+        4
+      ],
+      "hotLine": 1.0,
+      "words": {
+        "subject": "ocean",
+        "map": "map of sea temperature compared with normal",
+        "dates": "month",
+        "what": "difference from normal",
+        "top": "largest",
+        "missing": "land or sea ice, so there is no sea temperature here. Try a place at sea."
+      }
     }
   ]
 }

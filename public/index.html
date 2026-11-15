@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Earth Jukebox: hear NASA's views of Earth</title>
-<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, an atmospheric river, carbon dioxide and lightning, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
+<meta name="description" content="NASA views of Earth at night, air pollution, ocean currents, an atmospheric river, carbon dioxide, lightning and El Niño, turned into sound. Made for blind and low-vision listeners first, and fully usable with a keyboard and a screen reader.">
 <meta name="theme-color" content="#0a0d14">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a0d14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffc861' stroke-width='2.5'/%3E%3Cpath d='M16 7v18' stroke='%23ffc861' stroke-width='2.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -258,7 +258,7 @@
       </article>
       <article aria-labelledby="how-2">
         <h3 id="how-2">Reading NASA's pictures</h3>
-        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: a line through the middle of NASA's picture measures the bright white flow lines, ten times per second of video. Atmospheric river: every band of NASA's film is read for its blue water vapour, twenty times a second, and the date of every moment is read from NASA's own date overlay, digit by digit, because NASA's clock races, stops and replays.</p>
+        <p>No numbers are invented. Our Python scripts read NASA's own videos frame by frame. Night lights: brightness, calibrated against ten cities. Air quality: NASA shows four pollutants in strips that slide across one map; we find each strip in every frame and rebuild a whole world map for each pollutant from its colour scale. Ocean: NASA's world map of surface currents, averaged over a year, where brighter flow lines mean faster water; the guided lesson measures how NASA's flow lines move off Florida. El Niño: every daily sea temperature map is read back into degrees from NASA's own colour bar and averaged by month; September 2026 matches NOAA's El Niño index (+2.05 against +2.1 degrees). Atmospheric river: every band of NASA's film is read for its blue water vapour, twenty times a second, and the date of every moment is read from NASA's own date overlay, digit by digit, because NASA's clock races, stops and replays.</p>
       </article>
       <article aria-labelledby="how-3">
         <h3 id="how-3">Turning numbers into sound</h3>
@@ -280,13 +280,13 @@
 
 <footer class="site-foot">
   <div class="wrap">
-    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality, ocean and atmospheric river tracks by Earth Jukebox.</p>
+    <p>Made for NASA Space Apps 2026, The Earth Information Jukebox. Night lights and carbon dioxide sound design and video reading by team RUSTMN, Ulaanbaatar. Air quality, ocean, atmospheric river and El Niño tracks by Earth Jukebox.</p>
     <p>Instrument samples: FluidR3_GM soundfont (CC BY 3.0) via midi-js-soundfonts. Sound: Tone.js. Globe: plain WebGL with NASA Blue Marble. Built with help from an AI coding assistant; no data, images or audio are AI-generated.</p>
   </div>
 </footer>
 
 <script src="bundle.js?v=7"></script>
-<script src="globe.js?v=13"></script>
-<script src="app.js?v=16"></script>
+<script src="globe.js?v=14"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

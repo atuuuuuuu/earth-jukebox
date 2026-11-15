@@ -3,12 +3,12 @@
 NASA Space Apps 2026, "The Earth Information Jukebox". NASA Earth Information Center videos become
 numbers (the backend), and the numbers become sound live in the browser. The tracks are the
 challenge's NASA resources (numbered as on its Resources tab) 1 and 3 (night lights), 6 (air quality),
-7 (Perpetual Ocean 2), 8 (carbon dioxide), 9 (lightning), and NASA's atmospheric river film (SVS 4960). 1, 6 and 7 come first.
+7 (Perpetual Ocean 2), 8 (carbon dioxide), 9 (lightning), NASA's atmospheric river film (SVS 4960) and NASA's sea temperature anomaly film (SVS 5176, El Niño). 1, 6 and 7 come first.
 
 ## Layout
 
 - `public/` the website: `index.html`, `styles.css`, `app.js` (the page), `lesson.js` (the guided lesson shown before the player when a score names one: ocean currents), `globe.js` (the 3D globe, plain WebGL), `bundle.js` (built: Tone.js as `EJ.Tone`, and `EJ.toWav`), `textures/` (NASA Blue Marble), `api/` (scores), `data/` (3 degree grids), `media/` (map images, the atmospheric river video), `samples/`
-- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/ocean.js` (the atmospheric river, mapping `river`, with NASA's clock). Lightning, air quality, ocean currents and carbon dioxide use the night-lights mapping (kalimba; vibraphone with a sour drone for the `pollutants` chapter; harp for the `currents` chapter). Ocean currents (NASA's flat ECCO2 film, SVS 3912) and carbon dioxide (NASA's turning globe, flattened) are one world map each, built by `backend/eic/pipeline/tracks/globe_map.py`
+- `public/sweep/` the sound engine (team RUSTMN): `sonifier.js` wraps `player.js`, `audio.js` and `tracks/night-lights.js` / `tracks/ocean.js` (the atmospheric river, mapping `river`, with NASA's clock). Lightning, air quality, ocean currents and carbon dioxide use the night-lights mapping (kalimba; vibraphone with a sour drone for the `pollutants` chapter; harp for the `currents` chapter; for the two-sided `change` and `anomaly` (El Niño) chapters a rising pair for up and a falling cello for down). Ocean currents (NASA's flat ECCO2 film, SVS 3912) and carbon dioxide (NASA's turning globe, flattened) are one world map each, built by `backend/eic/pipeline/tracks/globe_map.py`
 - `backend/eic/` team RUSTMN's pipeline: NASA videos to `public/data/*.json` and `public/media/`. One YAML per track in `backend/eic/tracks/`
 - `backend/build_sweep.py` + `backend/sweep.config.json`: grids to `public/api`. `backend/API.md` is the contract, `backend/validate_api.py` enforces it
 - `test/run.cjs` the real page by keyboard, with axe. `test/responsive.cjs` every layout from 320 to 1440 px. `backend/tests/` the score builder, the validator and the lightning correction (`npm run test:backend`)

@@ -227,7 +227,9 @@
   const onNote = (note) => {
     lastNote = note;
     buzz(Math.round(12 + 30 * (note.velocity ?? 0.5)));
-    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, note.kind === "gain" ? 1 : note.kind === "loss" ? 2 : 0);
+    // Rings: lavender new light, orange dimmed light; on the sea temperature map orange warmer, blue cooler, as NASA colours them.
+    const ring = score.sweep.chapter === "anomaly" ? { gain: 2, loss: 3 } : { gain: 1, loss: 2 };
+    if (globe && !usesVideo()) globe.ping(note.lon, note.lat, ring[note.kind] ?? 0);
   };
   const onEnd = () => {
     playing = false; setPlayButton(); idle();
